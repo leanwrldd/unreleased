@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Folder, Music2, ChevronRight, ArrowLeft, Home, Play, Loader2,
   FolderOpen, HardDrive, LayoutList, LayoutGrid, ImageIcon, Video,
-  Download, ArrowUpDown, ArrowUp, ArrowDown, Link, Check,
+  Download, ArrowUpDown, ArrowUp, ArrowDown, Link, Check, Info,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import {
@@ -133,7 +133,7 @@ function urlToPath(pathname: string): string {
 }
 
 export default function ApiFilesView(): JSX.Element {
-  const { playTrack } = useStore()
+  const { playTrack, setSearchQuery, setActiveView } = useStore()
 
   const [currentPath, setCurrentPath] = useState('')
   const [entries, setEntries] = useState<JWApiFileEntry[]>([])
@@ -221,6 +221,12 @@ export default function ApiFilesView(): JSX.Element {
   }
 
   const goHome = (): void => { setHistory([]); navigate('', true) }
+
+  const findInTracker = (entry: JWApiFileEntry): void => {
+    const title = entry.name.replace(/\.[^.]+$/, '')
+    setSearchQuery(title)
+    setActiveView('api-tracker')
+  }
 
   const copyLink = (entry: JWApiFileEntry): void => {
     const url = entry.type === 'file'
@@ -396,6 +402,7 @@ export default function ApiFilesView(): JSX.Element {
                   <div key={entry.path}
                     className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-overlay transition-colors cursor-default"
                     onClick={() => { if (isDir) navigate(entry.path); else if (isMedia) openLightbox(entry) }}
+                    onDoubleClick={() => { if (mt === 'audio') handlePlay(entry) }}
                   >
                     {/* Icon / thumbnail */}
                     <div className="relative shrink-0 w-9 h-9">
@@ -404,24 +411,16 @@ export default function ApiFilesView(): JSX.Element {
                           <Folder size={20} className="text-text-secondary group-hover:text-accent transition-colors" />
                         </div>
                       ) : mt === 'audio' ? (
-                        <>
+                        <button
+                          className="relative w-9 h-9 rounded overflow-hidden"
+                          onClick={(e) => { e.stopPropagation(); handlePlay(entry) }}
+                          title="Play"
+                        >
                           <ApiCoverThumb path={entry.path} size={36} />
-                          {/* Desktop: hover overlay */}
-                          <button
-                            className="absolute inset-0 items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded hidden md:flex"
-                            onClick={(e) => { e.stopPropagation(); handlePlay(entry) }}
-                            title="Play"
-                          >
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded">
                             {playing === entry.path ? <Loader2 size={14} className="text-white animate-spin" /> : <Play size={14} fill="white" className="text-white ml-0.5" />}
-                          </button>
-                          {/* Mobile: corner play button */}
-                          <button
-                            className="md:hidden absolute bottom-0.5 right-0.5 w-5 h-5 rounded-full bg-accent flex items-center justify-center"
-                            onClick={(e) => { e.stopPropagation(); handlePlay(entry) }}
-                          >
-                            {playing === entry.path ? <Loader2 size={10} className="text-black animate-spin" /> : <Play size={10} fill="black" className="text-black" />}
-                          </button>
-                        </>
+                          </div>
+                        </button>
                       ) : mt === 'image' ? (
                         <div className="w-9 h-9"><ApiImageThumb path={entry.path} size={36} /></div>
                       ) : mt === 'video' ? (
@@ -437,11 +436,11 @@ export default function ApiFilesView(): JSX.Element {
                     {!isDir && <span className="hidden md:inline text-[10px] uppercase tracking-wide text-text-muted bg-surface-overlay px-1.5 py-0.5 rounded shrink-0">{ext}</span>}
                     {mt === 'audio' && (
                       <button
-                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 rounded-full bg-accent flex items-center justify-center transition-opacity shrink-0"
-                        onClick={(e) => { e.stopPropagation(); handlePlay(entry) }}
-                        title="Play"
+                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 rounded-full bg-surface-raised hover:bg-surface-overlay flex items-center justify-center transition-opacity shrink-0 border border-[var(--border)]"
+                        onClick={(e) => { e.stopPropagation(); findInTracker(entry) }}
+                        title="Find in Tracker"
                       >
-                        {playing === entry.path ? <Loader2 size={13} className="text-black animate-spin" /> : <Play size={13} fill="black" className="text-black ml-0.5" />}
+                        <Info size={12} className="text-text-muted" />
                       </button>
                     )}
                     {!isDir && (
@@ -481,7 +480,11 @@ export default function ApiFilesView(): JSX.Element {
                 return (
                   <div key={entry.path}
                     className="group flex flex-col rounded-xl overflow-hidden bg-surface-overlay hover:bg-surface-raised transition-colors cursor-default"
-                    onClick={() => { if (isDir) navigate(entry.path); else if (isMedia) openLightbox(entry) }}
+                    onClick={() => {
+                      if (isDir) navigate(entry.path)
+                      else if (isMedia) openLightbox(entry)
+                      else if (mt === 'audio') handlePlay(entry)
+                    }}
                   >
                     {/* Thumb */}
                     <div className="relative w-full aspect-square bg-surface-raised flex items-center justify-center overflow-hidden">
@@ -491,14 +494,11 @@ export default function ApiFilesView(): JSX.Element {
                         <>
                           <img src={buildCoverArtUrl(entry.path)} alt="" className="w-full h-full object-cover"
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                          <button
-                            className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => { e.stopPropagation(); handlePlay(entry) }}
-                          >
-                            <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shadow-lg">
-                              {playing === entry.path ? <Loader2 size={18} className="text-black animate-spin" /> : <Play size={18} fill="black" className="text-black ml-0.5" />}
-                            </div>
-                          </button>
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            {playing === entry.path
+                              ? <Loader2 size={24} className="text-white animate-spin" />
+                              : <Play size={24} fill="white" className="text-white ml-0.5" />}
+                          </div>
                         </>
                       ) : mt === 'image' ? (
                         <>
@@ -522,9 +522,18 @@ export default function ApiFilesView(): JSX.Element {
                       ) : (
                         <span className="text-xs uppercase text-text-muted">{ext}</span>
                       )}
-                      {/* Download + copy link overlay buttons (grid) */}
+                      {/* Top-right overlay buttons (grid) */}
                       {!isDir && (
                         <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                          {mt === 'audio' && (
+                            <button
+                              className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center"
+                              onClick={(e) => { e.stopPropagation(); findInTracker(entry) }}
+                              title="Find in Tracker"
+                            >
+                              <Info size={11} className="text-white" />
+                            </button>
+                          )}
                           <button
                             className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center"
                             onClick={(e) => { e.stopPropagation(); copyLink(entry) }}

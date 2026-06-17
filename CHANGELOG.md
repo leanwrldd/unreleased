@@ -6,6 +6,13 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.2.1] — 2026-06-17
+
+- **Improve** Files: play audio by clicking the cover art or double-clicking the row — standalone play button removed
+- **New** Files: info button on audio files — searches the Tracker for that song and jumps straight to it
+
+---
+
 ## [1.2.0] — 2026-06-17
 
 - **New** Deep URL routing for Files — navigating into a folder updates the URL to /files/FolderName/SubFolder; paste or refresh any folder URL to land directly in it

@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.1',
+    date: '2026-06-17',
+    changes: [
+      { type: 'improve', text: 'Files: play audio by clicking the cover art or double-clicking the row — standalone play button removed' },
+      { type: 'new', text: 'Files: info button on audio files — searches the Tracker for that song and jumps straight to it' },
+    ]
+  },
+  {
     version: '1.2.0',
     date: '2026-06-17',
     changes: [
