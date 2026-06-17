@@ -5,7 +5,7 @@ A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com),
 > **This is the `web` branch** — API-only, no local library, deployable to any static host.  
 > For the full desktop app (Electron + local library), see the [`main` branch](https://github.com/leanwrldd/unreleased/tree/main).
 
-![Version](https://img.shields.io/badge/version-1.2.1-blue)
+![Version](https://img.shields.io/badge/version-1.2.2-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -69,6 +69,10 @@ Built by **freakylatif** — find me on Discord.
 ---
 
 ## Changelog
+
+### v1.2.2 — 2026-06-17
+- **Fix** Mobile bottom nav no longer hidden by the browser address bar — uses dynamic viewport height and safe-area insets
+- **Improve** Logo is larger in the sidebar
 
 ### v1.2.1 — 2026-06-17
 - **Improve** Files: play audio by clicking the cover art or double-clicking the row — standalone play button removed

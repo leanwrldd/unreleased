@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.2',
+    date: '2026-06-17',
+    changes: [
+      { type: 'fix', text: 'Mobile bottom nav no longer hidden by the browser address bar — uses dynamic viewport height and safe-area insets' },
+      { type: 'improve', text: 'Logo is larger in the sidebar' },
+    ]
+  },
+  {
     version: '1.2.1',
     date: '2026-06-17',
     changes: [

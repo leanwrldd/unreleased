@@ -18,7 +18,7 @@ export default function Sidebar(): JSX.Element {
       {/* Logo */}
       <div className="px-5 pt-6 pb-4">
         <div className="flex items-center gap-2">
-          <img src={logo} alt="unreleased" className="h-16 w-auto object-contain" />
+          <img src={logo} alt="unreleased" className="h-24 w-auto object-contain" />
           <span className="font-bold text-text-primary text-lg tracking-[0.08em]">unreleased</span>
         </div>
       </div>

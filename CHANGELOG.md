@@ -6,6 +6,13 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.2.2] — 2026-06-17
+
+- **Fix** Mobile bottom nav no longer hidden by the browser address bar — uses dynamic viewport height and safe-area insets
+- **Improve** Logo is larger in the sidebar
+
+---
+
 ## [1.2.1] — 2026-06-17
 
 - **Improve** Files: play audio by clicking the cover art or double-clicking the row — standalone play button removed

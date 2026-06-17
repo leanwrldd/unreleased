@@ -13,7 +13,7 @@ export default function BottomNav(): JSX.Element {
   ]
 
   return (
-    <nav className="md:hidden flex items-stretch bg-sidebar shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
+    <nav className="md:hidden flex items-stretch bg-sidebar shrink-0" style={{ borderTop: '1px solid var(--border)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       {items.map(({ icon, label, view }) => {
         const active = activeView === view
         return (

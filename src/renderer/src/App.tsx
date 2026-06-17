@@ -59,7 +59,7 @@ export default function App(): JSX.Element {
   }, [accentColor])
 
   return (
-    <div className="flex flex-col h-screen bg-surface overflow-hidden">
+    <div className="flex flex-col h-dvh bg-surface overflow-hidden">
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <main className="flex-1 overflow-hidden flex">
