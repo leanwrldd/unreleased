@@ -7,6 +7,7 @@ function getViewFromPath(pathname: string): ViewType {
   if (pathname === '/categories') return 'api-categories'
   if (pathname === '/radio') return 'api-radio'
   if (pathname === '/editor') return 'editor'
+  if (pathname === '/compilation') return 'compilation'
   return 'api-tracker'
 }
 
@@ -16,6 +17,7 @@ import ApiTrackerView from './components/ApiTrackerView'
 import ApiRadioView from './components/ApiRadioView'
 import ApiFilesView from './components/ApiFilesView'
 import ApiCategoryView from './components/ApiCategoryView'
+import ApiCompilationView from './components/ApiCompilationView'
 import EditorPage from './components/EditorPage'
 import Player from './components/Player'
 import NowPlaying from './components/NowPlaying'
@@ -71,6 +73,7 @@ export default function App(): JSX.Element {
               : activeView === 'api-files' ? <ApiFilesView />
               : activeView === 'api-categories' ? <ApiCategoryView />
               : activeView === 'editor' ? <EditorPage />
+              : activeView === 'compilation' ? <ApiCompilationView />
               : <ApiTrackerView />}
           </ErrorBoundary>
           {showNowPlaying && <ErrorBoundary><NowPlaying /></ErrorBoundary>}

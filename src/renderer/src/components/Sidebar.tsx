@@ -1,4 +1,4 @@
-import { LayoutDashboard, SearchCode, Radio, HardDrive, Settings, Github, MessageCircle } from 'lucide-react'
+import { LayoutDashboard, SearchCode, Radio, HardDrive, Settings, Github, MessageCircle, Archive } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
@@ -10,6 +10,7 @@ export default function Sidebar(): JSX.Element {
     { icon: <LayoutDashboard size={18} />, label: 'Categories', view: 'api-categories' },
     { icon: <SearchCode size={18} />, label: 'Tracker', view: 'api-tracker' },
     { icon: <Radio size={18} />, label: 'Radio', view: 'api-radio' },
+    { icon: <Archive size={18} />, label: 'Compilation', view: 'compilation' },
     { icon: <HardDrive size={18} />, label: 'Files', view: 'api-files' },
   ]
 

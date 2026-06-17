@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.8',
+    date: '2026-06-17',
+    changes: [
+      { type: 'new', text: 'Compilation tab — browse released discography, unreleased, and singles with album grid and track file list views' },
+      { type: 'fix', text: 'Song info modal: duration no longer duplicated, empty fields hidden, unsurfaced songs without files have no play button' },
+      { type: 'improve', text: 'Song info modal UI overhaul — blurred hero backdrop with cover art, clean label/value rows, and grouped sections' },
+    ]
+  },
+  {
     version: '1.2.7',
     date: '2026-06-17',
     changes: [
