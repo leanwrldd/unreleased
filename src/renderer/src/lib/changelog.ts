@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.6',
+    date: '2026-06-17',
+    changes: [
+      { type: 'fix', text: 'Radio: unsurfaced songs also excluded — only released and unreleased songs play (unsurfaced have no audio files)' },
+      { type: 'new', text: 'Contribute: Album field added — editor-entered only, not pulled from the API' },
+    ]
+  },
+  {
     version: '1.3.5',
     date: '2026-06-17',
     changes: [

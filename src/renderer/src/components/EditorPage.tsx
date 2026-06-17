@@ -65,6 +65,7 @@ export default function EditorPage(): JSX.Element {
   // ── Correction fields (pre-filled from API, editable) ─────────────────────
   const [correctedTitle, setCorrectedTitle] = useState('')
   const [correctedArtist, setCorrectedArtist] = useState('')
+  const [correctedAlbum, setCorrectedAlbum] = useState('')
   const [correctedEra, setCorrectedEra] = useState('')
   const [correctedCategory, setCorrectedCategory] = useState('')
   const [verifiedProducers, setVerifiedProducers] = useState('')
@@ -86,7 +87,7 @@ export default function EditorPage(): JSX.Element {
   const canEdit = supabaseReady && (userProfile?.role === 'editor' || userProfile?.role === 'admin')
 
   const resetForm = (): void => {
-    setCorrectedTitle(''); setCorrectedArtist(''); setCorrectedEra('')
+    setCorrectedTitle(''); setCorrectedArtist(''); setCorrectedAlbum(''); setCorrectedEra('')
     setCorrectedCategory(''); setVerifiedProducers(''); setVerifiedEngineers('')
     setVerifiedReleaseDate(''); setVerifiedRecordingDate(''); setVerifiedLocation('')
     setVerifiedLeakType(''); setContext(''); setSampleInfo(''); setTrivia('')
@@ -122,6 +123,7 @@ export default function EditorPage(): JSX.Element {
       if (sup) {
         if (sup.corrected_title) setCorrectedTitle(sup.corrected_title)
         if (sup.corrected_artist) setCorrectedArtist(sup.corrected_artist)
+        if (sup.corrected_album) setCorrectedAlbum(sup.corrected_album)
         if (sup.corrected_era) setCorrectedEra(sup.corrected_era)
         if (sup.corrected_category) setCorrectedCategory(sup.corrected_category)
         if (sup.verified_producers) setVerifiedProducers(sup.verified_producers)
@@ -170,6 +172,7 @@ export default function EditorPage(): JSX.Element {
     const result = await upsertSupplement(selected.id, {
       corrected_title: correctedTitle || null,
       corrected_artist: correctedArtist || null,
+      corrected_album: correctedAlbum || null,
       corrected_era: correctedEra || null,
       corrected_category: correctedCategory || null,
       verified_producers: verifiedProducers || null,
@@ -318,6 +321,7 @@ export default function EditorPage(): JSX.Element {
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Title" value={correctedTitle} onChange={setCorrectedTitle} />
                   <Field label="Artist" value={correctedArtist} onChange={setCorrectedArtist} />
+                  <Field label="Album" value={correctedAlbum} onChange={setCorrectedAlbum} hint="editor-only, not in API" placeholder="e.g. Goodbye & Good Riddance" />
                   <Field label="Era" value={correctedEra} onChange={setCorrectedEra} />
                   <Field label="Category" value={correctedCategory} onChange={setCorrectedCategory} placeholder="Released / Unreleased / Unsurfaced / Session" />
                 </div>

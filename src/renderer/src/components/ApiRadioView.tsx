@@ -18,8 +18,8 @@ export default function ApiRadioView(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [hasPlayed, setHasPlayed] = useState(false)
 
-  // Playable categories — recording_session is never included
-  const PLAYABLE = ['released', 'unreleased', 'unsurfaced'] as const
+  // Playable categories — unsurfaced and recording_session have no audio files
+  const PLAYABLE = ['released', 'unreleased'] as const
 
   const fetchRandom = useCallback(async (autoPlay = false): Promise<void> => {
     setLoading(true)

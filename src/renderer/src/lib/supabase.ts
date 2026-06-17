@@ -29,6 +29,7 @@ export interface SongSupplement {
   // Corrections (override API data)
   corrected_title: string | null
   corrected_artist: string | null
+  corrected_album: string | null
   corrected_era: string | null
   corrected_category: string | null
   verified_leak_type: string | null
