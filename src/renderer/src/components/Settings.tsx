@@ -44,7 +44,7 @@ export default function Settings(): JSX.Element {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => { if (e.target === overlayRef.current) setShowSettings(false) }}
     >
-      <div className="bg-surface border border-[var(--border)] rounded-2xl shadow-2xl w-[520px] max-h-[80vh] flex flex-col overflow-hidden">
+      <div className="bg-surface border border-[var(--border)] rounded-2xl shadow-2xl w-full max-w-[520px] mx-3 max-h-[88vh] md:max-h-[80vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
           <h2 className="text-text-primary font-bold text-lg">Settings</h2>

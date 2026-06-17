@@ -74,7 +74,7 @@ export default function NowPlaying(): JSX.Element {
           {/* Album art collapsible */}
           {!artCollapsed && (
             <div className="px-6 shrink-0">
-              <div className="aspect-square w-full rounded-xl overflow-hidden bg-surface-overlay shadow-2xl">
+              <div className={`${isMobile ? 'h-48' : 'aspect-square'} w-full rounded-xl overflow-hidden bg-surface-overlay shadow-2xl`}>
                 {currentTrackFull?.albumArt ? (
                   <img
                     src={currentTrackFull.albumArt}

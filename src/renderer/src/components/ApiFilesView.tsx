@@ -363,12 +363,20 @@ export default function ApiFilesView(): JSX.Element {
                       ) : mt === 'audio' ? (
                         <>
                           <ApiCoverThumb path={entry.path} size={36} />
+                          {/* Desktop: hover overlay */}
                           <button
-                            className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded"
+                            className="absolute inset-0 items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded hidden md:flex"
                             onClick={(e) => { e.stopPropagation(); handlePlay(entry) }}
                             title="Play"
                           >
                             {playing === entry.path ? <Loader2 size={14} className="text-white animate-spin" /> : <Play size={14} fill="white" className="text-white ml-0.5" />}
+                          </button>
+                          {/* Mobile: corner play button */}
+                          <button
+                            className="md:hidden absolute bottom-0.5 right-0.5 w-5 h-5 rounded-full bg-accent flex items-center justify-center"
+                            onClick={(e) => { e.stopPropagation(); handlePlay(entry) }}
+                          >
+                            {playing === entry.path ? <Loader2 size={10} className="text-black animate-spin" /> : <Play size={10} fill="black" className="text-black" />}
                           </button>
                         </>
                       ) : mt === 'image' ? (
@@ -381,12 +389,12 @@ export default function ApiFilesView(): JSX.Element {
                     </div>
                     <span className={`flex-1 text-sm truncate ${isDir ? 'text-text-primary font-medium cursor-pointer' : 'text-text-secondary'}`}>{entry.name}</span>
                     {!isDir && entry.size != null && (
-                      <span className="text-text-muted text-xs shrink-0 w-14 text-right">{(entry.size / 1_048_576).toFixed(1)} MB</span>
+                      <span className="hidden md:inline text-text-muted text-xs shrink-0 w-14 text-right">{(entry.size / 1_048_576).toFixed(1)} MB</span>
                     )}
-                    {!isDir && <span className="text-[10px] uppercase tracking-wide text-text-muted bg-surface-overlay px-1.5 py-0.5 rounded shrink-0">{ext}</span>}
+                    {!isDir && <span className="hidden md:inline text-[10px] uppercase tracking-wide text-text-muted bg-surface-overlay px-1.5 py-0.5 rounded shrink-0">{ext}</span>}
                     {mt === 'audio' && (
                       <button
-                        className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-accent flex items-center justify-center transition-opacity shrink-0"
+                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 rounded-full bg-accent flex items-center justify-center transition-opacity shrink-0"
                         onClick={(e) => { e.stopPropagation(); handlePlay(entry) }}
                         title="Play"
                       >
@@ -395,7 +403,7 @@ export default function ApiFilesView(): JSX.Element {
                     )}
                     {!isDir && (
                       <button
-                        className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-full bg-surface-raised hover:bg-surface-overlay flex items-center justify-center transition-opacity shrink-0 border border-[var(--border)]"
+                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 rounded-full bg-surface-raised hover:bg-surface-overlay flex items-center justify-center transition-opacity shrink-0 border border-[var(--border)]"
                         onClick={(e) => { e.stopPropagation(); handleDownload(entry) }}
                         title="Download"
                       >

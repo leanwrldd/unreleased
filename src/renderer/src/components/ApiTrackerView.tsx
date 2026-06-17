@@ -27,7 +27,7 @@ function formatDur(secs: number): string {
 
 // ─── Stats bar ────────────────────────────────────────────────────────────────
 function StatsBar({ stats }: { stats: JWApiStats | null }): JSX.Element {
-  if (!stats) return <div className="h-12 bg-surface-raised animate-pulse rounded-xl mb-4" />
+  if (!stats) return <div className="h-8 bg-surface-raised animate-pulse rounded-xl mb-3" />
   const cats: [string, number][] = [
     ['Released', stats.category_stats.released],
     ['Unreleased', stats.category_stats.unreleased],
@@ -35,14 +35,14 @@ function StatsBar({ stats }: { stats: JWApiStats | null }): JSX.Element {
     ['Sessions', stats.category_stats.recording_session],
   ]
   return (
-    <div className="flex items-center gap-3 mb-4 px-1">
-      <div className="flex items-center gap-1.5">
-        <span className="text-text-primary font-bold text-lg">{stats.total_songs.toLocaleString()}</span>
-        <span className="text-text-muted text-xs">songs total</span>
+    <div className="flex items-center gap-3 mb-3 px-1 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className="text-text-primary font-bold text-base">{stats.total_songs.toLocaleString()}</span>
+        <span className="text-text-muted text-xs">songs</span>
       </div>
-      <div className="w-px h-5 bg-[var(--border)]" />
+      <div className="w-px h-4 bg-[var(--border)] shrink-0" />
       {cats.map(([label, count]) => (
-        <div key={label} className="flex items-center gap-1">
+        <div key={label} className="flex items-center gap-1 shrink-0">
           <span className="text-text-muted text-xs">{label}</span>
           <span className="text-text-secondary text-xs font-medium">{count.toLocaleString()}</span>
         </div>
@@ -58,12 +58,13 @@ function SongRow({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: (
   const altTitles = song.track_titles?.slice(1) ?? []
 
   return (
-    <div className="group flex items-center gap-3 px-3 py-2 hover:bg-surface-overlay rounded-lg transition-colors cursor-default">
+    <div className="group flex items-center gap-3 px-3 py-2.5 md:py-2 hover:bg-surface-overlay active:bg-surface-overlay rounded-lg transition-colors cursor-default">
       {/* Cover art */}
-      <div className="relative shrink-0 w-9 h-9 rounded overflow-hidden bg-surface-overlay">
+      <div className="relative shrink-0 w-10 h-10 md:w-9 md:h-9 rounded overflow-hidden bg-surface-overlay">
         <AlbumArtThumbnail track={track} size={36} shimmer={false} />
+        {/* Desktop: hover overlay play button */}
         <button
-          className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute inset-0 items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
           onClick={() => onPlay(song)}
           title="Play"
         >
@@ -71,31 +72,40 @@ function SongRow({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: (
         </button>
       </div>
 
-      {/* Title + alt titles */}
+      {/* Title + mobile subtitle */}
       <div className="flex-1 min-w-0">
         <p className="text-text-primary text-sm font-medium truncate">{title}</p>
+        {/* Mobile: artist + era under title */}
+        <p className="md:hidden text-text-muted text-xs truncate mt-0.5">
+          {song.credited_artists || 'Juice WRLD'}
+          {song.era?.name ? ` · ${song.era.name}` : ''}
+        </p>
+        {/* Desktop: alt titles */}
         {altTitles.length > 0 && (
-          <p className="text-text-muted text-xs truncate">{altTitles.join(' · ')}</p>
+          <p className="hidden md:block text-text-muted text-xs truncate">{altTitles.join(' · ')}</p>
         )}
       </div>
 
-      {/* Artist */}
-      <span className="text-text-muted text-xs truncate w-32 shrink-0">{song.credited_artists || 'Juice WRLD'}</span>
-
-      {/* Era */}
-      <span className="text-text-muted text-xs truncate w-36 shrink-0">{song.era?.name ?? '—'}</span>
-
-      {/* Category badge — clickable */}
+      {/* Desktop-only columns */}
+      <span className="hidden md:block text-text-muted text-xs truncate w-32 shrink-0">{song.credited_artists || 'Juice WRLD'}</span>
+      <span className="hidden md:block text-text-muted text-xs truncate w-36 shrink-0">{song.era?.name ?? '—'}</span>
       <button
         onClick={onCategoryClick}
-        className="text-xs px-1.5 py-0.5 rounded bg-surface-overlay text-text-muted shrink-0 w-24 text-center hover:bg-surface-raised hover:text-accent transition-colors"
+        className="hidden md:block text-xs px-1.5 py-0.5 rounded bg-surface-overlay text-text-muted shrink-0 w-24 text-center hover:bg-surface-raised hover:text-accent transition-colors"
         title="Go to Categories"
       >
         {CATEGORY_LABELS[song.category] ?? song.category}
       </button>
+      <span className="hidden md:block text-text-muted text-xs w-10 text-right shrink-0">{formatDur(parseDuration(song.length))}</span>
 
-      {/* Duration */}
-      <span className="text-text-muted text-xs w-10 text-right shrink-0">{formatDur(parseDuration(song.length))}</span>
+      {/* Mobile: play button */}
+      <button
+        className="md:hidden p-2 text-text-muted active:text-accent transition-colors shrink-0"
+        onClick={() => onPlay(song)}
+        title="Play"
+      >
+        <Play size={17} />
+      </button>
     </div>
   )
 }
@@ -110,14 +120,22 @@ function SongCard({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: 
       {/* Cover art */}
       <div className="relative w-full aspect-square bg-surface-raised">
         <AlbumArtThumbnail track={track} size={160} shimmer={false} />
+        {/* Desktop: hover overlay */}
         <button
-          className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute inset-0 items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
           onClick={() => onPlay(song)}
           title="Play"
         >
           <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shadow-lg">
             <Play size={18} fill="black" className="text-black ml-0.5" />
           </div>
+        </button>
+        {/* Mobile: always-visible play button in corner */}
+        <button
+          className="md:hidden absolute bottom-1.5 right-1.5 w-8 h-8 rounded-full bg-accent flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+          onClick={() => onPlay(song)}
+        >
+          <Play size={14} fill="black" className="text-black ml-0.5" />
         </button>
       </div>
 
@@ -147,8 +165,6 @@ function SongCard({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: 
 // ─── Jump-to-page input ───────────────────────────────────────────────────────
 function PageJumper({ page, totalPages, onJump }: { page: number; totalPages: number; onJump: (p: number) => void }): JSX.Element {
   const [value, setValue] = useState(String(page))
-
-  // Keep in sync when page changes externally
   useEffect(() => { setValue(String(page)) }, [page])
 
   const commit = (): void => {
@@ -163,7 +179,7 @@ function PageJumper({ page, totalPages, onJump }: { page: number; totalPages: nu
   return (
     <div className="flex items-center gap-1 text-xs text-text-muted">
       <input
-        type="text"
+        type="text" inputMode="numeric"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onBlur={commit}
@@ -205,47 +221,29 @@ export default function ApiTrackerView(): JSX.Element {
   const [category, setCategory] = useState<Category>('')
   const [era, setEra] = useState('')
 
-  // Apply category/era filter drilled from CategoryView, then clear from store
   useEffect(() => {
-    if (apiTrackerCategory) {
-      setCategory(apiTrackerCategory as Category)
-      setApiTrackerCategory('')
-    }
-    if (apiTrackerEra) {
-      setEra(apiTrackerEra)
-      setApiTrackerEra('')
-    }
+    if (apiTrackerCategory) { setCategory(apiTrackerCategory as Category); setApiTrackerCategory('') }
+    if (apiTrackerEra) { setEra(apiTrackerEra); setApiTrackerEra('') }
   }, [])
 
-  const handleCategoryClick = useCallback(() => {
-    setActiveView('api-categories')
-  }, [setActiveView])
-
+  const handleCategoryClick = useCallback(() => { setActiveView('api-categories') }, [setActiveView])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Load stats + eras once
   useEffect(() => {
     apiFetch<JWApiStats>('/stats/').then(setStats).catch(console.error)
-    // /eras/ may return a plain array or a paginated {results: [...]} object
     apiFetch<JWApiEra[] | { results: JWApiEra[] }>('/eras/')
       .then((data) => setEras(Array.isArray(data) ? data : (data as { results: JWApiEra[] }).results ?? []))
       .catch(console.error)
   }, [])
 
-  // Debounce search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      setDebouncedSearch(search)
-      setPage(1)
-    }, 400)
+    debounceRef.current = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [search])
 
-  // Reset page on filter change
   useEffect(() => { setPage(1) }, [category, era])
 
-  // Fetch songs
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -257,12 +255,7 @@ export default function ApiTrackerView(): JSX.Element {
       page,
       page_size: PAGE_SIZE,
     })
-      .then((data) => {
-        if (!cancelled) {
-          setSongs(data.results)
-          setCount(data.count)
-        }
-      })
+      .then((data) => { if (!cancelled) { setSongs(data.results); setCount(data.count) } })
       .catch((err) => { if (!cancelled) setError(err.message) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -273,7 +266,6 @@ export default function ApiTrackerView(): JSX.Element {
     playTrack(track, [track])
   }, [playTrack])
 
-  // Group songs by album field when toggle is on
   const groupedSongs = useMemo(() => {
     if (!groupByAlbum) return null
     const groups = new Map<string, JWApiSong[]>()
@@ -290,21 +282,21 @@ export default function ApiTrackerView(): JSX.Element {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {/* Header */}
-      <div className="px-5 pt-5 pb-3 shrink-0">
+      <div className="px-4 md:px-5 pt-4 md:pt-5 pb-3 shrink-0">
         <h1 className="text-text-primary text-xl font-bold mb-1">Tracker</h1>
         <StatsBar stats={stats} />
 
-        {/* Filters + view toggle */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[180px]">
+        {/* Filters */}
+        <div className="flex flex-col gap-2">
+          {/* Search — full width */}
+          <div className="relative w-full">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
             <input
               type="text"
               placeholder="Search songs, artists, producers…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-surface-overlay text-text-primary text-sm pl-8 pr-8 py-2 rounded-lg outline-none focus:ring-1 ring-accent border border-transparent focus:border-accent/40 placeholder:text-text-muted"
+              className="w-full bg-surface-overlay text-text-primary text-sm pl-8 pr-8 py-2.5 md:py-2 rounded-lg outline-none focus:ring-1 ring-accent border border-transparent focus:border-accent/40 placeholder:text-text-muted"
             />
             {search && (
               <button
@@ -316,68 +308,67 @@ export default function ApiTrackerView(): JSX.Element {
             )}
           </div>
 
-          {/* Category filter */}
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value as Category)}
-            className="bg-surface-overlay text-text-primary text-sm px-3 py-2 rounded-lg outline-none border border-transparent focus:ring-1 ring-accent focus:border-accent/40 cursor-pointer"
-          >
-            <option value="">All categories</option>
-            <option value="released">Released</option>
-            <option value="unreleased">Unreleased</option>
-            <option value="unsurfaced">Unsurfaced</option>
-            <option value="recording_session">Sessions</option>
-          </select>
-
-          {/* Era filter */}
-          <select
-            value={era}
-            onChange={(e) => setEra(e.target.value)}
-            className="bg-surface-overlay text-text-primary text-sm px-3 py-2 rounded-lg outline-none border border-transparent focus:ring-1 ring-accent focus:border-accent/40 cursor-pointer max-w-[180px]"
-          >
-            <option value="">All eras</option>
-            {(Array.isArray(eras) ? eras : []).map((e) => (
-              <option key={e.id} value={e.name}>{e.name}</option>
-            ))}
-          </select>
-
-          {/* Group by album toggle */}
-          <button
-            onClick={() => setGroupByAlbum(!groupByAlbum)}
-            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs transition-colors shrink-0 ${
-              groupByAlbum
-                ? 'bg-accent/15 text-accent border border-accent/30'
-                : 'bg-surface-overlay text-text-muted hover:text-text-secondary border border-transparent'
-            }`}
-            title="Group by album/era"
-          >
-            <Layers size={13} />
-            By album
-          </button>
-
-          {/* View mode toggle */}
-          <div className="flex items-center bg-surface-overlay rounded-lg p-0.5 shrink-0">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
-              title="List view"
+          {/* Second row: selects + toggles */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as Category)}
+              className="flex-1 min-w-0 bg-surface-overlay text-text-primary text-sm px-3 py-2.5 md:py-2 rounded-lg outline-none border border-transparent focus:ring-1 ring-accent focus:border-accent/40 cursor-pointer"
             >
-              <LayoutList size={15} />
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
-              title="Grid view"
+              <option value="">All categories</option>
+              <option value="released">Released</option>
+              <option value="unreleased">Unreleased</option>
+              <option value="unsurfaced">Unsurfaced</option>
+              <option value="recording_session">Sessions</option>
+            </select>
+
+            <select
+              value={era}
+              onChange={(e) => setEra(e.target.value)}
+              className="flex-1 min-w-0 bg-surface-overlay text-text-primary text-sm px-3 py-2.5 md:py-2 rounded-lg outline-none border border-transparent focus:ring-1 ring-accent focus:border-accent/40 cursor-pointer"
             >
-              <LayoutGrid size={15} />
+              <option value="">All eras</option>
+              {(Array.isArray(eras) ? eras : []).map((e) => (
+                <option key={e.id} value={e.name}>{e.name}</option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => setGroupByAlbum(!groupByAlbum)}
+              className={`flex items-center gap-1.5 px-2.5 py-2.5 md:py-2 rounded-lg text-xs transition-colors shrink-0 ${
+                groupByAlbum
+                  ? 'bg-accent/15 text-accent border border-accent/30'
+                  : 'bg-surface-overlay text-text-muted hover:text-text-secondary border border-transparent'
+              }`}
+              title="Group by album/era"
+            >
+              <Layers size={13} />
+              <span className="hidden sm:inline">By album</span>
             </button>
+
+            <div className="flex items-center bg-surface-overlay rounded-lg p-0.5 shrink-0">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 md:p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
+                title="List view"
+              >
+                <LayoutList size={16} md-size={15} />
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 md:p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
+                title="Grid view"
+              >
+                <LayoutGrid size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Column headers (list mode only) */}
+      {/* Column headers — desktop list only */}
       {viewMode === 'list' && (
-        <div className="px-5 pb-1 shrink-0">
+        <div className="hidden md:block px-5 pb-1 shrink-0">
           <div className="flex items-center gap-3 px-3 py-1 text-xs text-text-muted font-medium uppercase tracking-wider">
             <div className="w-9 shrink-0" />
             <div className="flex-1">Title</div>
@@ -390,7 +381,7 @@ export default function ApiTrackerView(): JSX.Element {
       )}
 
       {/* Song list / grid */}
-      <div className="flex-1 overflow-y-auto px-5 pb-4">
+      <div className="flex-1 overflow-y-auto px-3 md:px-5 pb-4">
         {loading ? (
           <div className="flex items-center justify-center h-40 gap-2 text-text-muted">
             <Loader2 size={18} className="animate-spin" />
@@ -435,7 +426,7 @@ export default function ApiTrackerView(): JSX.Element {
                     {albumName}
                     <span className="ml-2 font-normal opacity-60">{groupSongs.length}</span>
                   </p>
-                  <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
+                  <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
                     {groupSongs.map((song) => (
                       <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} />
                     ))}
@@ -444,7 +435,7 @@ export default function ApiTrackerView(): JSX.Element {
               ))}
             </div>
           ) : (
-            <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
+            <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
               {songs.map((song) => (
                 <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} />
               ))}
@@ -455,7 +446,7 @@ export default function ApiTrackerView(): JSX.Element {
 
       {/* Pagination */}
       {!loading && totalPages > 1 && (
-        <div className="px-5 py-3 shrink-0 border-t border-[var(--border)] flex items-center justify-between">
+        <div className="px-4 md:px-5 py-3 shrink-0 border-t border-[var(--border)] flex items-center justify-between gap-2">
           <span className="text-text-muted text-xs">
             {((page - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(page * PAGE_SIZE, count).toLocaleString()} of {count.toLocaleString()}
           </span>
@@ -463,7 +454,7 @@ export default function ApiTrackerView(): JSX.Element {
             <button
               disabled={page === 1}
               onClick={() => setPage((p) => p - 1)}
-              className="p-1.5 rounded-lg hover:bg-surface-overlay disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              className="p-2 rounded-lg hover:bg-surface-overlay disabled:opacity-30 disabled:pointer-events-none transition-colors"
             >
               <ChevronLeft size={16} className="text-text-muted" />
             </button>
@@ -471,7 +462,7 @@ export default function ApiTrackerView(): JSX.Element {
             <button
               disabled={page === totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="p-1.5 rounded-lg hover:bg-surface-overlay disabled:opacity-30 disabled:pointer-events-none transition-colors"
+              className="p-2 rounded-lg hover:bg-surface-overlay disabled:opacity-30 disabled:pointer-events-none transition-colors"
             >
               <ChevronRight size={16} className="text-text-muted" />
             </button>
