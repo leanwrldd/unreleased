@@ -5,7 +5,7 @@ A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com),
 > **This is the `web` branch** — API-only, no local library, deployable to any static host.  
 > For the full desktop app (Electron + local library), see the [`main` branch](https://github.com/leanwrldd/unreleased/tree/main).
 
-![Version](https://img.shields.io/badge/version-1.3.9-blue)
+![Version](https://img.shields.io/badge/version-1.4.0-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -16,7 +16,6 @@ A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com),
 ## Features
 
 - **Tracker** — search, filter, and sort thousands of songs by category, era, and column headers; collapsible category sidebar
-- **Radio mode** — toggle in the player bar; a fresh random queue loads when the current one ends
 - **File browser** — navigate the API filesystem, stream audio, and download files
 - **Now Playing panel** — album art, lyrics (fetched from the API), and track info
 - **Queue** — add songs from any view, reorder, clear
@@ -70,6 +69,12 @@ Built by **freakylatif** — find me on Discord.
 ---
 
 ## Changelog
+
+### v1.4.0 — 2026-06-18
+- **Fix** Radio feature removed — radio tab and toggle button no longer appear
+- **Fix** Repeat-one: track info (title, artist, cover art) no longer disappears when a song replays
+- **Fix** Files / Compilation: artist and cover art now show reliably; broken cover art falls back to music note icon
+- **Fix** Tracker: track names no longer disappear when the Now Playing panel opens
 
 ### v1.3.9 — 2026-06-18
 - **New** Radio mode: radio is now a toggle button (📻) in the player bar — when on, a fresh random queue loads when the current queue ends; dedicated radio tab removed

@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.4.0',
+    date: '2026-06-18',
+    changes: [
+      { type: 'fix', text: 'Radio feature removed — radio tab and toggle button no longer appear; radio-related code fully cleaned up' },
+      { type: 'fix', text: 'When a song replays on repeat-one, track info (title, artist, cover art) no longer disappears' },
+      { type: 'fix', text: 'Playing from Files or Compilation: artist and cover art now show reliably; broken cover art falls back to music note icon instead of a blank square' },
+      { type: 'fix', text: 'Tracker: track names no longer disappear when the Now Playing panel opens alongside the song list' },
+    ]
+  },
+  {
     version: '1.3.9',
     date: '2026-06-18',
     changes: [

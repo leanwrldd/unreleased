@@ -1,4 +1,4 @@
-import { SearchCode, Radio, HardDrive, Settings, Archive, ShieldCheck } from 'lucide-react'
+import { SearchCode, HardDrive, Settings, Archive, ShieldCheck } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
 
@@ -8,7 +8,6 @@ export default function BottomNav(): JSX.Element {
 
   const items: { icon: React.ReactNode; label: string; view: ViewType }[] = [
     { icon: <SearchCode size={24} />, label: 'Tracker', view: 'api-tracker' },
-    { icon: <Radio size={24} />, label: 'Radio', view: 'api-radio' },
     { icon: <Archive size={24} />, label: 'Compilation', view: 'compilation' },
     { icon: <HardDrive size={24} />, label: 'Files', view: 'api-files' },
   ]

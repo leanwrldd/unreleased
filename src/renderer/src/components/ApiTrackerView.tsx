@@ -217,7 +217,7 @@ function SongRow({
       </div>
 
       {/* Title */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-[100px]">
         <p className="text-text-primary text-sm font-medium truncate">{title}</p>
         <p className="md:hidden text-text-muted text-xs truncate mt-0.5">
           {song.credited_artists || 'Juice WRLD'}

@@ -15,11 +15,10 @@ import {
   Heart,
   ChevronUp,
   Check,
-  Radio,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { formatDuration } from '../lib/lyrics'
-import { apiFetch, JWApiSong, buildRandomQueue, songToTrack } from '../lib/juicewrldApi'
+import { apiFetch, JWApiSong } from '../lib/juicewrldApi'
 import { FullTrack } from '../types'
 
 let _seek: ((t: number) => void) | null = null
@@ -61,9 +60,6 @@ export default function Player(): JSX.Element {
     likedTrackIds,
     toggleLike,
     setActiveView,
-    radioMode,
-    setRadioMode,
-    playTrack,
   } = useStore()
 
   // Two audio slots — ping-pong between them for crossfade
@@ -134,32 +130,31 @@ export default function Player(): JSX.Element {
     return () => { _seek = null }
   }, []) // stable — only depends on refs
 
-  // Load full metadata when track changes
+  // Load full metadata when track changes or currentTrackFull is cleared
   useEffect(() => {
     if (!currentTrack) return
-    if (currentTrack.streamUrl) {
-      // API-sourced track — build synthetic FullTrack immediately so cover art shows
-      const synthetic: FullTrack = {
-        ...currentTrack,
-        albumArt: currentTrack.imageUrl ?? null,
-        lyrics: null,
-        syncedLyrics: null,
-        producer: null,
-        notes: null,
-        ext: '',
-      }
-      setCurrentTrackFull(synthetic)
-      // Fetch lyrics from API if this is a tracker song (id = "jw-{n}")
-      const match = currentTrack.id.match(/^jw-(\d+)$/)
-      if (match) {
-        apiFetch<JWApiSong>(`/songs/${match[1]}/`)
-          .then((song) => {
-            if (song.lyrics) setCurrentTrackFull({ ...synthetic, lyrics: song.lyrics })
-          })
-          .catch(() => {/* no lyrics — that's fine */})
-      }
+    if (currentTrackFull) return  // already populated — skip
+    // Build synthetic FullTrack immediately so cover art + artist show
+    const synthetic: FullTrack = {
+      ...currentTrack,
+      albumArt: currentTrack.imageUrl ?? null,
+      lyrics: null,
+      syncedLyrics: null,
+      producer: null,
+      notes: null,
+      ext: '',
     }
-  }, [currentTrack?.id])
+    setCurrentTrackFull(synthetic)
+    // Fetch lyrics from API if this is a tracker song (id = "jw-{n}")
+    const match = currentTrack.id.match(/^jw-(\d+)$/)
+    if (match) {
+      apiFetch<JWApiSong>(`/songs/${match[1]}/`)
+        .then((song) => {
+          if (song.lyrics) setCurrentTrackFull({ ...synthetic, lyrics: song.lyrics })
+        })
+        .catch(() => {/* no lyrics — that's fine */})
+    }
+  }, [currentTrack?.id, currentTrackFull])
 
   // Load audio into active slot when track changes
   useEffect(() => {
@@ -317,7 +312,13 @@ export default function Player(): JSX.Element {
       // Advance the store to the next track
       if (targetIdx >= 0 && targetIdx < queue.length) {
         const track = queue[targetIdx]
-        useStore.setState({ queueIndex: targetIdx, currentTrack: track, currentTrackFull: null, isPlaying: true })
+        const isSameTrack = targetIdx === queueIndex
+        useStore.setState({
+          queueIndex: targetIdx,
+          currentTrack: track,
+          currentTrackFull: isSameTrack ? useStore.getState().currentTrackFull : null,
+          isPlaying: true,
+        })
       }
       return
     }
@@ -331,21 +332,7 @@ export default function Player(): JSX.Element {
     const prevId = currentTrack?.id
     const next = nextTrack()
     if (!next) {
-      // Radio mode: fetch a new batch and keep playing
-      if (useStore.getState().radioMode) {
-        buildRandomQueue()
-          .then((songs) => {
-            if (songs.length) {
-              const tracks = songs.map(songToTrack)
-              useStore.getState().playTrack(tracks[0], tracks)
-            } else {
-              setIsPlaying(false)
-            }
-          })
-          .catch(() => setIsPlaying(false))
-      } else {
-        setIsPlaying(false)
-      }
+      setIsPlaying(false)
       return
     }
     if (next.id === prevId) {
@@ -423,6 +410,10 @@ export default function Player(): JSX.Element {
   }
   const speedLabel = playbackSpeed === 1 ? '1x' : `${playbackSpeed}x`
 
+  // Cover art error state — reset when track changes
+  const [coverArtError, setCoverArtError] = useState(false)
+  useEffect(() => { setCoverArtError(false) }, [currentTrack?.id])
+
   // Output device picker
   const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([])
   const [showOutputPicker, setShowOutputPicker] = useState(false)
@@ -480,8 +471,8 @@ export default function Player(): JSX.Element {
             className="w-10 h-10 rounded bg-surface-overlay shrink-0 overflow-hidden"
             onClick={() => setShowNowPlaying(!showNowPlaying)}
           >
-            {(currentTrackFull?.albumArt ?? currentTrack?.imageUrl) ? (
-              <img src={currentTrackFull?.albumArt ?? currentTrack?.imageUrl} alt="" className="w-full h-full object-cover" />
+            {(!coverArtError && (currentTrackFull?.albumArt ?? currentTrack?.imageUrl)) ? (
+              <img src={currentTrackFull?.albumArt ?? currentTrack?.imageUrl} alt="" className="w-full h-full object-cover" onError={() => setCoverArtError(true)} />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-text-muted">
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -525,8 +516,8 @@ export default function Player(): JSX.Element {
             onClick={() => setShowNowPlaying(!showNowPlaying)}
             title="Now Playing"
           >
-            {(currentTrackFull?.albumArt ?? currentTrack?.imageUrl) ? (
-              <img src={currentTrackFull?.albumArt ?? currentTrack?.imageUrl} alt="Album art" className="w-full h-full object-cover" />
+            {(!coverArtError && (currentTrackFull?.albumArt ?? currentTrack?.imageUrl)) ? (
+              <img src={currentTrackFull?.albumArt ?? currentTrack?.imageUrl} alt="Album art" className="w-full h-full object-cover" onError={() => setCoverArtError(true)} />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-text-muted">
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
@@ -580,14 +571,6 @@ export default function Player(): JSX.Element {
             <button onClick={toggleRepeat}
               className={`transition-colors ${repeat !== 'none' ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}>
               {repeat === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
-            </button>
-
-            <button
-              onClick={() => setRadioMode(!radioMode)}
-              title={radioMode ? 'Radio on — random queue plays next' : 'Radio off'}
-              className={`transition-colors ${radioMode ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}
-            >
-              <Radio size={18} />
             </button>
           </div>
 

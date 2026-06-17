@@ -76,9 +76,6 @@ interface StoreActions {
   setLikedTrackIds: (ids: string[]) => void
   toggleLike: (trackId: string) => void
 
-  // Radio mode
-  setRadioMode: (on: boolean) => void
-
   // API extras
   setApiTrackerCategory: (cat: string) => void
   setApiTrackerEra: (era: string) => void
@@ -124,7 +121,6 @@ interface AppStore {
   session: Session | null
   userProfile: Profile | null
   pendingEditorSongId: number | null
-  radioMode: boolean
 }
 
 export const useStore = create<AppStore & StoreActions>((set, get) => ({
@@ -165,7 +161,6 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   likedTrackIds: ls.get<string[]>('likedTrackIds') ?? [],
   apiTrackerCategory: '',
   apiTrackerEra: '',
-  radioMode: false,
   session: null,
   userProfile: null,
   pendingEditorSongId: null,
@@ -222,7 +217,8 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
       }
     }
     const track = queue[nextIdx]
-    set({ queueIndex: nextIdx, currentTrack: track, currentTrackFull: null, isPlaying: true })
+    const isSameTrack = nextIdx === queueIndex
+    set({ queueIndex: nextIdx, currentTrack: track, currentTrackFull: isSameTrack ? get().currentTrackFull : null, isPlaying: true })
     return track
   },
 
@@ -244,7 +240,6 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
     const paths: Partial<Record<ViewType, string>> = {
       'api-categories': '/categories',
       'api-tracker': '/tracker',
-      'api-radio': '/radio',
       'api-files': '/files',
       'editor': '/editor',
       'compilation': '/compilation',
@@ -323,7 +318,6 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   },
 
   // ─── API extras ──────────────────────────────────────────────────────────────
-  setRadioMode: (on) => set({ radioMode: on }),
   setApiTrackerCategory: (cat) => set({ apiTrackerCategory: cat }),
   setApiTrackerEra: (era) => set({ apiTrackerEra: era }),
 
