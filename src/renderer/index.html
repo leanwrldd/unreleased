@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>unreleased</title>
+    <!-- Apply saved theme before React renders to prevent flash -->
+    <script>
+      try {
+        const t = localStorage.getItem('wavelength-theme')
+        if (t !== 'light') document.documentElement.classList.add('dark')
+      } catch(_) {
+        document.documentElement.classList.add('dark')
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
