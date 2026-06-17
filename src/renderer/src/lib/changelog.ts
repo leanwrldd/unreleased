@@ -240,4 +240,64 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '1.0.4',
     date: '2026-06-16',
     changes: [
-      { typ
+      { type: 'fix', text: 'Accent color now applies everywhere (Tailwind opacity variants fixed)' },
+      { type: 'fix', text: 'Panel resize is now smooth and glitch-free' },
+      { type: 'fix', text: 'Settings About/changelog section layout corrected' },
+      { type: 'new', text: 'Metadata editor: refresh button re-reads file tags from disk' },
+    ]
+  },
+  {
+    version: '1.0.3',
+    date: '2026-06-16',
+    changes: [
+      { type: 'new', text: 'Accent color picker with presets + custom color in Settings' },
+      { type: 'new', text: 'Dev-only version editor in Settings About section' },
+      { type: 'new', text: 'Changelog panel in Settings About section' },
+      { type: 'improve', text: 'Metadata editor completely redesigned with two-panel layout' },
+      { type: 'improve', text: 'Removed duplicate dark/light theme buttons from Settings' },
+      { type: 'fix', text: 'Progress bar now respects accent color' },
+    ]
+  },
+  {
+    version: '1.0.2',
+    date: '2026-06-16',
+    changes: [
+      { type: 'new', text: 'Audio output device selector in player bar and settings' },
+      { type: 'new', text: 'Multi-select songs with Ctrl/Shift+click, batch actions' },
+      { type: 'new', text: 'True overlapping crossfade with dual-audio ping-pong engine' },
+      { type: 'fix', text: 'Crossfade toggle animation now works correctly' },
+      { type: 'fix', text: 'Crossfade settings now persist across launches' },
+      { type: 'fix', text: 'Editing metadata no longer skips to that song' },
+      { type: 'improve', text: 'Album song list column spacing improved' },
+      { type: 'improve', text: 'Sidebar logo enlarged, window control icons smaller' },
+    ]
+  },
+  {
+    version: '1.0.1',
+    date: '2026-06-10',
+    changes: [
+      { type: 'new', text: 'Queue panel with drag-to-reorder' },
+      { type: 'new', text: 'Now Playing panel with lyrics and metadata' },
+      { type: 'new', text: 'Crossfade and sleep timer' },
+      { type: 'new', text: 'Scan filters (file extensions, min duration, excluded folders)' },
+      { type: 'new', text: 'Album art export from metadata editor' },
+      { type: 'fix', text: 'Repeat/loop mode fixed' },
+      { type: 'fix', text: 'Shuffle no longer repeats the same track' },
+      { type: 'improve', text: 'Improved fuzzy search with word-level scoring' },
+      { type: 'improve', text: 'Resizable Now Playing and Queue panels' },
+    ]
+  },
+  {
+    version: '1.0.0',
+    date: '2026-06-01',
+    changes: [
+      { type: 'new', text: 'Initial release' },
+      { type: 'new', text: 'Library management with folder scanning' },
+      { type: 'new', text: 'Albums, Artists, Genres browser' },
+      { type: 'new', text: 'Playlists with drag-and-drop' },
+      { type: 'new', text: 'Metadata editor with lyrics and cover art' },
+      { type: 'new', text: 'Dark / light theme' },
+      { type: 'new', text: 'Frameless window with custom titlebar' },
+    ]
+  },
+]
