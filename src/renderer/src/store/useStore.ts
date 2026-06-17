@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { Track, FullTrack, ViewType, SortField, SortDir, Cols } from '../types'
+import type { Session } from '@supabase/supabase-js'
+import type { Profile } from '../lib/supabase'
 
 type ColumnConfig = Cols
 
@@ -77,6 +79,10 @@ interface StoreActions {
   // API extras
   setApiTrackerCategory: (cat: string) => void
   setApiTrackerEra: (era: string) => void
+
+  // Auth
+  setSession: (session: Session | null) => void
+  setUserProfile: (profile: Profile | null) => void
 }
 
 interface AppStore {
@@ -109,6 +115,8 @@ interface AppStore {
   likedTrackIds: string[]
   apiTrackerCategory: string
   apiTrackerEra: string
+  session: Session | null
+  userProfile: Profile | null
 }
 
 export const useStore = create<AppStore & StoreActions>((set, get) => ({
@@ -149,6 +157,8 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   likedTrackIds: ls.get<string[]>('likedTrackIds') ?? [],
   apiTrackerCategory: '',
   apiTrackerEra: '',
+  session: null,
+  userProfile: null,
 
   // ─── Playback ────────────────────────────────────────────────────────────────
   setQueue: (tracks, startIndex = 0) =>
@@ -228,6 +238,7 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
       'api-files': '/files',
       'editor': '/editor',
       'compilation': '/compilation',
+      'admin': '/admin',
     }
     const path = paths[view] ?? '/tracker'
     window.history.pushState({ view }, '', path)
@@ -304,4 +315,8 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   // ─── API extras ──────────────────────────────────────────────────────────────
   setApiTrackerCategory: (cat) => set({ apiTrackerCategory: cat }),
   setApiTrackerEra: (era) => set({ apiTrackerEra: era }),
+
+  // ─── Auth ─────────────────────────────────────────────────────────────────────
+  setSession: (session) => set({ session }),
+  setUserProfile: (userProfile) => set({ userProfile }),
 }))

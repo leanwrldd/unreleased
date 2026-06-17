@@ -6,6 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.0',
+    date: '2026-06-17',
+    changes: [
+      { type: 'new', text: 'Account system — sign up and request editor access, admins approve/reject requests' },
+      { type: 'new', text: 'Admin dashboard at /admin — manage pending approvals, editors, recent submissions, and stats' },
+      { type: 'new', text: 'Editor page now gated behind auth — sign in to edit, pending approval message for unapproved accounts' },
+      { type: 'new', text: 'Admin and Editor role badges shown in the Editor header' },
+      { type: 'new', text: 'Admin link appears in Sidebar and BottomNav for admin users only' },
+      { type: 'improve', text: 'Editor page save now only enabled for users with editor or admin role (enforced on both frontend and database via RLS)' },
+    ]
+  },
+  {
     version: '1.2.9',
     date: '2026-06-17',
     changes: [

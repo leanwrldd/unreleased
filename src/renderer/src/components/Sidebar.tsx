@@ -1,10 +1,11 @@
-import { LayoutDashboard, SearchCode, Radio, HardDrive, Settings, Github, MessageCircle, Archive } from 'lucide-react'
+import { LayoutDashboard, SearchCode, Radio, HardDrive, Settings, Github, MessageCircle, Archive, ShieldCheck } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
 
 export default function Sidebar(): JSX.Element {
-  const { activeView, setActiveView, setShowSettings } = useStore()
+  const { activeView, setActiveView, setShowSettings, userProfile } = useStore()
+  const isAdmin = userProfile?.role === 'admin'
 
   const items: { icon: React.ReactNode; label: string; view: ViewType }[] = [
     { icon: <LayoutDashboard size={18} />, label: 'Categories', view: 'api-categories' },
@@ -47,8 +48,21 @@ export default function Sidebar(): JSX.Element {
         ))}
       </nav>
 
-      {/* Bottom: Settings + GitHub */}
+      {/* Bottom: Admin + Settings + GitHub */}
       <div className="px-3 pb-4 space-y-1">
+        {isAdmin && (
+          <button
+            onClick={() => setActiveView('admin')}
+            className={`flex items-center gap-3 w-full px-3 py-2 rounded text-sm font-medium transition-colors ${
+              activeView === 'admin'
+                ? 'bg-surface-raised text-text-primary'
+                : 'text-text-secondary hover:text-text-primary hover:bg-surface-raised'
+            }`}
+          >
+            <ShieldCheck size={18} />
+            <span>Admin</span>
+          </button>
+        )}
         <button
           onClick={() => setShowSettings(true)}
           className="flex items-center gap-3 w-full px-3 py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"

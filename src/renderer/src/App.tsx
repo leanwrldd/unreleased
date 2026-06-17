@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useStore } from './store/useStore'
 import { ViewType } from './types'
+import { onAuthStateChange, getSession, getProfile } from './lib/supabase'
 
 function getViewFromPath(pathname: string): ViewType {
   if (pathname.startsWith('/files')) return 'api-files'
@@ -8,6 +9,7 @@ function getViewFromPath(pathname: string): ViewType {
   if (pathname === '/radio') return 'api-radio'
   if (pathname === '/editor') return 'editor'
   if (pathname === '/compilation') return 'compilation'
+  if (pathname === '/admin') return 'admin'
   return 'api-tracker'
 }
 
@@ -19,6 +21,7 @@ import ApiFilesView from './components/ApiFilesView'
 import ApiCategoryView from './components/ApiCategoryView'
 import ApiCompilationView from './components/ApiCompilationView'
 import EditorPage from './components/EditorPage'
+import AdminPage from './components/AdminPage'
 import Player from './components/Player'
 import NowPlaying from './components/NowPlaying'
 import QueuePanel from './components/QueuePanel'
@@ -36,7 +39,7 @@ function lightenHex(hex: string, amount: number): string {
 }
 
 export default function App(): JSX.Element {
-  const { showNowPlaying, showQueue, showSettings, activeView, theme, accentColor } = useStore()
+  const { showNowPlaying, showQueue, showSettings, activeView, theme, accentColor, setSession, setUserProfile } = useStore()
 
   // Sync view from URL on mount + handle back/forward
   useEffect(() => {
@@ -47,6 +50,30 @@ export default function App(): JSX.Element {
     window.addEventListener('popstate', syncFromPath)
     return () => window.removeEventListener('popstate', syncFromPath)
   }, [])
+
+  // Auth state listener
+  useEffect(() => {
+    // Load existing session on mount
+    getSession().then(async (session) => {
+      setSession(session)
+      if (session) {
+        const profile = await getProfile(session.user.id)
+        setUserProfile(profile)
+      }
+    })
+
+    // Listen for auth changes
+    const unsubscribe = onAuthStateChange(async (session) => {
+      setSession(session)
+      if (session) {
+        const profile = await getProfile(session.user.id)
+        setUserProfile(profile)
+      } else {
+        setUserProfile(null)
+      }
+    })
+    return unsubscribe
+  }, [setSession, setUserProfile])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -74,6 +101,7 @@ export default function App(): JSX.Element {
               : activeView === 'api-categories' ? <ApiCategoryView />
               : activeView === 'editor' ? <EditorPage />
               : activeView === 'compilation' ? <ApiCompilationView />
+              : activeView === 'admin' ? <AdminPage />
               : <ApiTrackerView />}
           </ErrorBoundary>
           {showNowPlaying && <ErrorBoundary><NowPlaying /></ErrorBoundary>}

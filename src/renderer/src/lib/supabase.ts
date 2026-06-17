@@ -1,8 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, Session } from '@supabase/supabase-js'
 
-// Set these in .env.local (never commit real values):
-//   VITE_SUPABASE_URL=https://xxx.supabase.co
-//   VITE_SUPABASE_ANON_KEY=eyJ...
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
@@ -10,38 +7,128 @@ export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
   : null
 
+export const supabaseReady = !!supabase
+
 // ── Types ──────────────────────────────────────────────────────────────────────
+
+export interface Profile {
+  id: string
+  email: string
+  username: string | null
+  role: 'pending' | 'editor' | 'admin'
+  created_at: string
+  approved_at: string | null
+  approved_by: string | null
+}
 
 export interface SongSupplement {
   id: string
   jw_song_id: number
   created_at: string
   updated_at: string
-
-  // Extended metadata
-  context: string | null          // Historical context / story
-  trivia: string[] | null         // Fun facts / trivia bullets
-  sample_info: string | null      // What samples are used
+  context: string | null
+  trivia: string[] | null
+  sample_info: string | null
   youtube_url: string | null
   soundcloud_url: string | null
-  external_links: Record<string, string> | null  // { label: url }
-
-  // Editorial corrections / additions (overrides API data)
+  external_links: Record<string, string> | null
   verified_producers: string | null
   verified_engineers: string | null
   verified_release_date: string | null
   verified_recording_date: string | null
   verified_recording_location: string | null
-
-  // Quality
-  quality_rating: number | null  // 1–10
+  quality_rating: number | null
   editor_notes: string | null
-  updated_by: string | null      // Editor display name (anon)
+  updated_by: string | null
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Auth ───────────────────────────────────────────────────────────────────────
 
-/** Fetch supplement for a single song. Returns null if not found or no client. */
+export async function signUp(
+  email: string,
+  password: string
+): Promise<{ error: string | null }> {
+  if (!supabase) return { error: 'Supabase not configured' }
+  const { error } = await supabase.auth.signUp({ email, password })
+  if (error) return { error: error.message }
+  return { error: null }
+}
+
+export async function signIn(
+  email: string,
+  password: string
+): Promise<{ error: string | null }> {
+  if (!supabase) return { error: 'Supabase not configured' }
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) return { error: error.message }
+  return { error: null }
+}
+
+export async function signOut(): Promise<void> {
+  if (!supabase) return
+  await supabase.auth.signOut()
+}
+
+export function onAuthStateChange(callback: (session: Session | null) => void): () => void {
+  if (!supabase) return () => {}
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    callback(session)
+  })
+  return () => subscription.unsubscribe()
+}
+
+export async function getSession(): Promise<Session | null> {
+  if (!supabase) return null
+  const { data } = await supabase.auth.getSession()
+  return data.session
+}
+
+// ── Profiles ───────────────────────────────────────────────────────────────────
+
+export async function getProfile(userId: string): Promise<Profile | null> {
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single()
+  if (error) return null
+  return data as Profile
+}
+
+export async function getProfiles(): Promise<Profile[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) return []
+  return (data ?? []) as Profile[]
+}
+
+export async function updateProfileRole(
+  userId: string,
+  role: 'pending' | 'editor' | 'admin',
+  adminId?: string
+): Promise<boolean> {
+  if (!supabase) return false
+  const patch: Record<string, unknown> = { role }
+  if (role === 'editor' || role === 'admin') {
+    patch.approved_at = new Date().toISOString()
+    if (adminId) patch.approved_by = adminId
+  }
+  const { error } = await supabase.from('profiles').update(patch).eq('id', userId)
+  return !error
+}
+
+export async function updateUsername(userId: string, username: string): Promise<boolean> {
+  if (!supabase) return false
+  const { error } = await supabase.from('profiles').update({ username }).eq('id', userId)
+  return !error
+}
+
+// ── Song supplements ───────────────────────────────────────────────────────────
+
 export async function getSupplement(jwSongId: number): Promise<SongSupplement | null> {
   if (!supabase) return null
   const { data, error } = await supabase
@@ -49,34 +136,41 @@ export async function getSupplement(jwSongId: number): Promise<SongSupplement | 
     .select('*')
     .eq('jw_song_id', jwSongId)
     .maybeSingle()
-  if (error) { console.error('[supabase] getSupplement:', error.message); return null }
+  if (error) return null
   return data as SongSupplement | null
 }
 
-/** Upsert supplement data for a song. */
 export async function upsertSupplement(
   jwSongId: number,
   patch: Partial<Omit<SongSupplement, 'id' | 'jw_song_id' | 'created_at' | 'updated_at'>>
 ): Promise<SongSupplement | null> {
-  if (!supabase) { console.warn('[supabase] No client — set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY'); return null }
+  if (!supabase) return null
   const { data, error } = await supabase
     .from('song_supplements')
     .upsert({ jw_song_id: jwSongId, ...patch, updated_at: new Date().toISOString() }, { onConflict: 'jw_song_id' })
     .select()
     .maybeSingle()
-  if (error) { console.error('[supabase] upsertSupplement:', error.message); return null }
+  if (error) return null
   return data as SongSupplement | null
 }
 
-/** Fetch supplements for a batch of song IDs (for list views). */
 export async function getSupplements(jwSongIds: number[]): Promise<Record<number, SongSupplement>> {
   if (!supabase || !jwSongIds.length) return {}
   const { data, error } = await supabase
     .from('song_supplements')
     .select('*')
     .in('jw_song_id', jwSongIds)
-  if (error) { console.error('[supabase] getSupplements:', error.message); return {} }
-  return Object.fromEntries((data as SongSupplement[]).map(s => [s.jw_song_id, s]))
+  if (error) return {}
+  return Object.fromEntries((data as SongSupplement[]).map((s) => [s.jw_song_id, s]))
 }
 
-export const supabaseReady = !!supabase
+export async function getRecentSupplements(limit = 20): Promise<SongSupplement[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('song_supplements')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(limit)
+  if (error) return []
+  return (data ?? []) as SongSupplement[]
+}
