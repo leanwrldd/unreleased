@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.5',
+    date: '2026-06-17',
+    changes: [
+      { type: 'fix', text: 'Radio: session recording files are now skipped — only released, unreleased, and unsurfaced songs play' },
+      { type: 'improve', text: 'Now Playing: removed Info tab — replaced with an ⓘ button in the header that opens the full song info modal (same as in the Tracker)' },
+    ]
+  },
+  {
     version: '1.3.4',
     date: '2026-06-17',
     changes: [

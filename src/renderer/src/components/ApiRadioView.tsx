@@ -22,7 +22,16 @@ export default function ApiRadioView(): JSX.Element {
     setLoading(true)
     setError(null)
     try {
-      const data = await apiFetch<JWApiRadioResponse>('/radio/random/')
+      // Retry until we get a non-session song (max 10 attempts)
+      let data: JWApiRadioResponse | null = null
+      for (let i = 0; i < 10; i++) {
+        const candidate = await apiFetch<JWApiRadioResponse>('/radio/random/')
+        if (candidate.song.category !== 'recording_session') {
+          data = candidate
+          break
+        }
+      }
+      if (!data) data = await apiFetch<JWApiRadioResponse>('/radio/random/')
       setRadio(data)
       if (autoPlay) {
         const track = songToTrack(data.song)
