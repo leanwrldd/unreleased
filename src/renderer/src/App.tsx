@@ -2,12 +2,13 @@ import { useEffect } from 'react'
 import { useStore } from './store/useStore'
 import { ViewType } from './types'
 
-const PATH_TO_VIEW: Record<string, ViewType> = {
-  '/categories': 'api-categories',
-  '/tracker': 'api-tracker',
-  '/radio': 'api-radio',
-  '/files': 'api-files',
+function getViewFromPath(pathname: string): ViewType {
+  if (pathname.startsWith('/files')) return 'api-files'
+  if (pathname === '/categories') return 'api-categories'
+  if (pathname === '/radio') return 'api-radio'
+  return 'api-tracker'
 }
+
 import Sidebar from './components/Sidebar'
 import BottomNav from './components/BottomNav'
 import ApiTrackerView from './components/ApiTrackerView'
@@ -36,8 +37,7 @@ export default function App(): JSX.Element {
   // Sync view from URL on mount + handle back/forward
   useEffect(() => {
     const syncFromPath = (): void => {
-      const view = PATH_TO_VIEW[window.location.pathname] ?? 'api-tracker'
-      useStore.setState({ activeView: view })
+      useStore.setState({ activeView: getViewFromPath(window.location.pathname) })
     }
     syncFromPath()
     window.addEventListener('popstate', syncFromPath)

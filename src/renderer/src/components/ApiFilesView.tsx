@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Folder, Music2, ChevronRight, ArrowLeft, Home, Play, Loader2,
   FolderOpen, HardDrive, LayoutList, LayoutGrid, ImageIcon, Video,
-  Download, ArrowUpDown, ArrowUp, ArrowDown,
+  Download, ArrowUpDown, ArrowUp, ArrowDown, Link, Check,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import {
@@ -122,6 +122,16 @@ function sortEntries(entries: JWApiFileEntry[], by: SortBy, dir: SortDir): JWApi
   })
 }
 
+function pathToUrl(folderPath: string): string {
+  if (!folderPath) return '/files'
+  return '/files/' + folderPath.split('/').map(encodeURIComponent).join('/')
+}
+
+function urlToPath(pathname: string): string {
+  if (!pathname.startsWith('/files/')) return ''
+  return decodeURIComponent(pathname.slice('/files/'.length))
+}
+
 export default function ApiFilesView(): JSX.Element {
   const { playTrack } = useStore()
 
@@ -134,6 +144,7 @@ export default function ApiFilesView(): JSX.Element {
   const [downloading, setDownloading] = useState<string | null>(null)
   const [lightboxItems, setLightboxItems] = useState<LightboxItem[]>([])
   const [lightboxIndex, setLightboxIndex] = useState(-1)
+  const [copiedPath, setCopiedPath] = useState<string | null>(null)
 
   // Persisted view settings
   const [viewMode, setViewModeState] = useState<ViewMode>(
@@ -165,7 +176,10 @@ export default function ApiFilesView(): JSX.Element {
     try {
       const data = await apiFetch<JWApiBrowseResponse>('/files/browse/', path ? { path } : {})
       const items = parseEntries(data)
-      if (pushHistory) setHistory((h) => [...h, currentPath])
+      if (pushHistory) {
+        setHistory((h) => [...h, currentPath])
+        window.history.pushState({ view: 'api-files', folderPath: path }, '', pathToUrl(path))
+      }
       setCurrentPath(path)
       setEntries(items)
     } catch (err) {
@@ -175,7 +189,26 @@ export default function ApiFilesView(): JSX.Element {
     }
   }, [currentPath])
 
-  useEffect(() => { navigate('', false) }, [])
+  // Keep a ref to navigate so popstate listener always has the latest version
+  const navigateRef = useRef(navigate)
+  useEffect(() => { navigateRef.current = navigate }, [navigate])
+
+  // On mount: read path from URL; listen for browser back/forward within /files
+  useEffect(() => {
+    const initialPath = urlToPath(window.location.pathname)
+    navigateRef.current(initialPath, false)
+
+    const handlePopstate = (): void => {
+      const p = window.location.pathname
+      if (p.startsWith('/files')) {
+        const fp = urlToPath(p)
+        setHistory([])
+        navigateRef.current(fp, false)
+      }
+    }
+    window.addEventListener('popstate', handlePopstate)
+    return () => window.removeEventListener('popstate', handlePopstate)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const goBack = (): void => {
     if (history.length > 0) {
@@ -187,7 +220,17 @@ export default function ApiFilesView(): JSX.Element {
     }
   }
 
-  const goHome = (): void => { setHistory([]); navigate('', false) }
+  const goHome = (): void => { setHistory([]); navigate('', true) }
+
+  const copyLink = (entry: JWApiFileEntry): void => {
+    const url = entry.type === 'file'
+      ? buildStreamUrl(entry.path)
+      : window.location.origin + pathToUrl(entry.path)
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedPath(entry.path)
+      setTimeout(() => setCopiedPath(null), 1800)
+    })
+  }
 
   const handlePlay = async (entry: JWApiFileEntry): Promise<void> => {
     if (playing === entry.path) return
@@ -410,6 +453,13 @@ export default function ApiFilesView(): JSX.Element {
                         {downloading === entry.path ? <Loader2 size={12} className="text-text-muted animate-spin" /> : <Download size={12} className="text-text-muted" />}
                       </button>
                     )}
+                    <button
+                      className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 rounded-full bg-surface-raised hover:bg-surface-overlay flex items-center justify-center transition-opacity shrink-0 border border-[var(--border)]"
+                      onClick={(e) => { e.stopPropagation(); copyLink(entry) }}
+                      title={isDir ? 'Copy folder link' : 'Copy file link'}
+                    >
+                      {copiedPath === entry.path ? <Check size={12} className="text-accent" /> : <Link size={12} className="text-text-muted" />}
+                    </button>
                   </div>
                 )
               })}
@@ -472,15 +522,24 @@ export default function ApiFilesView(): JSX.Element {
                       ) : (
                         <span className="text-xs uppercase text-text-muted">{ext}</span>
                       )}
-                      {/* Download overlay button (non-dirs, grid) */}
+                      {/* Download + copy link overlay buttons (grid) */}
                       {!isDir && (
-                        <button
-                          className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                          onClick={(e) => { e.stopPropagation(); handleDownload(entry) }}
-                          title="Download"
-                        >
-                          {downloading === entry.path ? <Loader2 size={11} className="text-white animate-spin" /> : <Download size={11} className="text-white" />}
-                        </button>
+                        <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                          <button
+                            className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center"
+                            onClick={(e) => { e.stopPropagation(); copyLink(entry) }}
+                            title="Copy link"
+                          >
+                            {copiedPath === entry.path ? <Check size={11} className="text-accent" /> : <Link size={11} className="text-white" />}
+                          </button>
+                          <button
+                            className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center"
+                            onClick={(e) => { e.stopPropagation(); handleDownload(entry) }}
+                            title="Download"
+                          >
+                            {downloading === entry.path ? <Loader2 size={11} className="text-white animate-spin" /> : <Download size={11} className="text-white" />}
+                          </button>
+                        </div>
                       )}
                     </div>
                     {/* Label */}
