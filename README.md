@@ -63,7 +63,7 @@ npm run build
 ## Credits
 
 - **[juicewrldapi.com](https://juicewrldapi.com)** — the API that powers API mode: song metadata, streaming, lyrics, eras, categories, and the file browser. This project would not exist without it.
-- **juicewrldapi** on Discord — for the help and support building the integration.
+- **juicewrldapi** (X) on Discord — for the help and support building the integration.
 
 ---
 
