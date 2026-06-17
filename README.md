@@ -54,16 +54,6 @@ npm run build
 npm run preview
 ```
 
-### Deploy
-
-The `dist/` folder is a self-contained static site — deploy it anywhere:
-
-- **Vercel**: `vercel --prod` or connect the repo and set the output dir to `dist`, root to `src/renderer`
-- **Netlify**: drag and drop `dist/`, or connect the repo with build command `vite build` and publish dir `dist`
-- **GitHub Pages**: push `dist/` to `gh-pages` branch
-
----
-
 ## Credits
 
 - **[juicewrldapi.com](https://juicewrldapi.com)** — the API powering everything: song metadata, streaming, lyrics, eras, categories, and the file browser.
