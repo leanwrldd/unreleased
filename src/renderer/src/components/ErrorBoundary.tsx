@@ -2,10 +2,10 @@ import { Component, ReactNode } from 'react'
 import { AlertTriangle, Copy, Check } from 'lucide-react'
 
 interface Props { children: ReactNode; fallback?: ReactNode }
-interface State { error: Error | null; copied: boolean; logPath: string | null }
+interface State { error: Error | null; copied: boolean }
 
 export default class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null, copied: false, logPath: null }
+  state: State = { error: null, copied: false }
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     return { error }
@@ -13,12 +13,6 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: { componentStack: string }): void {
     console.error('ErrorBoundary caught:', error, info)
-    // Write to crash log file
-    window.api.logCrash(error.message, (error.stack ?? '') + '\n\nComponent stack:' + info.componentStack)
-      .then((result) => {
-        if (result.ok && result.path) this.setState({ logPath: result.path })
-      })
-      .catch(() => {/* silently ignore */})
   }
 
   private copyError = (): void => {
@@ -53,14 +47,9 @@ export default class ErrorBoundary extends Component<Props, State> {
                 {this.state.copied ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
               </button>
             </div>
-            {this.state.logPath && (
-              <p className="text-text-muted text-[10px] font-mono opacity-60">
-                Saved to {this.state.logPath}
-              </p>
-            )}
             <button
               className="text-xs text-accent hover:text-accent-hover underline mt-1"
-              onClick={() => this.setState({ error: null, logPath: null })}
+              onClick={() => this.setState({ error: null })}
             >
               Try again
             </button>

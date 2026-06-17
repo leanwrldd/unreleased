@@ -123,7 +123,7 @@ function sortEntries(entries: JWApiFileEntry[], by: SortBy, dir: SortDir): JWApi
 }
 
 export default function ApiFilesView(): JSX.Element {
-  const { playTrack, apiDownloadDir } = useStore()
+  const { playTrack } = useStore()
 
   const [currentPath, setCurrentPath] = useState('')
   const [entries, setEntries] = useState<JWApiFileEntry[]>([])
@@ -203,17 +203,16 @@ export default function ApiFilesView(): JSX.Element {
     }
   }
 
-  const handleDownload = async (entry: JWApiFileEntry): Promise<void> => {
-    if (downloading === entry.path) return
-    setDownloading(entry.path)
-    try {
-      const url = buildStreamUrl(entry.path)
-      const destDir = apiDownloadDir || undefined
-      const result = await window.api.downloadFile(url, destDir, entry.name)
-      if (!result.ok) console.error('Download failed:', result.error)
-    } finally {
-      setDownloading(null)
-    }
+  const handleDownload = (entry: JWApiFileEntry): void => {
+    const url = buildStreamUrl(entry.path)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = entry.name
+    a.target = '_blank'
+    a.rel = 'noopener noreferrer'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
   }
 
   const openLightbox = (entry: JWApiFileEntry): void => {

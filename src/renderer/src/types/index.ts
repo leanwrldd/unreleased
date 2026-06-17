@@ -52,7 +52,7 @@ export interface SyncedLyricLine {
   text: string
 }
 
-export type ViewType = 'library' | 'playlist' | 'now-playing' | 'albums' | 'artists' | 'genres' | 'lyrics' | 'liked' | 'playlists' | 'files' | 'api-tracker' | 'api-radio' | 'api-files' | 'api-categories'
+export type ViewType = 'api-tracker' | 'api-radio' | 'api-files' | 'api-categories'
 
 export type SortField = 'default' | 'title' | 'artist' | 'album' | 'year' | 'genre' | 'duration'
 export type SortDir = 'asc' | 'desc'

@@ -59,7 +59,6 @@ export default function Player(): JSX.Element {
     setPlaybackSpeed,
     likedTrackIds,
     toggleLike,
-    setBrowseFilter,
     setActiveView
   } = useStore()
 
@@ -155,8 +154,6 @@ export default function Player(): JSX.Element {
           })
           .catch(() => {/* no lyrics — that's fine */})
       }
-    } else {
-      window.api.getMetadata(currentTrack.path).then(setCurrentTrackFull)
     }
   }, [currentTrack?.id])
 
@@ -470,16 +467,7 @@ export default function Player(): JSX.Element {
             <p className="text-text-primary text-sm font-medium truncate">
               {currentTrack?.title || 'Not playing'}
             </p>
-            {currentTrack?.artist ? (
-              <button
-                className="text-text-muted text-xs truncate hover:text-accent hover:underline transition-colors text-left w-full"
-                onClick={() => { setBrowseFilter({ type: 'artist', name: currentTrack.artist! }); setActiveView('artists') }}
-              >
-                {currentTrack.artist}
-              </button>
-            ) : (
-              <p className="text-text-muted text-xs truncate"></p>
-            )}
+            <p className="text-text-muted text-xs truncate">{currentTrack?.artist || ''}</p>
           </div>
 
           <button
