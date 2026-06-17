@@ -106,6 +106,14 @@ export async function getProfiles(): Promise<Profile[]> {
   return (data ?? []) as Profile[]
 }
 
+export async function deleteAccount(): Promise<{ error: string | null }> {
+  if (!supabase) return { error: 'Supabase not configured' }
+  const { error } = await supabase.rpc('delete_user')
+  if (error) return { error: error.message }
+  await supabase.auth.signOut()
+  return { error: null }
+}
+
 export async function changePassword(newPassword: string): Promise<{ error: string | null }> {
   if (!supabase) return { error: 'Supabase not configured' }
   const { error } = await supabase.auth.updateUser({ password: newPassword })

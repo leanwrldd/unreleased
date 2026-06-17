@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, Users, Clock, CheckCircle, XCircle, ShieldCheck, BarChart2, Loader2, RefreshCw, Trash2, Lock } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { getProfiles, getRecentSupplements, updateProfileRole, changePassword, Profile, SongSupplement, supabase } from '../lib/supabase'
+import { getProfiles, getRecentSupplements, updateProfileRole, changePassword, deleteAccount, Profile, SongSupplement, supabase } from '../lib/supabase'
 
 type Tab = 'pending' | 'editors' | 'submissions' | 'stats' | 'account'
 
@@ -330,6 +330,20 @@ export default function AdminPage(): JSX.Element {
                 }`}
               >
                 {pwState === 'saving' ? 'Saving…' : pwState === 'saved' ? 'Password changed!' : 'Update password'}
+              </button>
+            </div>
+
+            <div className="border-t border-[var(--border)] pt-4">
+              <p className="text-text-primary text-sm font-semibold mb-1">Delete account</p>
+              <p className="text-text-muted text-xs mb-3">Permanently removes your account and all associated data.</p>
+              <button
+                onClick={async () => {
+                  if (!confirm('Delete your account? This cannot be undone.')) return
+                  await deleteAccount()
+                }}
+                className="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm font-semibold transition-colors"
+              >
+                Delete account
               </button>
             </div>
           </div>

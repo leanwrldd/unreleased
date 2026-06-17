@@ -6,6 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.2',
+    date: '2026-06-17',
+    changes: [
+      { type: 'new', text: 'Contribute tab added to sidebar and bottom nav — replaces the hidden Editor route' },
+      { type: 'new', text: 'Delete account option in Contribute page header (for logged-in users) and Admin → Account tab' },
+      { type: 'improve', text: 'Log out moved to Contribute page header for logged-in users' },
+      { type: 'improve', text: 'Lyrics source attribution moved next to the filename as subtle gray text, no longer a separate info row' },
+      { type: 'improve', text: 'Sign-in prompt on Contribute page no longer uses "become an editor" language' },
+    ]
+  },
+  {
     version: '1.3.1',
     date: '2026-06-17',
     changes: [

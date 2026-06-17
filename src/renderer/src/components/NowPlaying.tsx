@@ -168,7 +168,6 @@ function InfoTab(): JSX.Element {
     ['Producer', currentTrackFull?.producer || null],
     ['Format', currentTrackFull?.ext?.replace('.', '').toUpperCase() || null],
     ['Notes', currentTrackFull?.notes || null],
-    ['Lyrics', lyricsSource],
   ]
 
   return (
@@ -183,9 +182,12 @@ function InfoTab(): JSX.Element {
           </div>
         ) : null
       )}
-      <div className="pt-4 flex items-center gap-2 text-text-muted">
+      <div className="pt-4 flex items-center gap-1.5 text-text-muted">
         <FileAudio size={14} />
         <span className="text-xs">{currentTrack.title}</span>
+        {lyricsSource && (
+          <span className="text-[10px] text-text-muted/50 ml-1">· lyrics: {lyricsSource}</span>
+        )}
       </div>
     </div>
   )

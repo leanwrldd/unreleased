@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { ChevronLeft, Search, Loader2, Check, AlertCircle, LogIn, Clock } from 'lucide-react'
+import { Search, Loader2, Check, AlertCircle, LogIn, Clock } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { apiFetch, JWApiPaginatedResponse, JWApiSong } from '../lib/juicewrldApi'
-import { upsertSupplement, supabaseReady, signOut } from '../lib/supabase'
+import { upsertSupplement, supabaseReady, signOut, deleteAccount } from '../lib/supabase'
 import AuthModal from './AuthModal'
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
@@ -31,8 +31,16 @@ export default function EditorPage(): JSX.Element {
   const [qualityRating, setQualityRating] = useState<string>('')
   const [editorNotes, setEditorNotes] = useState('')
   const [saveState, setSaveState] = useState<SaveState>('idle')
+  const [deleting, setDeleting] = useState(false)
 
   const canEdit = supabaseReady && (userProfile?.role === 'editor' || userProfile?.role === 'admin')
+
+  const handleDeleteAccount = async (): Promise<void> => {
+    if (!confirm('Delete your account? This cannot be undone.')) return
+    setDeleting(true)
+    await deleteAccount()
+    setDeleting(false)
+  }
 
   const search = async (): Promise<void> => {
     if (!query.trim()) return
@@ -106,13 +114,7 @@ export default function EditorPage(): JSX.Element {
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {/* Header */}
       <div className="px-5 pt-5 pb-3 shrink-0 flex items-center gap-3 border-b border-[var(--border)]">
-        <button
-          onClick={() => setActiveView('api-tracker')}
-          className="p-1.5 rounded-lg hover:bg-surface-overlay transition-colors text-text-muted hover:text-text-primary"
-        >
-          <ChevronLeft size={18} />
-        </button>
-        <h1 className="text-text-primary text-xl font-bold">Editor</h1>
+        <h1 className="text-text-primary text-xl font-bold">Contribute</h1>
 
         {session && (
           <div className="ml-auto flex items-center gap-2">
@@ -128,7 +130,14 @@ export default function EditorPage(): JSX.Element {
               onClick={() => signOut()}
               className="text-xs text-text-muted hover:text-text-primary transition-colors"
             >
-              Sign out
+              Log out
+            </button>
+            <button
+              onClick={handleDeleteAccount}
+              disabled={deleting}
+              className="text-xs text-red-400/60 hover:text-red-400 transition-colors"
+            >
+              {deleting ? 'Deleting…' : 'Delete account'}
             </button>
           </div>
         )}
@@ -141,8 +150,8 @@ export default function EditorPage(): JSX.Element {
             <LogIn size={22} className="text-accent" />
           </div>
           <div>
-            <p className="text-text-primary font-semibold mb-1">Sign in to edit</p>
-            <p className="text-text-muted text-sm">Create an account or sign in to contribute song data.</p>
+            <p className="text-text-primary font-semibold mb-1">Sign in to contribute</p>
+            <p className="text-text-muted text-sm">Add context, trivia, lyrics sources and corrections to song entries.</p>
           </div>
           <button
             onClick={() => setShowAuth(true)}
