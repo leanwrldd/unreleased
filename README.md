@@ -192,4 +192,3 @@ npm run build
 - **New** — Playlists with drag-and-drop
 - **New** — Metadata editor with lyrics and cover art
 - **New** — Dark / light theme
-- **New** — Frameless window with custom titlebar
