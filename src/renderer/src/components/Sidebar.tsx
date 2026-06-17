@@ -1,4 +1,4 @@
-import { LayoutDashboard, SearchCode, Radio, HardDrive, Settings, Github } from 'lucide-react'
+import { LayoutDashboard, SearchCode, Radio, HardDrive, Settings, Github, MessageCircle } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
@@ -58,6 +58,15 @@ export default function Sidebar(): JSX.Element {
         >
           <Github size={18} />
           <span>GitHub</span>
+        </a>
+        <a
+          href="https://discord.gg/qq7DMNkBJ4"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 w-full px-3 py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+        >
+          <MessageCircle size={18} />
+          <span>Discord</span>
         </a>
       </div>
     </aside>

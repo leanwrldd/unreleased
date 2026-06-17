@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github } from 'lucide-react'
+import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { CHANGELOG } from '../lib/changelog'
 
@@ -213,7 +213,7 @@ export default function Settings(): JSX.Element {
                 juicewrldapi.com
               </a>
             </p>
-            <div className="flex gap-2 mb-4">
+            <div className="flex flex-wrap gap-2 mb-4">
               <a
                 href="https://github.com/leanwrldd/unreleased"
                 target="_blank"
@@ -222,6 +222,15 @@ export default function Settings(): JSX.Element {
               >
                 <Github size={13} />
                 GitHub
+              </a>
+              <a
+                href="https://discord.gg/qq7DMNkBJ4"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors px-2.5 py-1.5 rounded-lg bg-surface-overlay hover:bg-surface-raised border border-[var(--border)]"
+              >
+                <MessageCircle size={13} />
+                Discord
               </a>
               <a
                 href="https://unreleased-juicewrldapi.vercel.app"

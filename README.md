@@ -9,6 +9,7 @@ A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com),
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
+[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/qq7DMNkBJ4)
 
 ---
 
@@ -58,6 +59,12 @@ npm run preview
 
 - **[juicewrldapi.com](https://juicewrldapi.com)** — the API powering everything: song metadata, streaming, lyrics, eras, categories, and the file browser.
 - **juicewrldapi** on Discord — for the help and support building the integration.
+
+## Community
+
+Join the Discord server: **[discord.gg/qq7DMNkBJ4](https://discord.gg/qq7DMNkBJ4)**
+
+Built by **freakylatif** — find me on Discord.
 
 ---
 
