@@ -3,7 +3,7 @@ import { useResizablePanel } from '../hooks/useResizablePanel'
 import { X, Music, ChevronUp, ChevronDown, FileAudio } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import LyricsDisplay from './LyricsDisplay'
-import { formatDuration } from '../lib/lyrics'
+import { formatDuration, isLrcFormat } from '../lib/lyrics'
 
 type Tab = 'lyrics' | 'info'
 
@@ -146,6 +146,16 @@ function InfoTab(): JSX.Element {
   const { currentTrack, currentTrackFull } = useStore()
   if (!currentTrack) return <div />
 
+  const isApiTrack = /^jw-\d+$/.test(currentTrack.id)
+  const rawLyrics = currentTrackFull?.syncedLyrics || currentTrackFull?.lyrics
+  const hasLyrics = !!rawLyrics
+  const isSynced = hasLyrics && isLrcFormat(rawLyrics!)
+  const lyricsSource = hasLyrics
+    ? isApiTrack
+      ? `juicewrldapi.com${isSynced ? ' · synced' : ''}`
+      : `Local file${isSynced ? ' · synced' : ''}`
+    : null
+
   const rows: Array<[string, string | number | null | undefined]> = [
     ['Title', currentTrack.title],
     ['Artist', currentTrack.artist],
@@ -158,6 +168,7 @@ function InfoTab(): JSX.Element {
     ['Producer', currentTrackFull?.producer || null],
     ['Format', currentTrackFull?.ext?.replace('.', '').toUpperCase() || null],
     ['Notes', currentTrackFull?.notes || null],
+    ['Lyrics', lyricsSource],
   ]
 
   return (

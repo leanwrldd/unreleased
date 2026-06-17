@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Music2, Unlock, EyeOff, Mic, Layers, Clock } from 'lucide-react'
+import { Loader2, Music2, Unlock, EyeOff, Mic, Clock } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { apiFetch, JWApiStats, JWApiEra } from '../lib/juicewrldApi'
 
@@ -47,22 +47,12 @@ const CATEGORIES: CategoryCard[] = [
   },
 ]
 
-const LS_GROUP = 'api-categories:groupByAlbum'
-
 export default function ApiCategoryView(): JSX.Element {
   const { setActiveView, setApiTrackerCategory, setApiTrackerEra } = useStore()
   const [stats, setStats] = useState<JWApiStats | null>(null)
   const [eras, setEras] = useState<JWApiEra[]>([])
   const [loadingStats, setLoadingStats] = useState(true)
   const [loadingEras, setLoadingEras] = useState(true)
-  const [groupByAlbum, setGroupByAlbumState] = useState(
-    () => localStorage.getItem(LS_GROUP) === 'true'
-  )
-
-  const setGroupByAlbum = (v: boolean): void => {
-    setGroupByAlbumState(v)
-    localStorage.setItem(LS_GROUP, String(v))
-  }
 
   useEffect(() => {
     apiFetch<JWApiStats>('/stats/')
@@ -88,36 +78,12 @@ export default function ApiCategoryView(): JSX.Element {
 
   const counts = stats?.category_stats
 
-  // Group eras by era name initial letter when groupByAlbum is on
-  const eraGroups = groupByAlbum
-    ? eras.reduce<Map<string, JWApiEra[]>>((map, era) => {
-        const letter = era.name.charAt(0).toUpperCase()
-        if (!map.has(letter)) map.set(letter, [])
-        map.get(letter)!.push(era)
-        return map
-      }, new Map())
-    : null
-
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
       <div className="px-5 pt-5 pb-8">
 
         {/* ── Header ──────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between mb-1">
-          <h1 className="text-text-primary text-xl font-bold">Categories</h1>
-          <button
-            onClick={() => setGroupByAlbum(!groupByAlbum)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-              groupByAlbum
-                ? 'bg-accent/15 text-accent border border-accent/30'
-                : 'bg-surface-overlay text-text-muted hover:text-text-secondary border border-transparent'
-            }`}
-            title="Group eras alphabetically"
-          >
-            <Layers size={13} />
-            By album
-          </button>
-        </div>
+        <h1 className="text-text-primary text-xl font-bold mb-1">Categories</h1>
         <p className="text-text-muted text-sm mb-5">Browse songs by release status or era</p>
 
         {/* ── Category cards ───────────────────────────────────────────── */}
@@ -169,24 +135,7 @@ export default function ApiCategoryView(): JSX.Element {
           </div>
         ) : eras.length === 0 ? (
           <p className="text-text-muted text-sm">No eras found</p>
-        ) : groupByAlbum && eraGroups ? (
-          /* Grouped by first letter */
-          <div className="space-y-4">
-            {Array.from(eraGroups.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([letter, group]) => (
-              <div key={letter}>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-widest px-1 mb-2 border-b border-[var(--border)] pb-1">
-                  {letter}
-                </p>
-                <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
-                  {group.map((era) => (
-                    <EraCard key={era.id} era={era} stats={stats} onClick={() => handleEraClick(era.name)} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
         ) : (
-          /* Flat grid */
           <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
             {eras.map((era) => (
               <EraCard key={era.id} era={era} stats={stats} onClick={() => handleEraClick(era.name)} />

@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.1',
+    date: '2026-06-17',
+    changes: [
+      { type: 'improve', text: 'Categories: removed "By album" sort toggle — eras now always display in their default order' },
+      { type: 'new', text: 'Now Playing info tab: shows lyrics source (juicewrldapi.com or Local file) and whether they are synced' },
+    ]
+  },
+  {
     version: '1.3.0',
     date: '2026-06-17',
     changes: [
