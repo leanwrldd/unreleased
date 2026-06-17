@@ -226,6 +226,7 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
       'api-tracker': '/tracker',
       'api-radio': '/radio',
       'api-files': '/files',
+      'editor': '/editor',
     }
     const path = paths[view] ?? '/tracker'
     window.history.pushState({ view }, '', path)

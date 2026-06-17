@@ -17,9 +17,14 @@ export default function Sidebar(): JSX.Element {
     <aside className="hidden md:flex flex-col h-full bg-sidebar w-60 shrink-0 border-r border-[var(--border)]">
       {/* Logo */}
       <div className="px-5 pt-6 pb-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col items-center gap-1">
           <img src={logo} alt="unreleased" className="h-32 w-auto object-contain" />
-          <span className="font-bold text-text-primary text-lg tracking-[0.08em]">unreleased</span>
+          <span
+            className="text-text-primary text-sm uppercase select-none"
+            style={{ fontFamily: "'Josefin Sans', sans-serif", fontWeight: 100, letterSpacing: '0.35em' }}
+          >
+            unreleased
+          </span>
         </div>
       </div>
 

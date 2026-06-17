@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle } from 'lucide-react'
+import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle, PenLine } from 'lucide-react'
 import { useStore } from '../store/useStore'
 
 const ACCENT_PRESETS = [
@@ -9,7 +9,7 @@ const ACCENT_PRESETS = [
 
 export default function Settings(): JSX.Element {
   const {
-    setShowSettings,
+    setShowSettings, setActiveView,
     theme, setTheme,
     accentColor, setAccentColor,
     audioOutput, setAudioOutput,
@@ -207,7 +207,7 @@ export default function Settings(): JSX.Element {
               <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">About</h3>
             </div>
             <p className="text-text-muted text-xs mb-3">
-              unreleased v1.2.5 — powered by{' '}
+              unreleased v1.2.6 — powered by{' '}
               <a href="https://juicewrldapi.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                 juicewrldapi.com
               </a>
@@ -241,6 +241,14 @@ export default function Settings(): JSX.Element {
                 Vercel
               </a>
             </div>
+
+            <button
+              onClick={() => { setShowSettings(false); setActiveView('editor') }}
+              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-accent/10 hover:bg-accent/15 border border-accent/25 text-accent text-sm font-medium transition-colors mt-2"
+            >
+              <PenLine size={15} />
+              Become an Editor
+            </button>
           </section>
         </div>
       </div>

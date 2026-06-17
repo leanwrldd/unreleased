@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.6',
+    date: '2026-06-17',
+    changes: [
+      { type: 'new', text: 'Song info modal — click ℹ on any song in the Tracker (or double-click the row) to see all details: titles, alt names, artists, producers, era, category, duration, leak type, date, and lyrics' },
+      { type: 'new', text: 'Files info button now opens the song info modal instead of jumping to the Tracker' },
+      { type: 'new', text: 'Become an Editor page — accessible from Settings (placeholder for now)' },
+      { type: 'improve', text: '"unreleased" wordmark redesigned — thin Josefin Sans, wide letter-spacing' },
+    ]
+  },
+  {
     version: '1.2.5',
     date: '2026-06-17',
     changes: [

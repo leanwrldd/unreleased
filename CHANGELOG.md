@@ -6,6 +6,15 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.2.6] — 2026-06-17
+
+- **New** Song info modal — click ℹ on any song in the Tracker (or double-click the row) to see all details: titles, alt names, artists, producers, era, category, duration, leak type, date, and lyrics
+- **New** Files info button now opens the song info modal instead of jumping to the Tracker
+- **New** Become an Editor page — accessible from Settings (placeholder for now)
+- **Improve** "unreleased" wordmark redesigned — thin Josefin Sans, wide letter-spacing
+
+---
+
 ## [1.2.5] — 2026-06-17
 
 - **Improve** Tracker: clicking a category badge now filters by that category in place instead of navigating to the Categories view

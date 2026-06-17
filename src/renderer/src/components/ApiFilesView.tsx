@@ -11,10 +11,13 @@ import {
   buildCoverArtUrl,
   JWApiFileEntry,
   JWApiBrowseResponse,
+  JWApiSong,
+  JWApiPaginatedResponse,
 } from '../lib/juicewrldApi'
 import { getFileExt, getMediaType } from '../lib/fileTypes'
 import { Track } from '../types'
 import MediaLightbox, { LightboxItem } from './MediaLightbox'
+import SongInfoModal from './SongInfoModal'
 
 type ViewMode = 'list' | 'grid'
 type SortBy = 'name' | 'type' | 'size'
@@ -133,7 +136,7 @@ function urlToPath(pathname: string): string {
 }
 
 export default function ApiFilesView(): JSX.Element {
-  const { playTrack, setSearchQuery, setActiveView } = useStore()
+  const { playTrack } = useStore()
 
   const [currentPath, setCurrentPath] = useState('')
   const [entries, setEntries] = useState<JWApiFileEntry[]>([])
@@ -145,6 +148,7 @@ export default function ApiFilesView(): JSX.Element {
   const [lightboxItems, setLightboxItems] = useState<LightboxItem[]>([])
   const [lightboxIndex, setLightboxIndex] = useState(-1)
   const [copiedPath, setCopiedPath] = useState<string | null>(null)
+  const [infoSong, setInfoSong] = useState<JWApiSong | null>(null)
 
   // Persisted view settings
   const [viewMode, setViewModeState] = useState<ViewMode>(
@@ -222,10 +226,15 @@ export default function ApiFilesView(): JSX.Element {
 
   const goHome = (): void => { setHistory([]); navigate('', true) }
 
-  const findInTracker = (entry: JWApiFileEntry): void => {
+  const openSongInfo = async (entry: JWApiFileEntry): Promise<void> => {
     const title = entry.name.replace(/\.[^.]+$/, '')
-    setSearchQuery(title)
-    setActiveView('api-tracker')
+    try {
+      const data = await apiFetch<JWApiPaginatedResponse>('/songs/', { search: title, page_size: 5 })
+      const match = data.results[0] ?? null
+      setInfoSong(match)
+    } catch {
+      setInfoSong(null)
+    }
   }
 
   const copyLink = (entry: JWApiFileEntry): void => {
@@ -437,7 +446,7 @@ export default function ApiFilesView(): JSX.Element {
                     {mt === 'audio' && (
                       <button
                         className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 rounded-full bg-surface-raised hover:bg-surface-overlay flex items-center justify-center transition-opacity shrink-0 border border-[var(--border)]"
-                        onClick={(e) => { e.stopPropagation(); findInTracker(entry) }}
+                        onClick={(e) => { e.stopPropagation(); openSongInfo(entry) }}
                         title="Find in Tracker"
                       >
                         <Info size={12} className="text-text-muted" />
@@ -528,7 +537,7 @@ export default function ApiFilesView(): JSX.Element {
                           {mt === 'audio' && (
                             <button
                               className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center"
-                              onClick={(e) => { e.stopPropagation(); findInTracker(entry) }}
+                              onClick={(e) => { e.stopPropagation(); openSongInfo(entry) }}
                               title="Find in Tracker"
                             >
                               <Info size={11} className="text-white" />
@@ -572,6 +581,8 @@ export default function ApiFilesView(): JSX.Element {
           onNav={setLightboxIndex}
         />
       )}
+
+      <SongInfoModal song={infoSong} onClose={() => setInfoSong(null)} />
     </>
   )
 }

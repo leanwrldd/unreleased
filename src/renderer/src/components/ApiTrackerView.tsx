@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Search, Play, ChevronLeft, ChevronRight, Loader2, Music2, X, LayoutList, LayoutGrid, Layers } from 'lucide-react'
+import { Search, Play, ChevronLeft, ChevronRight, Loader2, Music2, X, LayoutList, LayoutGrid, Layers, Info } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
+import SongInfoModal from './SongInfoModal'
 import {
   apiFetch,
   songToTrack,
@@ -52,13 +53,16 @@ function StatsBar({ stats }: { stats: JWApiStats | null }): JSX.Element {
 }
 
 // ─── Song row (list mode) ─────────────────────────────────────────────────────
-function SongRow({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: (song: JWApiSong) => void; onCategoryClick: (cat: Category) => void }): JSX.Element {
+function SongRow({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; onPlay: (song: JWApiSong) => void; onCategoryClick: (cat: Category) => void; onInfo: (song: JWApiSong) => void }): JSX.Element {
   const track = songToTrack(song)
   const title = song.track_titles?.[0] || song.name
   const altTitles = song.track_titles?.slice(1) ?? []
 
   return (
-    <div className="group flex items-center gap-3 px-3 py-2.5 md:py-2 hover:bg-surface-overlay active:bg-surface-overlay rounded-lg transition-colors cursor-default">
+    <div
+      className="group flex items-center gap-3 px-3 py-2.5 md:py-2 hover:bg-surface-overlay active:bg-surface-overlay rounded-lg transition-colors cursor-default"
+      onDoubleClick={() => onInfo(song)}
+    >
       {/* Cover art */}
       <div className="relative shrink-0 w-10 h-10 md:w-9 md:h-9 rounded overflow-hidden bg-surface-overlay">
         <AlbumArtThumbnail track={track} size={36} shimmer={false} />
@@ -98,20 +102,38 @@ function SongRow({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: (
       </button>
       <span className="hidden md:block text-text-muted text-xs w-10 text-right shrink-0">{formatDur(parseDuration(song.length))}</span>
 
-      {/* Mobile: play button */}
+      {/* Desktop: info button (hover) */}
       <button
-        className="md:hidden p-2 text-text-muted active:text-accent transition-colors shrink-0"
-        onClick={() => onPlay(song)}
-        title="Play"
+        className="hidden md:flex opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all shrink-0"
+        onClick={(e) => { e.stopPropagation(); onInfo(song) }}
+        title="Song info"
       >
-        <Play size={17} />
+        <Info size={14} />
       </button>
+
+      {/* Mobile: info + play buttons */}
+      <div className="md:hidden flex items-center shrink-0">
+        <button
+          className="p-2 text-text-muted active:text-accent transition-colors"
+          onClick={(e) => { e.stopPropagation(); onInfo(song) }}
+          title="Song info"
+        >
+          <Info size={16} />
+        </button>
+        <button
+          className="p-2 text-text-muted active:text-accent transition-colors"
+          onClick={() => onPlay(song)}
+          title="Play"
+        >
+          <Play size={17} />
+        </button>
+      </div>
     </div>
   )
 }
 
 // ─── Song card (grid mode) ────────────────────────────────────────────────────
-function SongCard({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: (song: JWApiSong) => void; onCategoryClick: (cat: Category) => void }): JSX.Element {
+function SongCard({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; onPlay: (song: JWApiSong) => void; onCategoryClick: (cat: Category) => void; onInfo: (song: JWApiSong) => void }): JSX.Element {
   const track = songToTrack(song)
   const title = song.track_titles?.[0] || song.name
 
@@ -156,6 +178,13 @@ function SongCard({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: 
           >
             {CATEGORY_LABELS[song.category] ?? song.category}
           </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onInfo(song) }}
+            className="ml-auto p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text-primary transition-colors"
+            title="Song info"
+          >
+            <Info size={11} />
+          </button>
         </div>
       </div>
     </div>
@@ -199,6 +228,7 @@ const LS_TRACKER_GROUP = 'api-tracker:groupByAlbum'
 export default function ApiTrackerView(): JSX.Element {
   const { playTrack, apiTrackerCategory, setApiTrackerCategory, apiTrackerEra, setApiTrackerEra } = useStore()
 
+  const [selectedSong, setSelectedSong] = useState<JWApiSong | null>(null)
   const [stats, setStats] = useState<JWApiStats | null>(null)
   const [eras, setEras] = useState<JWApiEra[]>([])
   const [songs, setSongs] = useState<JWApiSong[]>([])
@@ -265,6 +295,8 @@ export default function ApiTrackerView(): JSX.Element {
     const track = songToTrack(song)
     playTrack(track, [track])
   }, [playTrack])
+
+  const handleInfo = useCallback((song: JWApiSong) => { setSelectedSong(song) }, [])
 
   const groupedSongs = useMemo(() => {
     if (!groupByAlbum) return null
@@ -407,13 +439,13 @@ export default function ApiTrackerView(): JSX.Element {
                     <span className="ml-2 font-normal opacity-60">{groupSongs.length}</span>
                   </div>
                   {groupSongs.map((song) => (
-                    <SongRow key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} />
+                    <SongRow key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} />
                   ))}
                 </div>
               ))
             ) : (
               songs.map((song) => (
-                <SongRow key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} />
+                <SongRow key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} />
               ))
             )}
           </div>
@@ -428,7 +460,7 @@ export default function ApiTrackerView(): JSX.Element {
                   </p>
                   <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
                     {groupSongs.map((song) => (
-                      <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} />
+                      <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} />
                     ))}
                   </div>
                 </div>
@@ -437,12 +469,15 @@ export default function ApiTrackerView(): JSX.Element {
           ) : (
             <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
               {songs.map((song) => (
-                <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} />
+                <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} />
               ))}
             </div>
           )
         )}
       </div>
+
+      {/* Song info modal */}
+      <SongInfoModal song={selectedSong} onClose={() => setSelectedSong(null)} />
 
       {/* Pagination */}
       {!loading && totalPages > 1 && (
