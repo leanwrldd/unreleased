@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.4',
+    date: '2026-06-17',
+    changes: [
+      { type: 'improve', text: 'Contribute page: all fields pre-filled from API data when a song is selected — edit to correct/override' },
+      { type: 'new', text: 'Contribute page: new correction fields — title, artist, era, category, leak type' },
+      { type: 'new', text: 'Contribute page: existing saved edits load automatically when you re-select a song' },
+      { type: 'improve', text: 'Contribute page: removed "Your name" field — attribution is automatic from your account' },
+    ]
+  },
+  {
     version: '1.3.3',
     date: '2026-06-17',
     changes: [

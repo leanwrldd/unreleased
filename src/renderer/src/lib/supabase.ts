@@ -26,6 +26,13 @@ export interface SongSupplement {
   jw_song_id: number
   created_at: string
   updated_at: string
+  // Corrections (override API data)
+  corrected_title: string | null
+  corrected_artist: string | null
+  corrected_era: string | null
+  corrected_category: string | null
+  verified_leak_type: string | null
+  // Supplemental info
   context: string | null
   trivia: string[] | null
   sample_info: string | null
