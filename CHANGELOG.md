@@ -6,6 +6,13 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.2.4] — 2026-06-17
+
+- **Fix** Mobile bottom nav labels now visible — inactive tab text was inheriting no color (appeared black on dark sidebar)
+- **Improve** Mobile nav icons slightly larger (24px); sidebar logo bigger (h-32)
+
+---
+
 ## [1.2.3] — 2026-06-17
 
 - **Fix** Mobile bottom nav labels no longer hidden on small screens — text truncates cleanly instead of overflowing

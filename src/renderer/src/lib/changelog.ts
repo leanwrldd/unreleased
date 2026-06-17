@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.4',
+    date: '2026-06-17',
+    changes: [
+      { type: 'fix', text: 'Mobile bottom nav labels now visible — inactive tab text was inheriting no color (appeared black on dark sidebar)' },
+      { type: 'improve', text: 'Mobile nav icons slightly larger (24px); sidebar logo bigger (h-32)' },
+    ]
+  },
+  {
     version: '1.2.3',
     date: '2026-06-17',
     changes: [

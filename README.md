@@ -5,7 +5,7 @@ A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com),
 > **This is the `web` branch** — API-only, no local library, deployable to any static host.  
 > For the full desktop app (Electron + local library), see the [`main` branch](https://github.com/leanwrldd/unreleased/tree/main).
 
-![Version](https://img.shields.io/badge/version-1.2.3-blue)
+![Version](https://img.shields.io/badge/version-1.2.4-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -69,6 +69,10 @@ Built by **freakylatif** — find me on Discord.
 ---
 
 ## Changelog
+
+### v1.2.4 — 2026-06-17
+- **Fix** Mobile bottom nav labels now visible — inactive tab text was inheriting no color (appeared black on dark sidebar)
+- **Improve** Mobile nav icons slightly larger (24px); sidebar logo bigger (h-32)
 
 ### v1.2.3 — 2026-06-17
 - **Fix** Mobile bottom nav labels no longer hidden on small screens — text truncates cleanly instead of overflowing
