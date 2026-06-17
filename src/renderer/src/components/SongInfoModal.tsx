@@ -1,8 +1,7 @@
-import { useState, useRef } from 'react'
+import { useRef } from 'react'
 import {
   X, Music2, Mic2, Disc3, Clock, Flame, Calendar,
-  ChevronDown, Users, MapPin, FileText, Guitar,
-  Info, Hash, Layers, Zap
+  Users, MapPin, FileText, Guitar, Info, Hash, Layers, Zap
 } from 'lucide-react'
 import { JWApiSong, CATEGORY_LABELS, buildImageUrl, parseDuration } from '../lib/juicewrldApi'
 
@@ -24,31 +23,18 @@ interface SectionProps {
   title: string
   icon: JSX.Element
   children: React.ReactNode
-  defaultOpen?: boolean
 }
 
-function Section({ title, icon, children, defaultOpen = true }: SectionProps): JSX.Element {
-  const [open, setOpen] = useState(defaultOpen)
+function Section({ title, icon, children }: SectionProps): JSX.Element {
   return (
     <div className="border border-[var(--border)] rounded-xl overflow-hidden">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-3 py-2.5 bg-surface-overlay hover:bg-surface-raised transition-colors"
-      >
-        <div className="flex items-center gap-2 text-text-secondary text-xs font-semibold uppercase tracking-wide">
-          <span className="text-text-muted">{icon}</span>
-          {title}
-        </div>
-        <ChevronDown
-          size={14}
-          className={`text-text-muted transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && (
-        <div className="px-3 pb-3 pt-2 text-text-primary text-xs leading-relaxed space-y-1.5">
-          {children}
-        </div>
-      )}
+      <div className="flex items-center gap-2 px-3 py-2 bg-surface-overlay">
+        <span className="text-text-muted">{icon}</span>
+        <span className="text-text-secondary text-xs font-semibold uppercase tracking-wide">{title}</span>
+      </div>
+      <div className="px-3 pb-3 pt-2 text-text-primary text-xs leading-relaxed space-y-1.5">
+        {children}
+      </div>
     </div>
   )
 }
@@ -84,7 +70,6 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
   const hasInstrumentals = song.instrumentals || song.instrumental_names
   const hasSession = song.session_titles || song.session_tracking
 
-  // Try to parse notes JSON — fall back to raw string
   let notesDisplay: string | null = null
   if (song.notes) {
     try {
@@ -153,10 +138,10 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
 
         {/* Quick stats row */}
         <div className="flex items-center gap-4 px-5 pb-3 shrink-0 flex-wrap">
-          {(song.credited_artists) && (
+          {song.credited_artists && (
             <div className="flex items-center gap-1.5 text-text-muted">
               <Mic2 size={12} />
-              <span className="text-xs">{song.credited_artists || 'Juice WRLD'}</span>
+              <span className="text-xs">{song.credited_artists}</span>
             </div>
           )}
           {song.length && (
@@ -184,21 +169,18 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
         {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-2.5">
 
-          {/* Producers */}
           {song.producers && (
             <Section title="Produced by" icon={<Disc3 size={13} />}>
-              <p className="text-text-primary">{song.producers}</p>
+              <p>{song.producers}</p>
             </Section>
           )}
 
-          {/* Engineers */}
           {song.engineers && (
             <Section title="Engineers" icon={<Users size={13} />}>
-              <p className="text-text-primary">{song.engineers}</p>
+              <p>{song.engineers}</p>
             </Section>
           )}
 
-          {/* Recording Details */}
           {hasRecording && (
             <Section title="Recording Details" icon={<MapPin size={13} />}>
               {song.recording_locations && <Field label="Location" value={song.recording_locations} />}
@@ -206,14 +188,12 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
             </Section>
           )}
 
-          {/* File Names */}
           {song.file_names && (
             <Section title="File Names" icon={<FileText size={13} />}>
-              <p className="text-text-primary font-mono text-[11px] leading-relaxed">{song.file_names}</p>
+              <p className="font-mono text-[11px]">{song.file_names}</p>
             </Section>
           )}
 
-          {/* Instrumentals */}
           {hasInstrumentals && (
             <Section title="Instrumentals" icon={<Guitar size={13} />}>
               {song.instrumentals && <Field label="Info" value={song.instrumentals} />}
@@ -223,21 +203,18 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
             </Section>
           )}
 
-          {/* Bitrate */}
           {song.bitrate && (
-            <Section title="Quality" icon={<Zap size={13} />} defaultOpen={false}>
+            <Section title="Quality" icon={<Zap size={13} />}>
               <Field label="Bitrate" value={song.bitrate} />
             </Section>
           )}
 
-          {/* Additional Info */}
           {song.additional_information && (
             <Section title="Additional Info" icon={<Info size={13} />}>
-              <p className="text-text-primary whitespace-pre-wrap">{song.additional_information}</p>
+              <p className="whitespace-pre-wrap">{song.additional_information}</p>
             </Section>
           )}
 
-          {/* Important Dates */}
           {hasImportantDates && (
             <Section title="Important Dates" icon={<Calendar size={13} />}>
               {song.preview_date && <Field label="Preview Date" value={song.preview_date} />}
@@ -246,35 +223,25 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
             </Section>
           )}
 
-          {/* Session Info */}
           {hasSession && (
-            <Section title="Session Info" icon={<Layers size={13} />} defaultOpen={false}>
+            <Section title="Session Info" icon={<Layers size={13} />}>
               {song.session_titles && <Field label="Titles" value={song.session_titles} />}
               {song.session_tracking && <Field label="Tracking" value={song.session_tracking} />}
             </Section>
           )}
 
-          {/* Notes */}
           {notesDisplay && (
-            <Section title="Notes" icon={<Hash size={13} />} defaultOpen={false}>
-              <p className="text-text-primary whitespace-pre-wrap">{notesDisplay}</p>
+            <Section title="Notes" icon={<Hash size={13} />}>
+              <p className="whitespace-pre-wrap">{notesDisplay}</p>
             </Section>
           )}
 
-          {/* Lyrics */}
           {song.lyrics && (
             <Section title="Lyrics" icon={<Music2 size={13} />}>
               <div className="bg-surface-raised rounded-xl p-3 max-h-48 overflow-y-auto no-scrollbar mt-0.5">
                 <pre className="text-text-secondary text-xs leading-relaxed whitespace-pre-wrap font-sans">{song.lyrics}</pre>
               </div>
             </Section>
-          )}
-
-          {/* Empty state */}
-          {!song.producers && !song.engineers && !hasRecording && !song.file_names &&
-           !hasInstrumentals && !song.additional_information && !hasImportantDates &&
-           !hasSession && !notesDisplay && !song.lyrics && (
-            <p className="text-text-muted text-xs text-center py-4">No additional information available.</p>
           )}
 
         </div>
