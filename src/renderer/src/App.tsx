@@ -6,7 +6,6 @@ import { onAuthStateChange, getSession, getProfile } from './lib/supabase'
 function getViewFromPath(pathname: string): ViewType {
   if (pathname.startsWith('/files')) return 'api-files'
   if (pathname === '/categories') return 'api-categories'
-  if (pathname === '/radio') return 'api-radio'
   if (pathname === '/editor') return 'editor'
   if (pathname === '/compilation') return 'compilation'
   if (pathname === '/admin') return 'admin'
@@ -16,7 +15,6 @@ function getViewFromPath(pathname: string): ViewType {
 import Sidebar from './components/Sidebar'
 import BottomNav from './components/BottomNav'
 import ApiTrackerView from './components/ApiTrackerView'
-import ApiRadioView from './components/ApiRadioView'
 import ApiFilesView from './components/ApiFilesView'
 import ApiCategoryView from './components/ApiCategoryView'
 import ApiCompilationView from './components/ApiCompilationView'
@@ -96,7 +94,6 @@ export default function App(): JSX.Element {
         <main className="flex-1 overflow-hidden flex">
           <ErrorBoundary>
             {activeView === 'api-tracker' ? <ApiTrackerView />
-              : activeView === 'api-radio' ? <ApiRadioView />
               : activeView === 'api-files' ? <ApiFilesView />
               : activeView === 'api-categories' ? <ApiCategoryView />
               : activeView === 'editor' ? <EditorPage />

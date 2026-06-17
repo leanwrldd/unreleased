@@ -139,9 +139,11 @@ export default function NowPlaying(): JSX.Element {
               const artSrc = currentTrackFull?.albumArt ?? currentTrack.imageUrl
               return (
                 <div className={`px-6 shrink-0 ${artCollapsed ? 'pt-2 pb-3' : 'py-3'}`}>
-                  {artCollapsed && artSrc && (
+                  {artCollapsed && (
                     <div className="flex gap-3 items-center mb-3">
-                      <img src={artSrc} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                      {artSrc && (
+                        <img src={artSrc} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                      )}
                       <div className="min-w-0">
                         <p className="text-text-primary font-bold text-base truncate">{currentTrack.title}</p>
                         <p className="text-text-muted text-xs truncate">{currentTrack.artist}</p>

@@ -6,6 +6,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.9',
+    date: '2026-06-18',
+    changes: [
+      { type: 'new', text: 'Radio mode: removed dedicated radio tab — radio is now a toggle button (📻) in the player bar; when on, a fresh random queue loads automatically when the current queue ends' },
+      { type: 'new', text: 'Tracker: click any column header (Title, Artist, Era, Category, Time) to sort; click again to reverse — powered by the API\'s ordering parameter' },
+      { type: 'fix', text: 'Tracker: removed era dropdown and "By album" toggle — era filter now lives in the category sidebar' },
+      { type: 'fix', text: 'Player bar and Now Playing: track info (title, artist, cover art) now shows correctly when playing from Files or Compilation' },
+      { type: 'fix', text: 'Now Playing: title and artist always visible when artwork is collapsed, even for tracks without cover art' },
+      { type: 'fix', text: 'Queue panel: songs with unknown duration now show --:-- instead of 0:00' },
+      { type: 'fix', text: 'Favicon: icon resized and auto-cropped — no longer appears tiny in browser tabs' },
+      { type: 'improve', text: 'App name wordmark: slightly heavier font weight for better legibility' },
+      { type: 'improve', text: 'Audio output picker: re-enumerates devices when playback starts — should surface all available output devices with labels' },
+    ]
+  },
+  {
     version: '1.3.8',
     date: '2026-06-18',
     changes: [

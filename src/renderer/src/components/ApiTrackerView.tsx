@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Search, Play, ChevronLeft, ChevronRight, Loader2, Music2, X,
-  LayoutList, LayoutGrid, Layers, Info, Download, ListPlus, PanelLeft,
+  LayoutList, LayoutGrid, Info, Download, ListPlus, PanelLeft,
+  ChevronUp, ChevronDown,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
@@ -17,7 +18,6 @@ type ViewMode = 'list' | 'grid'
 
 const PAGE_SIZE = 50
 const LS_TRACKER_VIEW = 'api-tracker:viewMode'
-const LS_TRACKER_GROUP = 'api-tracker:groupByAlbum'
 const LS_TRACKER_SIDEBAR = 'api-tracker:showSidebar'
 
 function formatDur(secs: number): string {
@@ -405,16 +405,29 @@ export default function ApiTrackerView(): JSX.Element {
   const [viewMode, setViewModeState] = useState<ViewMode>(
     () => (localStorage.getItem(LS_TRACKER_VIEW) as ViewMode) || 'list'
   )
-  const [groupByAlbum, setGroupByAlbumState] = useState<boolean>(
-    () => localStorage.getItem(LS_TRACKER_GROUP) === 'true'
-  )
   const [showSidebar, setShowSidebarState] = useState<boolean>(
     () => localStorage.getItem(LS_TRACKER_SIDEBAR) !== 'false'
   )
 
   const setViewMode = (v: ViewMode): void => { setViewModeState(v); localStorage.setItem(LS_TRACKER_VIEW, v) }
-  const setGroupByAlbum = (v: boolean): void => { setGroupByAlbumState(v); localStorage.setItem(LS_TRACKER_GROUP, String(v)) }
   const setShowSidebar = (v: boolean): void => { setShowSidebarState(v); localStorage.setItem(LS_TRACKER_SIDEBAR, String(v)) }
+
+  // Column sort: field name maps to DRF `ordering` param; prefix `-` for desc
+  type OrderField = 'name' | 'credited_artists' | 'era__name' | 'category' | 'length'
+  const [orderField, setOrderField] = useState<OrderField | null>(null)
+  const [orderDir, setOrderDir] = useState<'asc' | 'desc'>('asc')
+
+  const handleSort = (field: OrderField): void => {
+    if (orderField === field) {
+      setOrderDir((d) => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setOrderField(field)
+      setOrderDir('asc')
+    }
+    setPage(1)
+  }
+
+  const ordering = orderField ? (orderDir === 'desc' ? `-${orderField}` : orderField) : undefined
 
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -452,6 +465,7 @@ export default function ApiTrackerView(): JSX.Element {
       search: debouncedSearch || undefined,
       category: category || undefined,
       era: era || undefined,
+      ordering,
       page,
       page_size: PAGE_SIZE,
     })
@@ -459,26 +473,16 @@ export default function ApiTrackerView(): JSX.Element {
       .catch((err) => { if (!cancelled) setError(err.message) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [debouncedSearch, category, era, page])
+  }, [debouncedSearch, category, era, ordering, page])
 
   const handlePlay = useCallback((song: JWApiSong) => {
     const track = songToTrack(song)
-    playTrack(track, [track])
-  }, [playTrack])
+    const allTracks = songs.map(songToTrack)
+    playTrack(track, allTracks)
+  }, [playTrack, songs])
 
   const handleInfo = useCallback((song: JWApiSong) => { setSelectedSong(song) }, [])
   const handleQueue = useCallback((track: Track) => { addToQueue(track) }, [addToQueue])
-
-  const groupedSongs = useMemo(() => {
-    if (!groupByAlbum) return null
-    const groups = new Map<string, JWApiSong[]>()
-    for (const song of songs) {
-      const key = song.era?.name || '—'
-      if (!groups.has(key)) groups.set(key, [])
-      groups.get(key)!.push(song)
-    }
-    return groups
-  }, [songs, groupByAlbum])
 
   const totalPages = Math.ceil(count / PAGE_SIZE)
 
@@ -535,30 +539,6 @@ export default function ApiTrackerView(): JSX.Element {
               <option value="unsurfaced">Unsurfaced</option>
               <option value="recording_session">Sessions</option>
             </select>
-
-            <select
-              value={era}
-              onChange={(e) => setEra(e.target.value)}
-              className="flex-1 min-w-0 bg-surface-overlay text-text-primary text-sm px-3 py-2.5 md:py-2 rounded-lg outline-none border border-transparent focus:ring-1 ring-accent focus:border-accent/40 cursor-pointer"
-            >
-              <option value="">All eras</option>
-              {(Array.isArray(eras) ? eras : []).map((e) => (
-                <option key={e.id} value={e.name}>{e.name}</option>
-              ))}
-            </select>
-
-            <button
-              onClick={() => setGroupByAlbum(!groupByAlbum)}
-              className={`flex items-center gap-1.5 px-2.5 py-2.5 md:py-2 rounded-lg text-xs transition-colors shrink-0 ${
-                groupByAlbum
-                  ? 'bg-accent/15 text-accent border border-accent/30'
-                  : 'bg-surface-overlay text-text-muted hover:text-text-secondary border border-transparent'
-              }`}
-              title="Group by album/era"
-            >
-              <Layers size={13} />
-              <span className="hidden sm:inline">By album</span>
-            </button>
 
             <div className="flex items-center bg-surface-overlay rounded-lg p-0.5 shrink-0">
               <button
@@ -625,15 +605,33 @@ export default function ApiTrackerView(): JSX.Element {
           {/* Column headers — desktop list only */}
           {viewMode === 'list' && (
             <div className="hidden md:block px-5 pb-1 shrink-0">
-              <div className="flex items-center gap-3 px-3 py-1 text-xs text-text-muted font-medium uppercase tracking-wider">
-                <div className="w-9 shrink-0" />
-                <div className="flex-1">Title</div>
-                <div className="w-32 shrink-0">Artist</div>
-                <div className="w-36 shrink-0">Era</div>
-                <div className="w-24 shrink-0 text-center">Category</div>
-                <div className="w-10 shrink-0 text-right">Time</div>
-                <div className="w-20 shrink-0" />
-              </div>
+              {(() => {
+                const SortBtn = ({ field, label, className }: { field: OrderField; label: string; className?: string }): JSX.Element => {
+                  const active = orderField === field
+                  return (
+                    <button
+                      onClick={() => handleSort(field)}
+                      className={`flex items-center gap-0.5 text-xs font-medium uppercase tracking-wider transition-colors ${active ? 'text-accent' : 'text-text-muted hover:text-text-secondary'} ${className ?? ''}`}
+                    >
+                      {label}
+                      {active
+                        ? orderDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />
+                        : <span className="w-2.5" />}
+                    </button>
+                  )
+                }
+                return (
+                  <div className="flex items-center gap-3 px-3 py-1">
+                    <div className="w-9 shrink-0" />
+                    <SortBtn field="name" label="Title" className="flex-1" />
+                    <SortBtn field="credited_artists" label="Artist" className="w-32 shrink-0" />
+                    <SortBtn field="era__name" label="Era" className="w-36 shrink-0" />
+                    <SortBtn field="category" label="Category" className="w-24 shrink-0 justify-center" />
+                    <SortBtn field="length" label="Time" className="w-10 shrink-0 justify-end" />
+                    <div className="w-20 shrink-0" />
+                  </div>
+                )
+              })()}
             </div>
           )}
 
@@ -656,48 +654,16 @@ export default function ApiTrackerView(): JSX.Element {
               </div>
             ) : viewMode === 'list' ? (
               <div className="space-y-0.5">
-                {groupedSongs ? (
-                  Array.from(groupedSongs.entries()).map(([albumName, groupSongs]) => (
-                    <div key={albumName}>
-                      <div className="sticky top-0 z-10 px-3 py-1.5 text-xs font-semibold text-text-muted uppercase tracking-wider bg-surface/90 backdrop-blur-sm border-b border-[var(--border)] mb-0.5">
-                        {albumName}
-                        <span className="ml-2 font-normal opacity-60">{groupSongs.length}</span>
-                      </div>
-                      {groupSongs.map((song) => (
-                        <SongRow key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} onQueue={handleQueue} />
-                      ))}
-                    </div>
-                  ))
-                ) : (
-                  songs.map((song) => (
-                    <SongRow key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} onQueue={handleQueue} />
-                  ))
-                )}
+                {songs.map((song) => (
+                  <SongRow key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} onQueue={handleQueue} />
+                ))}
               </div>
             ) : (
-              groupedSongs ? (
-                <div className="space-y-4 pt-1">
-                  {Array.from(groupedSongs.entries()).map(([albumName, groupSongs]) => (
-                    <div key={albumName}>
-                      <p className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
-                        {albumName}
-                        <span className="ml-2 font-normal opacity-60">{groupSongs.length}</span>
-                      </p>
-                      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-                        {groupSongs.map((song) => (
-                          <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} onQueue={handleQueue} />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-                  {songs.map((song) => (
-                    <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} onQueue={handleQueue} />
-                  ))}
-                </div>
-              )
+              <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
+                {songs.map((song) => (
+                  <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} onQueue={handleQueue} />
+                ))}
+              </div>
             )}
           </div>
 

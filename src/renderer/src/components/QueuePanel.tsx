@@ -193,7 +193,7 @@ function QueueRow({ track, isActive, isPlaying, showDrag, onPlay, onRemove }: {
 
       <div className="flex items-center gap-1 shrink-0">
         <span className="text-text-muted text-xs tabular-nums opacity-60">
-          {formatDuration(track.duration)}
+          {track.duration ? formatDuration(track.duration) : '--:--'}
         </span>
         {onRemove && (
           <button

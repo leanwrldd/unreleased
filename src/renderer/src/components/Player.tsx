@@ -14,11 +14,12 @@ import {
   ListOrdered,
   Heart,
   ChevronUp,
-  Check
+  Check,
+  Radio,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { formatDuration } from '../lib/lyrics'
-import { apiFetch, JWApiSong } from '../lib/juicewrldApi'
+import { apiFetch, JWApiSong, buildRandomQueue, songToTrack } from '../lib/juicewrldApi'
 import { FullTrack } from '../types'
 
 let _seek: ((t: number) => void) | null = null
@@ -59,7 +60,10 @@ export default function Player(): JSX.Element {
     setPlaybackSpeed,
     likedTrackIds,
     toggleLike,
-    setActiveView
+    setActiveView,
+    radioMode,
+    setRadioMode,
+    playTrack,
   } = useStore()
 
   // Two audio slots — ping-pong between them for crossfade
@@ -326,7 +330,24 @@ export default function Player(): JSX.Element {
     }
     const prevId = currentTrack?.id
     const next = nextTrack()
-    if (!next) { setIsPlaying(false); return }
+    if (!next) {
+      // Radio mode: fetch a new batch and keep playing
+      if (useStore.getState().radioMode) {
+        buildRandomQueue()
+          .then((songs) => {
+            if (songs.length) {
+              const tracks = songs.map(songToTrack)
+              useStore.getState().playTrack(tracks[0], tracks)
+            } else {
+              setIsPlaying(false)
+            }
+          })
+          .catch(() => setIsPlaying(false))
+      } else {
+        setIsPlaying(false)
+      }
+      return
+    }
     if (next.id === prevId) {
       // Same track (single song in queue with repeat-all, or only one option)
       const a = getActive()
@@ -411,14 +432,24 @@ export default function Player(): JSX.Element {
   useEffect(() => {
     const enumerate = async (): Promise<void> => {
       try {
+        // Request microphone permission briefly to unlock device labels
+        // (browsers hide labels until a getUserMedia permission is granted)
         const devices = await navigator.mediaDevices.enumerateDevices()
-        setOutputDevices(devices.filter((d) => d.kind === 'audiooutput'))
+        const hasLabels = devices.some((d) => d.kind === 'audiooutput' && d.label)
+        if (!hasLabels) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+            stream.getTracks().forEach((t) => t.stop())
+          } catch { /* permission denied — show what we have */ }
+        }
+        const refreshed = await navigator.mediaDevices.enumerateDevices()
+        setOutputDevices(refreshed.filter((d) => d.kind === 'audiooutput'))
       } catch { /* ignore */ }
     }
     enumerate()
     navigator.mediaDevices.addEventListener('devicechange', enumerate)
     return () => navigator.mediaDevices.removeEventListener('devicechange', enumerate)
-  }, [])
+  }, [isPlaying])
 
   const openOutputPicker = (): void => {
     if (!outputBtnRef.current) return
@@ -459,8 +490,8 @@ export default function Player(): JSX.Element {
             className="w-10 h-10 rounded bg-surface-overlay shrink-0 overflow-hidden"
             onClick={() => setShowNowPlaying(!showNowPlaying)}
           >
-            {currentTrackFull?.albumArt ? (
-              <img src={currentTrackFull.albumArt} alt="" className="w-full h-full object-cover" />
+            {(currentTrackFull?.albumArt ?? currentTrack?.imageUrl) ? (
+              <img src={currentTrackFull?.albumArt ?? currentTrack?.imageUrl} alt="" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-text-muted">
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -504,8 +535,8 @@ export default function Player(): JSX.Element {
             onClick={() => setShowNowPlaying(!showNowPlaying)}
             title="Now Playing"
           >
-            {currentTrackFull?.albumArt ? (
-              <img src={currentTrackFull.albumArt} alt="Album art" className="w-full h-full object-cover" />
+            {(currentTrackFull?.albumArt ?? currentTrack?.imageUrl) ? (
+              <img src={currentTrackFull?.albumArt ?? currentTrack?.imageUrl} alt="Album art" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-text-muted">
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
@@ -559,6 +590,14 @@ export default function Player(): JSX.Element {
             <button onClick={toggleRepeat}
               className={`transition-colors ${repeat !== 'none' ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}>
               {repeat === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
+            </button>
+
+            <button
+              onClick={() => setRadioMode(!radioMode)}
+              title={radioMode ? 'Radio on — random queue plays next' : 'Radio off'}
+              className={`transition-colors ${radioMode ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}
+            >
+              <Radio size={18} />
             </button>
           </div>
 

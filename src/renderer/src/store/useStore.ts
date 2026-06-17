@@ -76,6 +76,9 @@ interface StoreActions {
   setLikedTrackIds: (ids: string[]) => void
   toggleLike: (trackId: string) => void
 
+  // Radio mode
+  setRadioMode: (on: boolean) => void
+
   // API extras
   setApiTrackerCategory: (cat: string) => void
   setApiTrackerEra: (era: string) => void
@@ -121,6 +124,7 @@ interface AppStore {
   session: Session | null
   userProfile: Profile | null
   pendingEditorSongId: number | null
+  radioMode: boolean
 }
 
 export const useStore = create<AppStore & StoreActions>((set, get) => ({
@@ -161,6 +165,7 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   likedTrackIds: ls.get<string[]>('likedTrackIds') ?? [],
   apiTrackerCategory: '',
   apiTrackerEra: '',
+  radioMode: false,
   session: null,
   userProfile: null,
   pendingEditorSongId: null,
@@ -318,6 +323,7 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   },
 
   // ─── API extras ──────────────────────────────────────────────────────────────
+  setRadioMode: (on) => set({ radioMode: on }),
   setApiTrackerCategory: (cat) => set({ apiTrackerCategory: cat }),
   setApiTrackerEra: (era) => set({ apiTrackerEra: era }),
 

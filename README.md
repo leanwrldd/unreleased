@@ -5,7 +5,7 @@ A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com),
 > **This is the `web` branch** — API-only, no local library, deployable to any static host.  
 > For the full desktop app (Electron + local library), see the [`main` branch](https://github.com/leanwrldd/unreleased/tree/main).
 
-![Version](https://img.shields.io/badge/version-1.2.9-blue)
+![Version](https://img.shields.io/badge/version-1.3.9-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -15,12 +15,11 @@ A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com),
 
 ## Features
 
-- **Categories** — browse Released, Unreleased, Unsurfaced, and Sessions with song counts; drill into Eras
-- **Tracker** — search and filter thousands of songs by category, era, and more
-- **Radio** — random song playback with skip
+- **Tracker** — search, filter, and sort thousands of songs by category, era, and column headers; collapsible category sidebar
+- **Radio mode** — toggle in the player bar; a fresh random queue loads when the current one ends
 - **File browser** — navigate the API filesystem, stream audio, and download files
 - **Now Playing panel** — album art, lyrics (fetched from the API), and track info
-- **Queue** — add songs, reorder, clear
+- **Queue** — add songs from any view, reorder, clear
 - **Compilation** — browse Studio Albums & Mixtapes, Unreleased, and Singles with album art grids
 - **Crossfade, playback speed, sleep timer, accent color, dark/light theme** — all settings persist via localStorage
 - **Supabase** — supplemental song data layer for editors
@@ -71,6 +70,32 @@ Built by **freakylatif** — find me on Discord.
 ---
 
 ## Changelog
+
+### v1.3.9 — 2026-06-18
+- **New** Radio mode: radio is now a toggle button (📻) in the player bar — when on, a fresh random queue loads when the current queue ends; dedicated radio tab removed
+- **New** Tracker: click any column header to sort (Title, Artist, Era, Category, Time); click again to reverse
+- **Fix** Tracker: removed era dropdown and "By album" toggle — era filter lives in the category sidebar
+- **Fix** Player bar and Now Playing: track info and cover art now show correctly when playing from Files or Compilation
+- **Fix** Now Playing: title and artist always visible when artwork is collapsed, even for tracks without cover art
+- **Fix** Queue panel: unknown-duration songs show `--:--` instead of `0:00`
+- **Fix** Favicon: icon resized and auto-cropped — no longer tiny in browser tabs
+- **Improve** App name wordmark: slightly heavier font weight
+- **Improve** Audio output picker: re-enumerates with permission prompt on playback start
+
+### v1.3.8 — 2026-06-18
+- **New** Site favicon — browser tabs now show the unreleased logo
+- **New** Tracker: collapsible category sidebar (desktop) with counts and era list
+- **New** All song lists have consistent action buttons — Info, Add to Queue, Download across Tracker, Compilation, Radio, and Files
+- **Fix** Radio: builds a full ~14-song random queue upfront; no longer stops after 2 songs
+- **Fix** Now Playing: cover art and info show correctly when playing from Compilation or Files
+- **Fix** Settings: "Become an Editor" hidden for users who are already editors/admins
+- **Improve** Nav: removed Categories (now inside Tracker) and Contribute (use pencil icon in Now Playing)
+
+### v1.3.7 — 2026-06-17
+- **Fix** Contribute: date fields stripped of API-prepended words like "Recorded"
+- **Improve** Contribute: Category is now a dropdown
+- **New** Contribute: Additional information pre-filled from API into Context/Story field
+- **New** Contribute: Lyrics and Synced Lyrics fields added
 
 ### v1.2.7 — 2026-06-17
 - **Improve** Song info modal now shows all available API data in collapsible sections: engineers, recording details, file names, instrumentals, additional info, important dates, session info, and notes

@@ -22,7 +22,7 @@ export default function Sidebar(): JSX.Element {
           <img src={logo} alt="unreleased" className="h-32 w-auto object-contain" />
           <span
             className="text-text-primary text-sm uppercase select-none"
-            style={{ fontFamily: "'Josefin Sans', sans-serif", fontWeight: 100, letterSpacing: '0.35em' }}
+            style={{ fontFamily: "'Josefin Sans', sans-serif", fontWeight: 300, letterSpacing: '0.35em' }}
           >
             unreleased
           </span>
