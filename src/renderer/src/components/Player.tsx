@@ -432,18 +432,8 @@ export default function Player(): JSX.Element {
   useEffect(() => {
     const enumerate = async (): Promise<void> => {
       try {
-        // Request microphone permission briefly to unlock device labels
-        // (browsers hide labels until a getUserMedia permission is granted)
         const devices = await navigator.mediaDevices.enumerateDevices()
-        const hasLabels = devices.some((d) => d.kind === 'audiooutput' && d.label)
-        if (!hasLabels) {
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-            stream.getTracks().forEach((t) => t.stop())
-          } catch { /* permission denied — show what we have */ }
-        }
-        const refreshed = await navigator.mediaDevices.enumerateDevices()
-        setOutputDevices(refreshed.filter((d) => d.kind === 'audiooutput'))
+        setOutputDevices(devices.filter((d) => d.kind === 'audiooutput'))
       } catch { /* ignore */ }
     }
     enumerate()
