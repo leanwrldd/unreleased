@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Search, Loader2, Check, AlertCircle, LogIn, Clock } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { apiFetch, JWApiPaginatedResponse, JWApiSong } from '../lib/juicewrldApi'
@@ -8,7 +8,7 @@ import AuthModal from './AuthModal'
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 export default function EditorPage(): JSX.Element {
-  const { setActiveView, session, userProfile } = useStore()
+  const { setActiveView, session, userProfile, pendingEditorSongId, setPendingEditorSongId } = useStore()
 
   const [query, setQuery] = useState('')
   const [results, setSongs] = useState<JWApiSong[]>([])
@@ -58,6 +58,16 @@ export default function EditorPage(): JSX.Element {
     setSongs([])
     setQuery(song.track_titles?.[0] || song.name)
   }
+
+  // Pre-select song navigated from NowPlaying edit button
+  useEffect(() => {
+    if (!pendingEditorSongId) return
+    const id = pendingEditorSongId
+    setPendingEditorSongId(null)
+    apiFetch<JWApiSong>(`/songs/${id}/`)
+      .then((song) => selectSong(song))
+      .catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async (): Promise<void> => {
     if (!selected || !canEdit) return

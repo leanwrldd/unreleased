@@ -83,6 +83,9 @@ interface StoreActions {
   // Auth
   setSession: (session: Session | null) => void
   setUserProfile: (profile: Profile | null) => void
+
+  // Editor
+  setPendingEditorSongId: (id: number | null) => void
 }
 
 interface AppStore {
@@ -117,6 +120,7 @@ interface AppStore {
   apiTrackerEra: string
   session: Session | null
   userProfile: Profile | null
+  pendingEditorSongId: number | null
 }
 
 export const useStore = create<AppStore & StoreActions>((set, get) => ({
@@ -159,6 +163,7 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   apiTrackerEra: '',
   session: null,
   userProfile: null,
+  pendingEditorSongId: null,
 
   // ─── Playback ────────────────────────────────────────────────────────────────
   setQueue: (tracks, startIndex = 0) =>
@@ -319,4 +324,7 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   // ─── Auth ─────────────────────────────────────────────────────────────────────
   setSession: (session) => set({ session }),
   setUserProfile: (userProfile) => set({ userProfile }),
+
+  // ─── Editor ───────────────────────────────────────────────────────────────────
+  setPendingEditorSongId: (pendingEditorSongId) => set({ pendingEditorSongId }),
 }))

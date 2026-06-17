@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useResizablePanel } from '../hooks/useResizablePanel'
-import { X, Music, ChevronUp, ChevronDown, FileAudio } from 'lucide-react'
+import { X, Music, ChevronUp, ChevronDown, FileAudio, Pencil } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import LyricsDisplay from './LyricsDisplay'
 import { formatDuration, isLrcFormat } from '../lib/lyrics'
@@ -12,6 +12,9 @@ export default function NowPlaying(): JSX.Element {
     currentTrack,
     currentTrackFull,
     setShowNowPlaying,
+    userProfile,
+    setPendingEditorSongId,
+    setActiveView,
   } = useStore()
   const [tab, setTab] = useState<Tab>('lyrics')
   const [artCollapsed, setArtCollapsed] = useState(false)
@@ -53,6 +56,23 @@ export default function NowPlaying(): JSX.Element {
               {artCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
             </button>
           )}
+          {(() => {
+            const jwMatch = currentTrack?.id.match(/^jw-(\d+)$/)
+            const canEdit = userProfile?.role === 'editor' || userProfile?.role === 'admin'
+            if (!jwMatch || !canEdit) return null
+            return (
+              <button
+                onClick={() => {
+                  setPendingEditorSongId(parseInt(jwMatch[1]))
+                  setActiveView('editor')
+                }}
+                className="text-text-muted hover:text-text-primary transition-colors"
+                title="Edit this song"
+              >
+                <Pencil size={15} />
+              </button>
+            )
+          })()}
           <button
             onClick={() => setShowNowPlaying(false)}
             className="text-text-muted hover:text-text-primary transition-colors"

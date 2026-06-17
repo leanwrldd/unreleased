@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.3',
+    date: '2026-06-17',
+    changes: [
+      { type: 'new', text: 'Editors and admins see a pencil icon in Now Playing — clicking it navigates to the Contribute page with that song pre-selected' },
+    ]
+  },
+  {
     version: '1.3.2',
     date: '2026-06-17',
     changes: [
