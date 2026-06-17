@@ -444,7 +444,59 @@ export default function Player(): JSX.Element {
         onError={(e) => console.error('Audio error (slotB):', e)}
       />
 
-      <div className="h-[90px] bg-surface border-t border-[var(--border)] flex items-center px-4 gap-4 shrink-0">
+      {/* ── Mobile player ── */}
+      <div className="md:hidden bg-surface border-t border-[var(--border)] shrink-0">
+        {/* Thin progress bar */}
+        <div className="h-[2px] bg-surface-overlay relative">
+          <div
+            className="h-full bg-accent absolute left-0 top-0 transition-none"
+            style={{ width: `${(seekDrag !== null ? seekDrag : progress) * 100}%` }}
+          />
+        </div>
+        {/* Track row */}
+        <div className="flex items-center px-3 py-2 gap-3 h-14">
+          <button
+            className="w-10 h-10 rounded bg-surface-overlay shrink-0 overflow-hidden"
+            onClick={() => setShowNowPlaying(!showNowPlaying)}
+          >
+            {currentTrackFull?.albumArt ? (
+              <img src={currentTrackFull.albumArt} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-text-muted">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                </svg>
+              </div>
+            )}
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-text-primary truncate">
+              {currentTrack?.title || 'Not playing'}
+            </p>
+            <p className="text-xs text-text-muted truncate">{currentTrack?.artist || ''}</p>
+          </div>
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button onClick={handlePrev} className="p-2 text-text-secondary hover:text-text-primary transition-colors">
+              <SkipBack size={18} fill="currentColor" />
+            </button>
+            <button
+              onClick={() => setIsPlaying(!isPlaying)}
+              disabled={!currentTrack}
+              className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:scale-105 active:scale-95 transition-transform disabled:opacity-30"
+            >
+              {isPlaying
+                ? <Pause size={16} fill="#000" className="text-black" />
+                : <Play  size={16} fill="#000" className="text-black ml-0.5" />}
+            </button>
+            <button onClick={handleNext} className="p-2 text-text-secondary hover:text-text-primary transition-colors">
+              <SkipForward size={18} fill="currentColor" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Desktop player ── */}
+      <div className="hidden md:flex h-[90px] bg-surface border-t border-[var(--border)] items-center px-4 gap-4 shrink-0">
         {/* Track info */}
         <div className="flex items-center gap-3 w-72 min-w-0">
           <button

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useStore } from './store/useStore'
 import Sidebar from './components/Sidebar'
+import BottomNav from './components/BottomNav'
 import ApiTrackerView from './components/ApiTrackerView'
 import ApiRadioView from './components/ApiRadioView'
 import ApiFilesView from './components/ApiFilesView'
@@ -55,6 +56,7 @@ export default function App(): JSX.Element {
         </main>
       </div>
       <Player />
+      <BottomNav />
       {showSettings && <Settings />}
     </div>
   )

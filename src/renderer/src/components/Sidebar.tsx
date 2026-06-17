@@ -14,7 +14,7 @@ export default function Sidebar(): JSX.Element {
   ]
 
   return (
-    <aside className="flex flex-col h-full bg-sidebar w-60 shrink-0 border-r border-[var(--border)]">
+    <aside className="hidden md:flex flex-col h-full bg-sidebar w-60 shrink-0 border-r border-[var(--border)]">
       {/* Logo */}
       <div className="px-5 pt-6 pb-4">
         <div className="flex items-center gap-2">

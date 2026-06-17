@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useResizablePanel } from '../hooks/useResizablePanel'
 import { X, Music, ChevronUp, ChevronDown, FileAudio } from 'lucide-react'
 import { useStore } from '../store/useStore'
@@ -16,13 +16,29 @@ export default function NowPlaying(): JSX.Element {
   const [tab, setTab] = useState<Tab>('lyrics')
   const [artCollapsed, setArtCollapsed] = useState(false)
   const [panelWidth, dragHandle] = useResizablePanel(360, 280, 520)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+
+  useEffect(() => {
+    const check = (): void => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   return (
-    <div className="bg-surface-raised border-l border-[var(--border)] flex shrink-0 overflow-hidden animate-slide-in-right" style={{ width: panelWidth }}>
-      {/* Resize handle — 4px wide, invisible until hover */}
-      <div className="w-1 shrink-0 relative group/handle" {...dragHandle}>
-        <div className="absolute inset-y-0 -left-1 -right-1 group-hover/handle:bg-accent/30 transition-colors rounded-full" />
-      </div>
+    <div
+      className="bg-surface-raised flex shrink-0 overflow-hidden animate-slide-in-right"
+      style={isMobile
+        ? { position: 'fixed', inset: 0, zIndex: 50 }
+        : { width: panelWidth, borderLeft: '1px solid var(--border)' }
+      }
+    >
+      {/* Resize handle — desktop only */}
+      {!isMobile && (
+        <div className="w-1 shrink-0 relative group/handle" {...dragHandle}>
+          <div className="absolute inset-y-0 -left-1 -right-1 group-hover/handle:bg-accent/30 transition-colors rounded-full" />
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
@@ -142,7 +158,6 @@ function InfoTab(): JSX.Element {
     ['Producer', currentTrackFull?.producer || null],
     ['Format', currentTrackFull?.ext?.replace('.', '').toUpperCase() || null],
     ['Notes', currentTrackFull?.notes || null],
-    ['File', currentTrack.path],
   ]
 
   return (
@@ -151,7 +166,7 @@ function InfoTab(): JSX.Element {
         value != null && value !== '' ? (
           <div key={label} className="py-2 border-b border-[var(--border)] last:border-0">
             <p className="text-text-muted text-[10px] font-semibold uppercase tracking-wider mb-0.5">{label}</p>
-            <p className={`text-text-primary text-sm ${label === 'File' ? 'break-all text-xs text-text-secondary' : 'truncate'}`}>
+            <p className="text-text-primary text-sm truncate">
               {String(value)}
             </p>
           </div>
@@ -159,7 +174,7 @@ function InfoTab(): JSX.Element {
       )}
       <div className="pt-4 flex items-center gap-2 text-text-muted">
         <FileAudio size={14} />
-        <span className="text-xs">{currentTrack.path.split(/[\\/]/).pop()}</span>
+        <span className="text-xs">{currentTrack.title}</span>
       </div>
     </div>
   )

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { X, GripVertical, ListMusic, Trash2 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
@@ -13,6 +13,13 @@ export default function QueuePanel(): JSX.Element {
   } = useStore()
 
   const [panelWidth, dragHandle] = useResizablePanel(300, 240, 480)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+
+  useEffect(() => {
+    const check = (): void => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   const upcoming = queue.slice(queueIndex + 1)
   const past = queue.slice(0, queueIndex)
@@ -38,13 +45,18 @@ export default function QueuePanel(): JSX.Element {
 
   return (
     <div
-      className="bg-surface-raised border-l border-[var(--border)] flex shrink-0 overflow-hidden animate-slide-in-right"
-      style={{ width: panelWidth }}
+      className="bg-surface-raised flex shrink-0 overflow-hidden animate-slide-in-right"
+      style={isMobile
+        ? { position: 'fixed', inset: 0, zIndex: 50 }
+        : { width: panelWidth, borderLeft: '1px solid var(--border)' }
+      }
     >
-      {/* Resize handle */}
-      <div className="w-1 shrink-0 relative group/handle" {...dragHandle}>
-        <div className="absolute inset-y-0 -left-1 -right-1 group-hover/handle:bg-accent/30 transition-colors rounded-full" />
-      </div>
+      {/* Resize handle — desktop only */}
+      {!isMobile && (
+        <div className="w-1 shrink-0 relative group/handle" {...dragHandle}>
+          <div className="absolute inset-y-0 -left-1 -right-1 group-hover/handle:bg-accent/30 transition-colors rounded-full" />
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
