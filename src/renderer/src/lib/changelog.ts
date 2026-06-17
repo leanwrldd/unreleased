@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.7',
+    date: '2026-06-17',
+    changes: [
+      { type: 'fix', text: 'Contribute: date fields (release date, recording date) cleaned — API-prepended words like "Recorded" are stripped automatically' },
+      { type: 'improve', text: 'Contribute: Category is now a dropdown (Released / Unreleased / Unsurfaced / Recording Session)' },
+      { type: 'new', text: 'Contribute: "Additional information" from API is now pre-filled into the Context/Story field' },
+      { type: 'new', text: 'Contribute: Lyrics and Synced Lyrics fields added — lyrics pre-filled from API if available, synced lyrics (LRC format) for editor entry' },
+    ]
+  },
+  {
     version: '1.3.6',
     date: '2026-06-17',
     changes: [

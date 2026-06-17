@@ -46,6 +46,8 @@ export interface SongSupplement {
   verified_recording_date: string | null
   verified_recording_location: string | null
   quality_rating: number | null
+  lyrics: string | null
+  synced_lyrics: string | null
   editor_notes: string | null
   updated_by: string | null
 }
