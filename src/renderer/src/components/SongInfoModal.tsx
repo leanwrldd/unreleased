@@ -1,8 +1,5 @@
 import { useRef } from 'react'
-import {
-  X, Music2, Mic2, Disc3, Clock, Flame, Calendar,
-  Users, MapPin, FileText, Guitar, Info, Hash, Layers, Zap
-} from 'lucide-react'
+import { X, Music2 } from 'lucide-react'
 import { JWApiSong, CATEGORY_LABELS, buildImageUrl, parseDuration } from '../lib/juicewrldApi'
 
 function formatDur(secs: number): string {
@@ -19,32 +16,21 @@ const CATEGORY_COLORS: Record<string, string> = {
   recording_session: 'bg-purple-500/15 text-purple-400 border-purple-500/25',
 }
 
-interface SectionProps {
-  title: string
-  icon: JSX.Element
-  children: React.ReactNode
-}
-
-function Section({ title, icon, children }: SectionProps): JSX.Element {
+function Row({ label, value }: { label: string; value: string | null | undefined }): JSX.Element | null {
+  if (!value) return null
   return (
-    <div className="border border-[var(--border)] rounded-xl overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 bg-surface-overlay">
-        <span className="text-text-muted">{icon}</span>
-        <span className="text-text-secondary text-xs font-semibold uppercase tracking-wide">{title}</span>
-      </div>
-      <div className="px-3 pb-3 pt-2 text-text-primary text-xs leading-relaxed space-y-1.5">
-        {children}
-      </div>
+    <div className="flex gap-3 py-2.5 border-b border-[var(--border)] last:border-0">
+      <span className="text-text-muted text-xs shrink-0 w-28 pt-px">{label}</span>
+      <span className="text-text-primary text-xs leading-relaxed whitespace-pre-wrap flex-1">{value}</span>
     </div>
   )
 }
 
-function Field({ label, value }: { label: string; value: string }): JSX.Element {
+function GroupLabel({ children }: { children: string }): JSX.Element {
   return (
-    <div>
-      <span className="text-text-muted font-medium">{label}: </span>
-      <span className="text-text-primary whitespace-pre-wrap">{value}</span>
-    </div>
+    <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted pt-4 pb-1 first:pt-0">
+      {children}
+    </p>
   )
 }
 
@@ -93,155 +79,168 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
       className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/70 backdrop-blur-sm p-0 md:p-4"
       onClick={(e) => { if (e.target === overlayRef.current) onClose() }}
     >
-      <div className="bg-surface border border-[var(--border)] rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-lg max-h-[92vh] md:max-h-[84vh] flex flex-col overflow-hidden">
+      <div className="bg-surface border border-[var(--border)] rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-lg max-h-[92vh] md:max-h-[86vh] flex flex-col overflow-hidden">
 
-        {/* Cover + title header */}
-        <div className="relative flex items-start gap-4 p-5 pb-4 shrink-0">
-          <div className="shrink-0 w-20 h-20 md:w-24 md:h-24 rounded-xl overflow-hidden bg-surface-overlay shadow-lg">
-            {coverUrl ? (
-              <img src={coverUrl} alt={primaryTitle} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Music2 size={32} className="text-text-muted opacity-30" />
-              </div>
-            )}
-          </div>
+        {/* ── Hero ── */}
+        <div className="relative shrink-0 overflow-hidden">
+          {/* Blurred backdrop */}
+          {coverUrl && (
+            <div
+              className="absolute inset-0 bg-cover bg-center scale-110"
+              style={{ backgroundImage: `url(${coverUrl})`, filter: 'blur(24px) brightness(0.35)' }}
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-surface" />
 
-          <div className="flex-1 min-w-0 pt-0.5">
-            <h2 className="text-text-primary font-bold text-lg leading-tight pr-8">{primaryTitle}</h2>
-            {altTitles.length > 0 && (
-              <div className="mt-1 space-y-0.5">
-                {altTitles.map((t, i) => (
-                  <p key={i} className="text-text-muted text-xs italic truncate">also known as "{t}"</p>
-                ))}
-              </div>
-            )}
-            <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${catColor}`}>
-                {catLabel}
-              </span>
-              {song.era?.name && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-overlay text-text-muted border border-[var(--border)]">
-                  {song.era.name}
-                </span>
-              )}
-            </div>
-          </div>
-
+          {/* Close */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-overlay text-text-muted hover:text-text-primary transition-colors"
+            className="absolute top-3 right-3 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-black/40 text-white/70 hover:text-white transition-colors"
           >
-            <X size={16} />
+            <X size={15} />
           </button>
-        </div>
 
-        {/* Quick stats row */}
-        <div className="flex items-center gap-4 px-5 pb-3 shrink-0 flex-wrap">
-          {song.credited_artists && (
-            <div className="flex items-center gap-1.5 text-text-muted">
-              <Mic2 size={12} />
-              <span className="text-xs">{song.credited_artists}</span>
-            </div>
-          )}
-          {song.length && (
-            <div className="flex items-center gap-1.5 text-text-muted">
-              <Clock size={12} />
-              <span className="text-xs">{duration}</span>
-            </div>
-          )}
-          {song.leak_type && (
-            <div className="flex items-center gap-1.5 text-text-muted">
-              <Flame size={12} />
-              <span className="text-xs">{song.leak_type}</span>
-            </div>
-          )}
-          {song.date_leaked && (
-            <div className="flex items-center gap-1.5 text-text-muted">
-              <Calendar size={12} />
-              <span className="text-xs">{song.date_leaked}</span>
-            </div>
-          )}
-        </div>
-
-        <div className="h-px bg-[var(--border)] mx-5 shrink-0" />
-
-        {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-2.5">
-
-          {song.producers && (
-            <Section title="Produced by" icon={<Disc3 size={13} />}>
-              <p>{song.producers}</p>
-            </Section>
-          )}
-
-          {song.engineers && (
-            <Section title="Engineers" icon={<Users size={13} />}>
-              <p>{song.engineers}</p>
-            </Section>
-          )}
-
-          {hasRecording && (
-            <Section title="Recording Details" icon={<MapPin size={13} />}>
-              {song.recording_locations && <Field label="Location" value={song.recording_locations} />}
-              {song.record_dates && <Field label="Date" value={song.record_dates} />}
-            </Section>
-          )}
-
-          {song.file_names && (
-            <Section title="File Names" icon={<FileText size={13} />}>
-              <p className="font-mono text-[11px]">{song.file_names}</p>
-            </Section>
-          )}
-
-          {hasInstrumentals && (
-            <Section title="Instrumentals" icon={<Guitar size={13} />}>
-              {song.instrumentals && <Field label="Info" value={song.instrumentals} />}
-              {song.instrumental_names && song.instrumental_names !== song.instrumentals && (
-                <Field label="Names" value={song.instrumental_names} />
+          {/* Cover + title */}
+          <div className="relative flex items-end gap-4 px-5 pt-8 pb-5">
+            <div className="shrink-0 w-24 h-24 rounded-xl overflow-hidden shadow-2xl bg-surface-overlay">
+              {coverUrl ? (
+                <img src={coverUrl} alt={primaryTitle} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Music2 size={32} className="text-text-muted opacity-30" />
+                </div>
               )}
-            </Section>
-          )}
+            </div>
 
-          {song.bitrate && (
-            <Section title="Quality" icon={<Zap size={13} />}>
-              <Field label="Bitrate" value={song.bitrate} />
-            </Section>
-          )}
-
-          {song.additional_information && (
-            <Section title="Additional Info" icon={<Info size={13} />}>
-              <p className="whitespace-pre-wrap">{song.additional_information}</p>
-            </Section>
-          )}
-
-          {hasImportantDates && (
-            <Section title="Important Dates" icon={<Calendar size={13} />}>
-              {song.preview_date && <Field label="Preview Date" value={song.preview_date} />}
-              {song.release_date && <Field label="Release Date" value={song.release_date} />}
-              {song.dates && <Field label="Other Dates" value={song.dates} />}
-            </Section>
-          )}
-
-          {hasSession && (
-            <Section title="Session Info" icon={<Layers size={13} />}>
-              {song.session_titles && <Field label="Titles" value={song.session_titles} />}
-              {song.session_tracking && <Field label="Tracking" value={song.session_tracking} />}
-            </Section>
-          )}
-
-          {notesDisplay && (
-            <Section title="Notes" icon={<Hash size={13} />}>
-              <p className="whitespace-pre-wrap">{notesDisplay}</p>
-            </Section>
-          )}
-
-          {song.lyrics && (
-            <Section title="Lyrics" icon={<Music2 size={13} />}>
-              <div className="bg-surface-raised rounded-xl p-3 max-h-48 overflow-y-auto no-scrollbar mt-0.5">
-                <pre className="text-text-secondary text-xs leading-relaxed whitespace-pre-wrap font-sans">{song.lyrics}</pre>
+            <div className="flex-1 min-w-0 pb-0.5">
+              <h2 className="text-white font-bold text-xl leading-tight">{primaryTitle}</h2>
+              {altTitles.length > 0 && (
+                <p className="text-white/50 text-xs mt-0.5 truncate italic">
+                  aka {altTitles.join(' · ')}
+                </p>
+              )}
+              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${catColor}`}>
+                  {catLabel}
+                </span>
+                {song.era?.name && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/60 border border-white/15">
+                    {song.era.name}
+                  </span>
+                )}
               </div>
-            </Section>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Scrollable info ── */}
+        <div className="overflow-y-auto flex-1 px-5 py-4">
+
+          {/* Core */}
+          <div>
+            <Row label="Artist" value={song.credited_artists || 'Juice WRLD'} />
+            <Row label="Duration" value={song.length ? `${song.length} (${duration})` : null} />
+            <Row label="Leak type" value={song.leak_type} />
+            <Row label="Date leaked" value={song.date_leaked} />
+            <Row label="Bitrate" value={song.bitrate} />
+          </div>
+
+          {/* Credits */}
+          {(song.producers || song.engineers) && (
+            <>
+              <GroupLabel>Credits</GroupLabel>
+              <div>
+                <Row label="Producers" value={song.producers} />
+                <Row label="Engineers" value={song.engineers} />
+              </div>
+            </>
+          )}
+
+          {/* Recording */}
+          {hasRecording && (
+            <>
+              <GroupLabel>Recording</GroupLabel>
+              <div>
+                <Row label="Location" value={song.recording_locations} />
+                <Row label="Date" value={song.record_dates} />
+              </div>
+            </>
+          )}
+
+          {/* Release */}
+          {hasImportantDates && (
+            <>
+              <GroupLabel>Dates</GroupLabel>
+              <div>
+                <Row label="Released" value={song.release_date} />
+                <Row label="Preview" value={song.preview_date} />
+                <Row label="Other" value={song.dates} />
+              </div>
+            </>
+          )}
+
+          {/* Instrumentals */}
+          {hasInstrumentals && (
+            <>
+              <GroupLabel>Instrumentals</GroupLabel>
+              <div>
+                <Row label="Info" value={song.instrumentals} />
+                {song.instrumental_names !== song.instrumentals && (
+                  <Row label="Names" value={song.instrumental_names} />
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Session */}
+          {hasSession && (
+            <>
+              <GroupLabel>Session</GroupLabel>
+              <div>
+                <Row label="Titles" value={song.session_titles} />
+                <Row label="Tracking" value={song.session_tracking} />
+              </div>
+            </>
+          )}
+
+          {/* File names */}
+          {song.file_names && (
+            <>
+              <GroupLabel>File Names</GroupLabel>
+              <p className="text-text-primary text-[11px] font-mono leading-relaxed pb-2.5 border-b border-[var(--border)]">
+                {song.file_names}
+              </p>
+            </>
+          )}
+
+          {/* Additional info */}
+          {song.additional_information && (
+            <>
+              <GroupLabel>Additional Info</GroupLabel>
+              <p className="text-text-primary text-xs leading-relaxed pb-2.5 border-b border-[var(--border)] whitespace-pre-wrap">
+                {song.additional_information}
+              </p>
+            </>
+          )}
+
+          {/* Notes */}
+          {notesDisplay && (
+            <>
+              <GroupLabel>Notes</GroupLabel>
+              <p className="text-text-primary text-xs leading-relaxed pb-2.5 border-b border-[var(--border)] whitespace-pre-wrap">
+                {notesDisplay}
+              </p>
+            </>
+          )}
+
+          {/* Lyrics */}
+          {song.lyrics && (
+            <>
+              <GroupLabel>Lyrics</GroupLabel>
+              <pre className="text-text-secondary text-xs leading-relaxed whitespace-pre-wrap font-sans pb-2">
+                {song.lyrics}
+              </pre>
+            </>
           )}
 
         </div>
