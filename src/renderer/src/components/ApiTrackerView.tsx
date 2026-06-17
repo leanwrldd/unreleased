@@ -52,7 +52,7 @@ function StatsBar({ stats }: { stats: JWApiStats | null }): JSX.Element {
 }
 
 // ─── Song row (list mode) ─────────────────────────────────────────────────────
-function SongRow({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: (song: JWApiSong) => void; onCategoryClick: () => void }): JSX.Element {
+function SongRow({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: (song: JWApiSong) => void; onCategoryClick: (cat: Category) => void }): JSX.Element {
   const track = songToTrack(song)
   const title = song.track_titles?.[0] || song.name
   const altTitles = song.track_titles?.slice(1) ?? []
@@ -90,9 +90,9 @@ function SongRow({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: (
       <span className="hidden md:block text-text-muted text-xs truncate w-32 shrink-0">{song.credited_artists || 'Juice WRLD'}</span>
       <span className="hidden md:block text-text-muted text-xs truncate w-36 shrink-0">{song.era?.name ?? '—'}</span>
       <button
-        onClick={onCategoryClick}
+        onClick={() => onCategoryClick(song.category as Category)}
         className="hidden md:block text-xs px-1.5 py-0.5 rounded bg-surface-overlay text-text-muted shrink-0 w-24 text-center hover:bg-surface-raised hover:text-accent transition-colors"
-        title="Go to Categories"
+        title="Filter by category"
       >
         {CATEGORY_LABELS[song.category] ?? song.category}
       </button>
@@ -111,7 +111,7 @@ function SongRow({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: (
 }
 
 // ─── Song card (grid mode) ────────────────────────────────────────────────────
-function SongCard({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: (song: JWApiSong) => void; onCategoryClick: () => void }): JSX.Element {
+function SongCard({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: (song: JWApiSong) => void; onCategoryClick: (cat: Category) => void }): JSX.Element {
   const track = songToTrack(song)
   const title = song.track_titles?.[0] || song.name
 
@@ -150,9 +150,9 @@ function SongCard({ song, onPlay, onCategoryClick }: { song: JWApiSong; onPlay: 
             </span>
           )}
           <button
-            onClick={(e) => { e.stopPropagation(); onCategoryClick() }}
+            onClick={(e) => { e.stopPropagation(); onCategoryClick(song.category as Category) }}
             className="text-[9px] uppercase tracking-wide text-accent/80 bg-accent/10 px-1.5 py-0.5 rounded shrink-0 hover:bg-accent/20 transition-colors"
-            title="Go to Categories"
+            title="Filter by category"
           >
             {CATEGORY_LABELS[song.category] ?? song.category}
           </button>
@@ -197,7 +197,7 @@ const LS_TRACKER_GROUP = 'api-tracker:groupByAlbum'
 
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function ApiTrackerView(): JSX.Element {
-  const { playTrack, apiTrackerCategory, setApiTrackerCategory, apiTrackerEra, setApiTrackerEra, setActiveView } = useStore()
+  const { playTrack, apiTrackerCategory, setApiTrackerCategory, apiTrackerEra, setApiTrackerEra } = useStore()
 
   const [stats, setStats] = useState<JWApiStats | null>(null)
   const [eras, setEras] = useState<JWApiEra[]>([])
@@ -226,7 +226,7 @@ export default function ApiTrackerView(): JSX.Element {
     if (apiTrackerEra) { setEra(apiTrackerEra); setApiTrackerEra('') }
   }, [])
 
-  const handleCategoryClick = useCallback(() => { setActiveView('api-categories') }, [setActiveView])
+  const handleCategoryClick = useCallback((cat: Category) => { setCategory(cat); setPage(1) }, [])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -352,7 +352,7 @@ export default function ApiTrackerView(): JSX.Element {
                 className={`p-2 md:p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
                 title="List view"
               >
-                <LayoutList size={16} md-size={15} />
+                <LayoutList size={16} />
               </button>
               <button
                 onClick={() => setViewMode('grid')}

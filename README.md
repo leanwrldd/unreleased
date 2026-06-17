@@ -5,7 +5,7 @@ A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com),
 > **This is the `web` branch** — API-only, no local library, deployable to any static host.  
 > For the full desktop app (Electron + local library), see the [`main` branch](https://github.com/leanwrldd/unreleased/tree/main).
 
-![Version](https://img.shields.io/badge/version-1.2.4-blue)
+![Version](https://img.shields.io/badge/version-1.2.5-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -69,6 +69,10 @@ Built by **freakylatif** — find me on Discord.
 ---
 
 ## Changelog
+
+### v1.2.5 — 2026-06-17
+- **Improve** Tracker: clicking a category badge now filters by that category in place instead of navigating to the Categories view
+- **Improve** Code cleanup and dead code removal in preparation for next release
 
 ### v1.2.4 — 2026-06-17
 - **Fix** Mobile bottom nav labels now visible — inactive tab text was inheriting no color (appeared black on dark sidebar)

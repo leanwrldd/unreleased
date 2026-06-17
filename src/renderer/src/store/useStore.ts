@@ -234,11 +234,7 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   setShowNowPlaying: (showNowPlaying) => set({ showNowPlaying }),
   setShowSettings: (showSettings) => set({ showSettings }),
   setViewMode: (viewMode) => { set({ viewMode }); ls.set('viewMode', viewMode) },
-  setTheme: (theme) => {
-    set({ theme })
-    ls.set('theme', theme)
-    try { localStorage.setItem('wavelength-theme', theme) } catch (_) {}
-  },
+  setTheme: (theme) => { set({ theme }); ls.set('theme', theme) },
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setShowQueue: (showQueue) => set({ showQueue }),
 

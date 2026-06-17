@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.5',
+    date: '2026-06-17',
+    changes: [
+      { type: 'improve', text: 'Tracker: clicking a category badge now filters by that category in place instead of navigating to the Categories view' },
+      { type: 'improve', text: 'Code cleanup and dead code removal in preparation for next release' },
+    ]
+  },
+  {
     version: '1.2.4',
     date: '2026-06-17',
     changes: [

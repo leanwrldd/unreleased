@@ -6,6 +6,13 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.2.5] — 2026-06-17
+
+- **Improve** Tracker: clicking a category badge now filters by that category in place instead of navigating to the Categories view
+- **Improve** Code cleanup and dead code removal in preparation for next release
+
+---
+
 ## [1.2.4] — 2026-06-17
 
 - **Fix** Mobile bottom nav labels now visible — inactive tab text was inheriting no color (appeared black on dark sidebar)
