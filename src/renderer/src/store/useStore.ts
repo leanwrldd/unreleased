@@ -220,7 +220,17 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   },
 
   // ─── UI ──────────────────────────────────────────────────────────────────────
-  setActiveView: (activeView) => set({ activeView }),
+  setActiveView: (view) => {
+    const paths: Partial<Record<ViewType, string>> = {
+      'api-categories': '/categories',
+      'api-tracker': '/tracker',
+      'api-radio': '/radio',
+      'api-files': '/files',
+    }
+    const path = paths[view] ?? '/tracker'
+    window.history.pushState({ view }, '', path)
+    set({ activeView: view })
+  },
   setShowNowPlaying: (showNowPlaying) => set({ showNowPlaying }),
   setShowSettings: (showSettings) => set({ showSettings }),
   setViewMode: (viewMode) => { set({ viewMode }); ls.set('viewMode', viewMode) },

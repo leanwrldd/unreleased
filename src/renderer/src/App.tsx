@@ -1,5 +1,13 @@
 import { useEffect } from 'react'
 import { useStore } from './store/useStore'
+import { ViewType } from './types'
+
+const PATH_TO_VIEW: Record<string, ViewType> = {
+  '/categories': 'api-categories',
+  '/tracker': 'api-tracker',
+  '/radio': 'api-radio',
+  '/files': 'api-files',
+}
 import Sidebar from './components/Sidebar'
 import BottomNav from './components/BottomNav'
 import ApiTrackerView from './components/ApiTrackerView'
@@ -24,6 +32,17 @@ function lightenHex(hex: string, amount: number): string {
 
 export default function App(): JSX.Element {
   const { showNowPlaying, showQueue, showSettings, activeView, theme, accentColor } = useStore()
+
+  // Sync view from URL on mount + handle back/forward
+  useEffect(() => {
+    const syncFromPath = (): void => {
+      const view = PATH_TO_VIEW[window.location.pathname] ?? 'api-tracker'
+      useStore.setState({ activeView: view })
+    }
+    syncFromPath()
+    window.addEventListener('popstate', syncFromPath)
+    return () => window.removeEventListener('popstate', syncFromPath)
+  }, [])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
