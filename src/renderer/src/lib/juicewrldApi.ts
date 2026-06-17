@@ -13,14 +13,31 @@ export interface JWApiEra {
 
 export interface JWApiSong {
   id: number
+  public_id?: number | null
   name: string
+  original_key?: string | null
   track_titles: string[]
   path: string
-  length: string          // "3:59"
+  length: string                     // "3:59"
   credited_artists: string
   producers: string
+  engineers?: string | null
+  recording_locations?: string | null
+  record_dates?: string | null
+  bitrate?: string | null
+  additional_information?: string | null
+  file_names?: string | null
+  instrumentals?: string | null
+  instrumental_names?: string | null
+  preview_date?: string | null
+  release_date?: string | null
+  dates?: string | null
+  session_titles?: string | null
+  session_tracking?: string | null
+  notes?: string | null
+  snippets?: unknown[]
   era: JWApiEra | null
-  image_url: string | null  // relative, e.g. "/assets/youtube.webp"
+  image_url: string | null           // relative, e.g. "/assets/youtube.webp"
   category: 'released' | 'unreleased' | 'unsurfaced' | 'recording_session'
   lyrics: string | null
   leak_type: string | null

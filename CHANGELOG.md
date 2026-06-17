@@ -6,6 +6,12 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.2.7] — 2026-06-17
+
+- **Improve** Song info modal now shows all available API data — engineers, recording locations, recording dates, file names, instrumentals, additional info, important dates, session info, notes, and bitrate — each in a collapsible section
+
+---
+
 ## [1.2.6] — 2026-06-17
 
 - **New** Song info modal — click ℹ on any song in the Tracker (or double-click the row) to see all details: titles, alt names, artists, producers, era, category, duration, leak type, date, and lyrics

@@ -5,7 +5,7 @@ A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com),
 > **This is the `web` branch** — API-only, no local library, deployable to any static host.  
 > For the full desktop app (Electron + local library), see the [`main` branch](https://github.com/leanwrldd/unreleased/tree/main).
 
-![Version](https://img.shields.io/badge/version-1.2.6-blue)
+![Version](https://img.shields.io/badge/version-1.2.7-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -70,7 +70,10 @@ Built by **freakylatif** — find me on Discord.
 
 ## Changelog
 
-### v1.2.6 — 2026-06-17
+### v1.2.7 — 2026-06-17
+- **Improve** Song info modal now shows all available API data in collapsible sections: engineers, recording details, file names, instrumentals, additional info, important dates, session info, and notes
+
+### v1.2.6
 - **New** Song info modal — ℹ button on every song in the Tracker (or double-click the row)
 - **New** Files info button opens the song info modal instead of jumping to the Tracker
 - **New** Become an Editor page — accessible from Settings
