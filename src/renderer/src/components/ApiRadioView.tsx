@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Play, SkipForward, Loader2, Radio } from 'lucide-react'
+import { Play, SkipForward, Loader2, Radio, Info, Download, ListPlus } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { apiFetch, songToTrack, parseDuration, CATEGORY_LABELS, JWApiSong, JWApiPaginatedResponse } from '../lib/juicewrldApi'
+import { apiFetch, songToTrack, parseDuration, buildStreamUrl, CATEGORY_LABELS, JWApiSong, JWApiPaginatedResponse } from '../lib/juicewrldApi'
+import SongInfoModal from './SongInfoModal'
+
+const PLAYABLE = ['released', 'unreleased'] as const
+const QUEUE_SIZE = 14
 
 function formatDur(secs: number): string {
   if (!secs) return '--:--'
@@ -10,31 +14,63 @@ function formatDur(secs: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-export default function ApiRadioView(): JSX.Element {
-  const { playTrack, currentTrack, isPlaying } = useStore()
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
 
+async function buildRandomQueue(): Promise<JWApiSong[]> {
+  // Fetch total counts for each playable category
+  const countResults = await Promise.all(
+    PLAYABLE.map((cat) => apiFetch<JWApiPaginatedResponse>('/songs/', { category: cat, page_size: 1 }))
+  )
+  const totals = countResults.map((r) => r.count)
+
+  // Pick QUEUE_SIZE random (category, offset) pairs
+  const fetches: Promise<JWApiSong | null>[] = []
+  for (let i = 0; i < QUEUE_SIZE; i++) {
+    const catIdx = Math.floor(Math.random() * PLAYABLE.length)
+    const category = PLAYABLE[catIdx]
+    const total = totals[catIdx]
+    if (total === 0) continue
+    const offset = Math.floor(Math.random() * total)
+    fetches.push(
+      apiFetch<JWApiPaginatedResponse>('/songs/', { category, page_size: 1, offset })
+        .then((r) => r.results[0] ?? null)
+        .catch(() => null)
+    )
+  }
+
+  const results = await Promise.all(fetches)
+  const songs = results.filter((s): s is JWApiSong => !!s && !!s.path)
+  return shuffle(songs)
+}
+
+export default function ApiRadioView(): JSX.Element {
+  const { playTrack, addToQueue, currentTrack, isPlaying } = useStore()
+
+  const [queue, setQueue] = useState<JWApiSong[]>([])
   const [song, setSong] = useState<JWApiSong | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasPlayed, setHasPlayed] = useState(false)
+  const [infoSong, setInfoSong] = useState<JWApiSong | null>(null)
 
-  // Playable categories — unsurfaced and recording_session have no audio files
-  const PLAYABLE = ['released', 'unreleased'] as const
-
-  const fetchRandom = useCallback(async (autoPlay = false): Promise<void> => {
+  const loadQueue = useCallback(async (autoPlay = false): Promise<void> => {
     setLoading(true)
     setError(null)
     try {
-      // Pick a random playable category, then a random song within it
-      const category = PLAYABLE[Math.floor(Math.random() * PLAYABLE.length)]
-      const countResp = await apiFetch<JWApiPaginatedResponse>('/songs/', { category, limit: 1 })
-      const offset = Math.floor(Math.random() * countResp.count)
-      const songResp = await apiFetch<JWApiPaginatedResponse>('/songs/', { category, limit: 1, offset })
-      const picked = songResp.results[0]
-      setSong(picked)
+      const songs = await buildRandomQueue()
+      if (!songs.length) throw new Error('No playable songs found')
+      setQueue(songs)
+      setSong(songs[0])
       if (autoPlay) {
-        const track = songToTrack(picked)
-        playTrack(track, [track])
+        const tracks = songs.map(songToTrack)
+        playTrack(tracks[0], tracks)
         setHasPlayed(true)
       }
     } catch (err) {
@@ -44,19 +80,39 @@ export default function ApiRadioView(): JSX.Element {
     }
   }, [playTrack])
 
-  // Load first song on mount (don't auto-play)
-  useEffect(() => { fetchRandom(false) }, [])
+  // Load queue on mount (no auto-play)
+  useEffect(() => { loadQueue(false) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePlay = useCallback((): void => {
     if (!song) return
-    const track = songToTrack(song)
-    playTrack(track, [track])
+    const tracks = queue.map(songToTrack)
+    const idx = Math.max(0, queue.findIndex((s) => s.id === song.id))
+    playTrack(tracks[idx] ?? tracks[0], tracks)
     setHasPlayed(true)
-  }, [song, playTrack])
+  }, [song, queue, playTrack])
 
   const handleSkip = useCallback((): void => {
-    fetchRandom(hasPlayed)
-  }, [fetchRandom, hasPlayed])
+    // Rebuild queue and auto-play if we've already started
+    loadQueue(hasPlayed)
+  }, [loadQueue, hasPlayed])
+
+  const handleAddToQueue = useCallback((): void => {
+    if (!song) return
+    addToQueue(songToTrack(song))
+  }, [song, addToQueue])
+
+  const handleDownload = useCallback((): void => {
+    if (!song?.path) return
+    const url = buildStreamUrl(song.path)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = (song.track_titles?.[0] || song.name) + '.mp3'
+    a.target = '_blank'
+    a.rel = 'noopener noreferrer'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }, [song])
 
   const track = song ? songToTrack(song) : null
   const isCurrentlyPlaying = track && currentTrack?.id === track.id && isPlaying
@@ -77,11 +133,7 @@ export default function ApiRadioView(): JSX.Element {
         ) : track ? (
           <div className="w-full h-full">
             {track.imageUrl ? (
-              <img
-                src={track.imageUrl}
-                alt=""
-                className="w-full h-full object-cover"
-              />
+              <img src={track.imageUrl} alt="" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <Radio size={56} className="text-text-muted opacity-20" />
@@ -127,6 +179,17 @@ export default function ApiRadioView(): JSX.Element {
 
       {/* Controls */}
       <div className="flex items-center gap-4">
+        {/* Info */}
+        {song && (
+          <button
+            onClick={() => setInfoSong(song)}
+            className="w-9 h-9 rounded-full bg-surface-overlay flex items-center justify-center hover:bg-surface-raised transition-colors"
+            title="Song info"
+          >
+            <Info size={16} className="text-text-muted" />
+          </button>
+        )}
+
         {/* Play current */}
         <button
           disabled={!track || loading}
@@ -145,12 +208,12 @@ export default function ApiRadioView(): JSX.Element {
           )}
         </button>
 
-        {/* Skip to next random */}
+        {/* Skip to next random queue */}
         <button
           disabled={loading}
           onClick={handleSkip}
           className="w-11 h-11 rounded-full bg-surface-overlay flex items-center justify-center hover:bg-surface-raised disabled:opacity-40 transition-colors"
-          title="Skip to random song"
+          title="New random queue"
         >
           {loading ? (
             <Loader2 size={18} className="text-text-muted animate-spin" />
@@ -158,12 +221,41 @@ export default function ApiRadioView(): JSX.Element {
             <SkipForward size={18} className="text-text-muted" />
           )}
         </button>
+
+        {/* Add to queue */}
+        {song?.path && (
+          <button
+            onClick={handleAddToQueue}
+            className="w-9 h-9 rounded-full bg-surface-overlay flex items-center justify-center hover:bg-surface-raised transition-colors"
+            title="Add to queue"
+          >
+            <ListPlus size={16} className="text-text-muted" />
+          </button>
+        )}
+
+        {/* Download */}
+        {song?.path && (
+          <button
+            onClick={handleDownload}
+            className="w-9 h-9 rounded-full bg-surface-overlay flex items-center justify-center hover:bg-surface-raised transition-colors"
+            title="Download"
+          >
+            <Download size={16} className="text-text-muted" />
+          </button>
+        )}
       </div>
 
       {/* Producer info */}
       {song?.producers && (
         <p className="text-text-muted text-xs opacity-60">Produced by {song.producers}</p>
       )}
+
+      {/* Queue hint */}
+      {queue.length > 1 && (
+        <p className="text-text-muted text-xs opacity-40">{queue.length} songs in queue</p>
+      )}
+
+      <SongInfoModal song={infoSong} onClose={() => setInfoSong(null)} />
     </div>
   )
 }

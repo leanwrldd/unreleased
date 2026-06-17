@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Folder, Music2, ChevronRight, ArrowLeft, Home, Play, Loader2,
   FolderOpen, HardDrive, LayoutList, LayoutGrid, ImageIcon, Video,
-  Download, ArrowUpDown, ArrowUp, ArrowDown, Link, Check, Info,
+  Download, ArrowUpDown, ArrowUp, ArrowDown, Link, Check, Info, ListPlus,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import {
@@ -136,7 +136,7 @@ function urlToPath(pathname: string): string {
 }
 
 export default function ApiFilesView(): JSX.Element {
-  const { playTrack } = useStore()
+  const { playTrack, addToQueue } = useStore()
 
   const [currentPath, setCurrentPath] = useState('')
   const [entries, setEntries] = useState<JWApiFileEntry[]>([])
@@ -452,6 +452,15 @@ export default function ApiFilesView(): JSX.Element {
                         <Info size={12} className="text-text-muted" />
                       </button>
                     )}
+                    {mt === 'audio' && (
+                      <button
+                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 rounded-full bg-surface-raised hover:bg-surface-overlay flex items-center justify-center transition-opacity shrink-0 border border-[var(--border)]"
+                        onClick={(e) => { e.stopPropagation(); addToQueue(fileToTrack(entry)) }}
+                        title="Add to queue"
+                      >
+                        <ListPlus size={12} className="text-text-muted" />
+                      </button>
+                    )}
                     {!isDir && (
                       <button
                         className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 rounded-full bg-surface-raised hover:bg-surface-overlay flex items-center justify-center transition-opacity shrink-0 border border-[var(--border)]"
@@ -541,6 +550,15 @@ export default function ApiFilesView(): JSX.Element {
                               title="Find in Tracker"
                             >
                               <Info size={11} className="text-white" />
+                            </button>
+                          )}
+                          {mt === 'audio' && (
+                            <button
+                              className="w-6 h-6 rounded-full bg-black/60 flex items-center justify-center"
+                              onClick={(e) => { e.stopPropagation(); addToQueue(fileToTrack(entry)) }}
+                              title="Add to queue"
+                            >
+                              <ListPlus size={11} className="text-white" />
                             </button>
                           )}
                           <button

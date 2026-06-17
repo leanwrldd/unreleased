@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Play, Loader2, Music2, ArrowLeft, ChevronRight, Folder } from 'lucide-react'
+import { Play, Loader2, Music2, ArrowLeft, ChevronRight, Folder, Download, ListPlus, Info } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import {
   apiFetch,
@@ -13,6 +13,7 @@ import {
   songToTrack,
 } from '../lib/juicewrldApi'
 import { Track } from '../types'
+import SongInfoModal from './SongInfoModal'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -89,9 +90,13 @@ function FolderCover({ path }: { path: string }): JSX.Element {
 function TrackerList({
   category,
   onPlay,
+  onQueue,
+  onInfo,
 }: {
   category: 'released' | 'unreleased'
   onPlay: (song: JWApiSong, all: JWApiSong[]) => void
+  onQueue: (track: Track) => void
+  onInfo: (song: JWApiSong) => void
 }): JSX.Element {
   const [songs, setSongs] = useState<JWApiSong[]>([])
   const [loading, setLoading] = useState(true)
@@ -147,12 +152,41 @@ function TrackerList({
                 <p className="text-text-muted text-[11px] truncate">{song.era.name}</p>
               )}
             </div>
-            <button
-              onClick={() => onPlay(song, songs)}
-              className="md:hidden p-2 text-text-muted active:text-accent shrink-0"
-            >
-              <Play size={16} />
-            </button>
+            {/* Desktop action buttons */}
+            <div className="hidden md:flex items-center gap-0.5">
+              <button
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all"
+                onClick={(e) => { e.stopPropagation(); onInfo(song) }}
+                title="Song info"
+              >
+                <Info size={14} />
+              </button>
+              <button
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all"
+                onClick={(e) => { e.stopPropagation(); onQueue(songToTrack(song)) }}
+                title="Add to queue"
+              >
+                <ListPlus size={14} />
+              </button>
+              <button
+                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const url = buildStreamUrl(song.path!)
+                  const a = document.createElement('a')
+                  a.href = url; a.download = title + '.mp3'; a.target = '_blank'; a.rel = 'noopener noreferrer'
+                  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+                }}
+                title="Download"
+              >
+                <Download size={14} />
+              </button>
+            </div>
+            {/* Mobile buttons */}
+            <div className="md:hidden flex items-center">
+              <button className="p-2 text-text-muted active:text-accent" onClick={() => onInfo(song)} title="Info"><Info size={15} /></button>
+              <button className="p-2 text-text-muted active:text-accent" onClick={() => onPlay(song, songs)} title="Play"><Play size={15} /></button>
+            </div>
           </div>
         )
       })}
@@ -175,8 +209,9 @@ function initNav(): Record<Tab, TabNav> {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function ApiCompilationView(): JSX.Element {
-  const { playTrack } = useStore()
+  const { playTrack, addToQueue } = useStore()
   const [activeTab, setActiveTab] = useState<Tab>('albums')
+  const [infoSong, setInfoSong] = useState<JWApiSong | null>(null)
 
   const [tabRoots, setTabRoots] = useState<Record<Tab, string>>({ albums: '', unreleased: '', singles: '' })
   const [discovering, setDiscovering] = useState(true)
@@ -312,36 +347,69 @@ export default function ApiCompilationView(): JSX.Element {
     </div>
   )
 
-  const renderAudioRow = (file: JWApiFileEntry) => (
-    <div
-      key={file.path}
-      className="group flex items-center gap-3 px-3 py-2.5 hover:bg-surface-overlay rounded-lg transition-colors"
-    >
-      <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-surface-overlay shrink-0 flex items-center justify-center">
-        <img
-          src={buildCoverArtUrl(file.path)}
-          alt=""
-          className="w-full h-full object-cover"
-          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-        />
-        <button
-          onClick={() => playFile(file)}
-          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 hidden md:flex items-center justify-center transition-opacity"
-        >
-          <Play size={12} fill="white" className="text-white ml-0.5" />
-        </button>
-      </div>
-      <span className="text-text-primary text-sm flex-1 truncate">
-        {file.name.replace(/\.[^.]+$/, '')}
-      </span>
-      <button
-        onClick={() => playFile(file)}
-        className="md:hidden p-2 text-text-muted active:text-accent shrink-0"
+  const renderAudioRow = (file: JWApiFileEntry) => {
+    const title = file.name.replace(/\.[^.]+$/, '')
+    const fileTrack: Track = {
+      id: `jw-file-${file.path}`,
+      path: file.path,
+      streamUrl: buildStreamUrl(file.path),
+      imageUrl: buildCoverArtUrl(file.path),
+      title,
+      artist: 'Juice WRLD',
+      album: activePath.split('/').pop() ?? '',
+      albumArtist: 'Juice WRLD',
+      year: null, trackNumber: null, duration: 0, genre: '', hasAlbumArt: true,
+    }
+    return (
+      <div
+        key={file.path}
+        className="group flex items-center gap-3 px-3 py-2.5 hover:bg-surface-overlay rounded-lg transition-colors"
       >
-        <Play size={16} />
-      </button>
-    </div>
-  )
+        <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-surface-overlay shrink-0 flex items-center justify-center">
+          <img
+            src={buildCoverArtUrl(file.path)}
+            alt=""
+            className="w-full h-full object-cover"
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+          />
+          <button
+            onClick={() => playFile(file)}
+            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 hidden md:flex items-center justify-center transition-opacity"
+          >
+            <Play size={12} fill="white" className="text-white ml-0.5" />
+          </button>
+        </div>
+        <span className="text-text-primary text-sm flex-1 truncate">{title}</span>
+        {/* Desktop action buttons */}
+        <div className="hidden md:flex items-center gap-0.5">
+          <button
+            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all"
+            onClick={(e) => { e.stopPropagation(); addToQueue(fileTrack) }}
+            title="Add to queue"
+          >
+            <ListPlus size={14} />
+          </button>
+          <button
+            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all"
+            onClick={(e) => {
+              e.stopPropagation()
+              const a = document.createElement('a')
+              a.href = buildStreamUrl(file.path); a.download = file.name; a.target = '_blank'; a.rel = 'noopener noreferrer'
+              document.body.appendChild(a); a.click(); document.body.removeChild(a)
+            }}
+            title="Download"
+          >
+            <Download size={14} />
+          </button>
+        </div>
+        {/* Mobile buttons */}
+        <div className="md:hidden flex items-center">
+          <button className="p-2 text-text-muted active:text-accent" onClick={() => addToQueue(fileTrack)} title="Queue"><ListPlus size={15} /></button>
+          <button className="p-2 text-text-muted active:text-accent" onClick={() => playFile(file)} title="Play"><Play size={15} /></button>
+        </div>
+      </div>
+    )
+  }
 
   // ── Root album grid content ─────────────────────────────────────────────────
 
@@ -434,9 +502,9 @@ export default function ApiCompilationView(): JSX.Element {
         ) : !hasRoot ? (
           // No folder found for this tab → fall back to Tracker API
           activeTab === 'unreleased' ? (
-            <TrackerList category="unreleased" onPlay={playTrackerSong} />
+            <TrackerList category="unreleased" onPlay={playTrackerSong} onQueue={addToQueue} onInfo={setInfoSong} />
           ) : activeTab === 'singles' ? (
-            <TrackerList category="released" onPlay={playTrackerSong} />
+            <TrackerList category="released" onPlay={playTrackerSong} onQueue={addToQueue} onInfo={setInfoSong} />
           ) : (
             <div className="flex flex-col items-center justify-center h-40 gap-2 text-text-muted">
               <Music2 size={32} className="opacity-20" />
@@ -471,6 +539,8 @@ export default function ApiCompilationView(): JSX.Element {
           </div>
         )}
       </div>
+
+      <SongInfoModal song={infoSong} onClose={() => setInfoSong(null)} />
     </div>
   )
 }

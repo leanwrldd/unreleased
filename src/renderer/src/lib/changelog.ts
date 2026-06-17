@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.3.8',
+    date: '2026-06-18',
+    changes: [
+      { type: 'new', text: 'Site favicon — browser tabs now show the unreleased logo instead of a generic file icon' },
+      { type: 'new', text: 'Tracker: collapsible category sidebar (desktop) with category counts and era list — replaces separate Categories view' },
+      { type: 'new', text: 'All song lists now have consistent action buttons — Info, Add to Queue, and Download across Tracker, Compilation, Radio, and Files views' },
+      { type: 'new', text: 'Add to Queue button added to all playable song rows (tracker, compilation, radio, files)' },
+      { type: 'fix', text: 'Radio: now builds a full queue of ~14 random songs upfront instead of stopping after 2 — pressing skip fetches a new queue' },
+      { type: 'fix', text: 'Now Playing: cover art and track info now show correctly when playing from compilation or file-based sources' },
+      { type: 'fix', text: 'Settings: "Become an Editor" button is now hidden for users who are already editors or admins' },
+      { type: 'improve', text: 'Sidebar and bottom nav: removed Categories (now inside Tracker) and Contribute (use the pencil icon in Now Playing) entries' },
+    ]
+  },
+  {
     version: '1.3.7',
     date: '2026-06-17',
     changes: [

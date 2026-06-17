@@ -1,29 +1,42 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { Search, Play, ChevronLeft, ChevronRight, Loader2, Music2, X, LayoutList, LayoutGrid, Layers, Info } from 'lucide-react'
+import {
+  Search, Play, ChevronLeft, ChevronRight, Loader2, Music2, X,
+  LayoutList, LayoutGrid, Layers, Info, Download, ListPlus, PanelLeft,
+} from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 import SongInfoModal from './SongInfoModal'
 import {
-  apiFetch,
-  songToTrack,
-  parseDuration,
-  CATEGORY_LABELS,
-  JWApiSong,
-  JWApiPaginatedResponse,
-  JWApiStats,
-  JWApiEra,
+  apiFetch, songToTrack, parseDuration, CATEGORY_LABELS, buildStreamUrl,
+  JWApiSong, JWApiPaginatedResponse, JWApiStats, JWApiEra,
 } from '../lib/juicewrldApi'
+import { Track } from '../types'
 
 type Category = 'released' | 'unreleased' | 'unsurfaced' | 'recording_session' | ''
 type ViewMode = 'list' | 'grid'
 
 const PAGE_SIZE = 50
+const LS_TRACKER_VIEW = 'api-tracker:viewMode'
+const LS_TRACKER_GROUP = 'api-tracker:groupByAlbum'
+const LS_TRACKER_SIDEBAR = 'api-tracker:showSidebar'
 
 function formatDur(secs: number): string {
   if (!secs) return '--:--'
   const m = Math.floor(secs / 60)
   const s = Math.floor(secs % 60)
   return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function downloadSong(song: JWApiSong): void {
+  const url = buildStreamUrl(song.path)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = (song.track_titles?.[0] || song.name) + '.mp3'
+  a.target = '_blank'
+  a.rel = 'noopener noreferrer'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
 }
 
 // ─── Stats bar ────────────────────────────────────────────────────────────────
@@ -52,8 +65,133 @@ function StatsBar({ stats }: { stats: JWApiStats | null }): JSX.Element {
   )
 }
 
+// ─── Category sidebar ─────────────────────────────────────────────────────────
+const CAT_SIDEBAR = [
+  { key: '' as Category,                label: 'All' },
+  { key: 'released' as Category,        label: 'Released' },
+  { key: 'unreleased' as Category,      label: 'Unreleased' },
+  { key: 'unsurfaced' as Category,      label: 'Unsurfaced' },
+  { key: 'recording_session' as Category, label: 'Sessions' },
+]
+
+function CategorySidebar({
+  stats, eras, selectedCategory, selectedEra, onCategory, onEra,
+}: {
+  stats: JWApiStats | null
+  eras: JWApiEra[]
+  selectedCategory: Category
+  selectedEra: string
+  onCategory: (c: Category) => void
+  onEra: (e: string) => void
+}): JSX.Element {
+  const counts: Record<string, number | undefined> = {
+    '':                stats?.total_songs,
+    released:          stats?.category_stats.released,
+    unreleased:        stats?.category_stats.unreleased,
+    unsurfaced:        stats?.category_stats.unsurfaced,
+    recording_session: stats?.category_stats.recording_session,
+  }
+
+  return (
+    <div className="w-44 shrink-0 border-r border-[var(--border)] overflow-y-auto flex flex-col py-2">
+      {/* Categories */}
+      <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted px-3 pt-1 pb-2">Category</p>
+      {CAT_SIDEBAR.map((cat) => (
+        <button
+          key={cat.key}
+          onClick={() => onCategory(cat.key)}
+          className={`flex items-center justify-between px-3 py-1.5 text-sm transition-colors text-left ${
+            selectedCategory === cat.key
+              ? 'text-accent font-semibold bg-accent/5'
+              : 'text-text-secondary hover:text-text-primary hover:bg-surface-raised'
+          }`}
+        >
+          <span className="truncate">{cat.label}</span>
+          {counts[cat.key] !== undefined && (
+            <span className="text-text-muted text-[10px] tabular-nums ml-1">{counts[cat.key]!.toLocaleString()}</span>
+          )}
+        </button>
+      ))}
+
+      {/* Eras */}
+      {eras.length > 0 && (
+        <>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted px-3 pt-4 pb-2">Era</p>
+          <button
+            onClick={() => onEra('')}
+            className={`flex items-center px-3 py-1.5 text-sm transition-colors text-left ${
+              !selectedEra ? 'text-accent font-semibold bg-accent/5' : 'text-text-secondary hover:text-text-primary hover:bg-surface-raised'
+            }`}
+          >
+            All eras
+          </button>
+          {eras.map((era) => (
+            <button
+              key={era.id}
+              onClick={() => onEra(era.name)}
+              className={`flex items-center px-3 py-1.5 text-sm transition-colors text-left ${
+                selectedEra === era.name ? 'text-accent font-semibold bg-accent/5' : 'text-text-secondary hover:text-text-primary hover:bg-surface-raised'
+              }`}
+            >
+              <span className="truncate">{era.name}</span>
+            </button>
+          ))}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─── Action buttons (shared) ──────────────────────────────────────────────────
+function SongActions({
+  song, onInfo, onQueue, size = 14,
+}: {
+  song: JWApiSong
+  onInfo: () => void
+  onQueue: (track: Track) => void
+  size?: number
+}): JSX.Element {
+  return (
+    <>
+      <button
+        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all shrink-0"
+        onClick={(e) => { e.stopPropagation(); onInfo() }}
+        title="Song info"
+      >
+        <Info size={size} />
+      </button>
+      {song.path && (
+        <>
+          <button
+            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all shrink-0"
+            onClick={(e) => { e.stopPropagation(); onQueue(songToTrack(song)) }}
+            title="Add to queue"
+          >
+            <ListPlus size={size} />
+          </button>
+          <button
+            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all shrink-0"
+            onClick={(e) => { e.stopPropagation(); downloadSong(song) }}
+            title="Download"
+          >
+            <Download size={size} />
+          </button>
+        </>
+      )}
+    </>
+  )
+}
+
 // ─── Song row (list mode) ─────────────────────────────────────────────────────
-function SongRow({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; onPlay: (song: JWApiSong) => void; onCategoryClick: (cat: Category) => void; onInfo: (song: JWApiSong) => void }): JSX.Element {
+function SongRow({
+  song, onPlay, onCategoryClick, onInfo, onQueue,
+}: {
+  song: JWApiSong
+  onPlay: (song: JWApiSong) => void
+  onCategoryClick: (cat: Category) => void
+  onInfo: (song: JWApiSong) => void
+  onQueue: (track: Track) => void
+}): JSX.Element {
   const track = songToTrack(song)
   const title = song.track_titles?.[0] || song.name
   const altTitles = song.track_titles?.slice(1) ?? []
@@ -67,7 +205,6 @@ function SongRow({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; o
       {/* Cover art */}
       <div className="relative shrink-0 w-10 h-10 md:w-9 md:h-9 rounded overflow-hidden bg-surface-overlay">
         <AlbumArtThumbnail track={track} size={36} shimmer={false} />
-        {/* Desktop: hover overlay play button */}
         {canPlay && (
           <button
             className="absolute inset-0 items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
@@ -79,15 +216,13 @@ function SongRow({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; o
         )}
       </div>
 
-      {/* Title + mobile subtitle */}
+      {/* Title */}
       <div className="flex-1 min-w-0">
         <p className="text-text-primary text-sm font-medium truncate">{title}</p>
-        {/* Mobile: artist + era under title */}
         <p className="md:hidden text-text-muted text-xs truncate mt-0.5">
           {song.credited_artists || 'Juice WRLD'}
           {song.era?.name ? ` · ${song.era.name}` : ''}
         </p>
-        {/* Desktop: alt titles */}
         {altTitles.length > 0 && (
           <p className="hidden md:block text-text-muted text-xs truncate">{altTitles.join(' · ')}</p>
         )}
@@ -105,14 +240,10 @@ function SongRow({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; o
       </button>
       <span className="hidden md:block text-text-muted text-xs w-10 text-right shrink-0">{formatDur(parseDuration(song.length))}</span>
 
-      {/* Desktop: info button (hover) */}
-      <button
-        className="hidden md:flex opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all shrink-0"
-        onClick={(e) => { e.stopPropagation(); onInfo(song) }}
-        title="Song info"
-      >
-        <Info size={14} />
-      </button>
+      {/* Desktop action buttons */}
+      <div className="hidden md:flex items-center gap-0.5 shrink-0">
+        <SongActions song={song} onInfo={() => onInfo(song)} onQueue={onQueue} />
+      </div>
 
       {/* Mobile: info + play buttons */}
       <div className="md:hidden flex items-center shrink-0">
@@ -124,13 +255,22 @@ function SongRow({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; o
           <Info size={16} />
         </button>
         {canPlay && (
-          <button
-            className="p-2 text-text-muted active:text-accent transition-colors"
-            onClick={() => onPlay(song)}
-            title="Play"
-          >
-            <Play size={17} />
-          </button>
+          <>
+            <button
+              className="p-2 text-text-muted active:text-accent transition-colors"
+              onClick={() => onQueue(songToTrack(song))}
+              title="Add to queue"
+            >
+              <ListPlus size={16} />
+            </button>
+            <button
+              className="p-2 text-text-muted active:text-accent transition-colors"
+              onClick={() => onPlay(song)}
+              title="Play"
+            >
+              <Play size={17} />
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -138,17 +278,23 @@ function SongRow({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; o
 }
 
 // ─── Song card (grid mode) ────────────────────────────────────────────────────
-function SongCard({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; onPlay: (song: JWApiSong) => void; onCategoryClick: (cat: Category) => void; onInfo: (song: JWApiSong) => void }): JSX.Element {
+function SongCard({
+  song, onPlay, onCategoryClick, onInfo, onQueue,
+}: {
+  song: JWApiSong
+  onPlay: (song: JWApiSong) => void
+  onCategoryClick: (cat: Category) => void
+  onInfo: (song: JWApiSong) => void
+  onQueue: (track: Track) => void
+}): JSX.Element {
   const track = songToTrack(song)
   const title = song.track_titles?.[0] || song.name
   const canPlay = !!song.path
 
   return (
     <div className="group flex flex-col rounded-xl overflow-hidden bg-surface-overlay hover:bg-surface-raised transition-colors cursor-default">
-      {/* Cover art */}
       <div className="relative w-full aspect-square bg-surface-raised">
         <AlbumArtThumbnail track={track} size={160} shimmer={false} />
-        {/* Desktop: hover overlay */}
         {canPlay && (
           <button
             className="absolute inset-0 items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
@@ -160,7 +306,6 @@ function SongCard({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; 
             </div>
           </button>
         )}
-        {/* Mobile: always-visible play button in corner */}
         {canPlay && (
           <button
             className="md:hidden absolute bottom-1.5 right-1.5 w-8 h-8 rounded-full bg-accent flex items-center justify-center shadow-lg active:scale-95 transition-transform"
@@ -171,7 +316,6 @@ function SongCard({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; 
         )}
       </div>
 
-      {/* Info */}
       <div className="p-2.5 flex flex-col gap-1 min-w-0">
         <p className="text-text-primary text-xs font-semibold truncate leading-tight">{title}</p>
         <p className="text-text-muted text-[10px] truncate">{song.credited_artists || 'Juice WRLD'}</p>
@@ -184,59 +328,70 @@ function SongCard({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; 
           <button
             onClick={(e) => { e.stopPropagation(); onCategoryClick(song.category as Category) }}
             className="text-[9px] uppercase tracking-wide text-accent/80 bg-accent/10 px-1.5 py-0.5 rounded shrink-0 hover:bg-accent/20 transition-colors"
-            title="Filter by category"
           >
             {CATEGORY_LABELS[song.category] ?? song.category}
           </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onInfo(song) }}
-            className="ml-auto p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text-primary transition-colors"
-            title="Song info"
-          >
-            <Info size={11} />
-          </button>
+          <div className="ml-auto flex items-center gap-0.5">
+            <button
+              onClick={(e) => { e.stopPropagation(); onInfo(song) }}
+              className="p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text-primary transition-colors"
+              title="Song info"
+            >
+              <Info size={11} />
+            </button>
+            {canPlay && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onQueue(songToTrack(song)) }}
+                  className="p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text-primary transition-colors"
+                  title="Add to queue"
+                >
+                  <ListPlus size={11} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); downloadSong(song) }}
+                  className="p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text-primary transition-colors"
+                  title="Download"
+                >
+                  <Download size={11} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-// ─── Jump-to-page input ───────────────────────────────────────────────────────
+// ─── Page jumper ──────────────────────────────────────────────────────────────
 function PageJumper({ page, totalPages, onJump }: { page: number; totalPages: number; onJump: (p: number) => void }): JSX.Element {
   const [value, setValue] = useState(String(page))
   useEffect(() => { setValue(String(page)) }, [page])
 
   const commit = (): void => {
     const n = parseInt(value, 10)
-    if (!isNaN(n) && n >= 1 && n <= totalPages) {
-      onJump(n)
-    } else {
-      setValue(String(page))
-    }
+    if (!isNaN(n) && n >= 1 && n <= totalPages) onJump(n)
+    else setValue(String(page))
   }
 
   return (
     <div className="flex items-center gap-1 text-xs text-text-muted">
       <input
-        type="text" inputMode="numeric"
-        value={value}
+        type="text" inputMode="numeric" value={value}
         onChange={(e) => setValue(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => { if (e.key === 'Enter') { commit(); (e.target as HTMLInputElement).blur() } }}
         className="w-10 text-center bg-surface-overlay text-text-primary text-xs py-0.5 rounded outline-none focus:ring-1 ring-accent border border-transparent focus:border-accent/40"
-        title="Jump to page"
       />
       <span>/ {totalPages}</span>
     </div>
   )
 }
 
-const LS_TRACKER_VIEW = 'api-tracker:viewMode'
-const LS_TRACKER_GROUP = 'api-tracker:groupByAlbum'
-
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function ApiTrackerView(): JSX.Element {
-  const { playTrack, apiTrackerCategory, setApiTrackerCategory, apiTrackerEra, setApiTrackerEra } = useStore()
+  const { playTrack, addToQueue, apiTrackerCategory, setApiTrackerCategory, apiTrackerEra, setApiTrackerEra } = useStore()
 
   const [selectedSong, setSelectedSong] = useState<JWApiSong | null>(null)
   const [stats, setStats] = useState<JWApiStats | null>(null)
@@ -246,15 +401,20 @@ export default function ApiTrackerView(): JSX.Element {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
   const [viewMode, setViewModeState] = useState<ViewMode>(
     () => (localStorage.getItem(LS_TRACKER_VIEW) as ViewMode) || 'list'
   )
   const [groupByAlbum, setGroupByAlbumState] = useState<boolean>(
     () => localStorage.getItem(LS_TRACKER_GROUP) === 'true'
   )
+  const [showSidebar, setShowSidebarState] = useState<boolean>(
+    () => localStorage.getItem(LS_TRACKER_SIDEBAR) !== 'false'
+  )
 
   const setViewMode = (v: ViewMode): void => { setViewModeState(v); localStorage.setItem(LS_TRACKER_VIEW, v) }
   const setGroupByAlbum = (v: boolean): void => { setGroupByAlbumState(v); localStorage.setItem(LS_TRACKER_GROUP, String(v)) }
+  const setShowSidebar = (v: boolean): void => { setShowSidebarState(v); localStorage.setItem(LS_TRACKER_SIDEBAR, String(v)) }
 
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -264,9 +424,10 @@ export default function ApiTrackerView(): JSX.Element {
   useEffect(() => {
     if (apiTrackerCategory) { setCategory(apiTrackerCategory as Category); setApiTrackerCategory('') }
     if (apiTrackerEra) { setEra(apiTrackerEra); setApiTrackerEra('') }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCategoryClick = useCallback((cat: Category) => { setCategory(cat); setPage(1) }, [])
+  const handleEraClick = useCallback((eraName: string) => { setEra(eraName); setPage(1) }, [])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -286,8 +447,7 @@ export default function ApiTrackerView(): JSX.Element {
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     apiFetch<JWApiPaginatedResponse>('/songs/', {
       search: debouncedSearch || undefined,
       category: category || undefined,
@@ -307,6 +467,7 @@ export default function ApiTrackerView(): JSX.Element {
   }, [playTrack])
 
   const handleInfo = useCallback((song: JWApiSong) => { setSelectedSong(song) }, [])
+  const handleQueue = useCallback((track: Track) => { addToQueue(track) }, [addToQueue])
 
   const groupedSongs = useMemo(() => {
     if (!groupByAlbum) return null
@@ -328,9 +489,8 @@ export default function ApiTrackerView(): JSX.Element {
         <h1 className="text-text-primary text-xl font-bold mb-1">Tracker</h1>
         <StatsBar stats={stats} />
 
-        {/* Filters */}
         <div className="flex flex-col gap-2">
-          {/* Search — full width */}
+          {/* Search */}
           <div className="relative w-full">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
             <input
@@ -341,21 +501,33 @@ export default function ApiTrackerView(): JSX.Element {
               className="w-full bg-surface-overlay text-text-primary text-sm pl-8 pr-8 py-2.5 md:py-2 rounded-lg outline-none focus:ring-1 ring-accent border border-transparent focus:border-accent/40 placeholder:text-text-muted"
             />
             {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
-              >
+              <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary">
                 <X size={13} />
               </button>
             )}
           </div>
 
-          {/* Second row: selects + toggles */}
+          {/* Second row: era + toggles */}
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Categories sidebar toggle — desktop only */}
+            <button
+              onClick={() => setShowSidebar(!showSidebar)}
+              className={`hidden md:flex items-center gap-1.5 px-2.5 py-2.5 md:py-2 rounded-lg text-xs transition-colors shrink-0 ${
+                showSidebar
+                  ? 'bg-accent/15 text-accent border border-accent/30'
+                  : 'bg-surface-overlay text-text-muted hover:text-text-secondary border border-transparent'
+              }`}
+              title="Toggle category sidebar"
+            >
+              <PanelLeft size={13} />
+              <span className="hidden sm:inline">Categories</span>
+            </button>
+
+            {/* Mobile: category dropdown */}
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value as Category)}
-              className="flex-1 min-w-0 bg-surface-overlay text-text-primary text-sm px-3 py-2.5 md:py-2 rounded-lg outline-none border border-transparent focus:ring-1 ring-accent focus:border-accent/40 cursor-pointer"
+              className="md:hidden flex-1 min-w-0 bg-surface-overlay text-text-primary text-sm px-3 py-2.5 rounded-lg outline-none border border-transparent focus:ring-1 ring-accent focus:border-accent/40 cursor-pointer"
             >
               <option value="">All categories</option>
               <option value="released">Released</option>
@@ -405,115 +577,151 @@ export default function ApiTrackerView(): JSX.Element {
               </button>
             </div>
           </div>
+
+          {/* Active filters chips */}
+          {(category || era) && (
+            <div className="flex gap-1.5 flex-wrap">
+              {category && (
+                <button
+                  onClick={() => setCategory('')}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-xs font-medium"
+                >
+                  {CATEGORY_LABELS[category] ?? category}
+                  <X size={10} />
+                </button>
+              )}
+              {era && (
+                <button
+                  onClick={() => setEra('')}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-xs font-medium"
+                >
+                  {era}
+                  <X size={10} />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Column headers — desktop list only */}
-      {viewMode === 'list' && (
-        <div className="hidden md:block px-5 pb-1 shrink-0">
-          <div className="flex items-center gap-3 px-3 py-1 text-xs text-text-muted font-medium uppercase tracking-wider">
-            <div className="w-9 shrink-0" />
-            <div className="flex-1">Title</div>
-            <div className="w-32 shrink-0">Artist</div>
-            <div className="w-36 shrink-0">Era</div>
-            <div className="w-24 shrink-0 text-center">Category</div>
-            <div className="w-10 shrink-0 text-right">Time</div>
+      {/* Body: sidebar + list */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Category sidebar — desktop only */}
+        {showSidebar && (
+          <div className="hidden md:block">
+            <CategorySidebar
+              stats={stats}
+              eras={eras}
+              selectedCategory={category}
+              selectedEra={era}
+              onCategory={(c) => { setCategory(c); setPage(1) }}
+              onEra={(e) => { setEra(e); setPage(1) }}
+            />
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Song list / grid */}
-      <div className="flex-1 overflow-y-auto px-3 md:px-5 pb-4">
-        {loading ? (
-          <div className="flex items-center justify-center h-40 gap-2 text-text-muted">
-            <Loader2 size={18} className="animate-spin" />
-            <span className="text-sm">Loading…</span>
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center h-40 gap-2 text-center">
-            <p className="text-text-muted text-sm">Failed to load: {error}</p>
-            <button onClick={() => setPage((p) => p)} className="text-accent text-sm underline">Retry</button>
-          </div>
-        ) : songs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 gap-2">
-            <Music2 size={32} className="text-text-muted opacity-30" />
-            <p className="text-text-muted text-sm">No songs found</p>
-          </div>
-        ) : viewMode === 'list' ? (
-          <div className="space-y-0.5">
-            {groupedSongs ? (
-              Array.from(groupedSongs.entries()).map(([albumName, groupSongs]) => (
-                <div key={albumName}>
-                  <div className="sticky top-0 z-10 px-3 py-1.5 text-xs font-semibold text-text-muted uppercase tracking-wider bg-surface/90 backdrop-blur-sm border-b border-[var(--border)] mb-0.5">
-                    {albumName}
-                    <span className="ml-2 font-normal opacity-60">{groupSongs.length}</span>
-                  </div>
-                  {groupSongs.map((song) => (
-                    <SongRow key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} />
+        {/* Main content */}
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          {/* Column headers — desktop list only */}
+          {viewMode === 'list' && (
+            <div className="hidden md:block px-5 pb-1 shrink-0">
+              <div className="flex items-center gap-3 px-3 py-1 text-xs text-text-muted font-medium uppercase tracking-wider">
+                <div className="w-9 shrink-0" />
+                <div className="flex-1">Title</div>
+                <div className="w-32 shrink-0">Artist</div>
+                <div className="w-36 shrink-0">Era</div>
+                <div className="w-24 shrink-0 text-center">Category</div>
+                <div className="w-10 shrink-0 text-right">Time</div>
+                <div className="w-20 shrink-0" />
+              </div>
+            </div>
+          )}
+
+          {/* Song list / grid */}
+          <div className="flex-1 overflow-y-auto px-3 md:px-5 pb-4">
+            {loading ? (
+              <div className="flex items-center justify-center h-40 gap-2 text-text-muted">
+                <Loader2 size={18} className="animate-spin" />
+                <span className="text-sm">Loading…</span>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-2 text-center">
+                <p className="text-text-muted text-sm">Failed to load: {error}</p>
+                <button onClick={() => setPage((p) => p)} className="text-accent text-sm underline">Retry</button>
+              </div>
+            ) : songs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-2">
+                <Music2 size={32} className="text-text-muted opacity-30" />
+                <p className="text-text-muted text-sm">No songs found</p>
+              </div>
+            ) : viewMode === 'list' ? (
+              <div className="space-y-0.5">
+                {groupedSongs ? (
+                  Array.from(groupedSongs.entries()).map(([albumName, groupSongs]) => (
+                    <div key={albumName}>
+                      <div className="sticky top-0 z-10 px-3 py-1.5 text-xs font-semibold text-text-muted uppercase tracking-wider bg-surface/90 backdrop-blur-sm border-b border-[var(--border)] mb-0.5">
+                        {albumName}
+                        <span className="ml-2 font-normal opacity-60">{groupSongs.length}</span>
+                      </div>
+                      {groupSongs.map((song) => (
+                        <SongRow key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} onQueue={handleQueue} />
+                      ))}
+                    </div>
+                  ))
+                ) : (
+                  songs.map((song) => (
+                    <SongRow key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} onQueue={handleQueue} />
+                  ))
+                )}
+              </div>
+            ) : (
+              groupedSongs ? (
+                <div className="space-y-4 pt-1">
+                  {Array.from(groupedSongs.entries()).map(([albumName, groupSongs]) => (
+                    <div key={albumName}>
+                      <p className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
+                        {albumName}
+                        <span className="ml-2 font-normal opacity-60">{groupSongs.length}</span>
+                      </p>
+                      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
+                        {groupSongs.map((song) => (
+                          <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} onQueue={handleQueue} />
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
-              ))
-            ) : (
-              songs.map((song) => (
-                <SongRow key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} />
-              ))
+              ) : (
+                <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
+                  {songs.map((song) => (
+                    <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} onQueue={handleQueue} />
+                  ))}
+                </div>
+              )
             )}
           </div>
-        ) : (
-          groupedSongs ? (
-            <div className="space-y-4 pt-1">
-              {Array.from(groupedSongs.entries()).map(([albumName, groupSongs]) => (
-                <div key={albumName}>
-                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wider px-1 mb-2">
-                    {albumName}
-                    <span className="ml-2 font-normal opacity-60">{groupSongs.length}</span>
-                  </p>
-                  <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-                    {groupSongs.map((song) => (
-                      <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} />
-                    ))}
-                  </div>
-                </div>
-              ))}
+
+          {/* Pagination */}
+          {!loading && totalPages > 1 && (
+            <div className="px-4 md:px-5 py-3 shrink-0 border-t border-[var(--border)] flex items-center justify-between gap-2">
+              <span className="text-text-muted text-xs">
+                {((page - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(page * PAGE_SIZE, count).toLocaleString()} of {count.toLocaleString()}
+              </span>
+              <div className="flex items-center gap-1">
+                <button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className="p-2 rounded-lg hover:bg-surface-overlay disabled:opacity-30 disabled:pointer-events-none transition-colors">
+                  <ChevronLeft size={16} className="text-text-muted" />
+                </button>
+                <PageJumper page={page} totalPages={totalPages} onJump={setPage} />
+                <button disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className="p-2 rounded-lg hover:bg-surface-overlay disabled:opacity-30 disabled:pointer-events-none transition-colors">
+                  <ChevronRight size={16} className="text-text-muted" />
+                </button>
+              </div>
             </div>
-          ) : (
-            <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-              {songs.map((song) => (
-                <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} />
-              ))}
-            </div>
-          )
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Song info modal */}
       <SongInfoModal song={selectedSong} onClose={() => setSelectedSong(null)} />
-
-      {/* Pagination */}
-      {!loading && totalPages > 1 && (
-        <div className="px-4 md:px-5 py-3 shrink-0 border-t border-[var(--border)] flex items-center justify-between gap-2">
-          <span className="text-text-muted text-xs">
-            {((page - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(page * PAGE_SIZE, count).toLocaleString()} of {count.toLocaleString()}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              disabled={page === 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="p-2 rounded-lg hover:bg-surface-overlay disabled:opacity-30 disabled:pointer-events-none transition-colors"
-            >
-              <ChevronLeft size={16} className="text-text-muted" />
-            </button>
-            <PageJumper page={page} totalPages={totalPages} onJump={setPage} />
-            <button
-              disabled={page === totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="p-2 rounded-lg hover:bg-surface-overlay disabled:opacity-30 disabled:pointer-events-none transition-colors"
-            >
-              <ChevronRight size={16} className="text-text-muted" />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

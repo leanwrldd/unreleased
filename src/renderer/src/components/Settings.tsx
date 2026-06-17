@@ -10,6 +10,7 @@ const ACCENT_PRESETS = [
 export default function Settings(): JSX.Element {
   const {
     setShowSettings, setActiveView,
+    userProfile,
     theme, setTheme,
     accentColor, setAccentColor,
     audioOutput, setAudioOutput,
@@ -207,7 +208,7 @@ export default function Settings(): JSX.Element {
               <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">About</h3>
             </div>
             <p className="text-text-muted text-xs mb-3">
-              unreleased v1.2.9 — powered by{' '}
+              unreleased v1.3.8 — powered by{' '}
               <a href="https://juicewrldapi.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                 juicewrldapi.com
               </a>
@@ -242,13 +243,15 @@ export default function Settings(): JSX.Element {
               </a>
             </div>
 
-            <button
-              onClick={() => { setShowSettings(false); setActiveView('editor') }}
-              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-accent/10 hover:bg-accent/15 border border-accent/25 text-accent text-sm font-medium transition-colors mt-2"
-            >
-              <PenLine size={15} />
-              Become an Editor
-            </button>
+            {(!userProfile || (userProfile.role !== 'editor' && userProfile.role !== 'admin')) && (
+              <button
+                onClick={() => { setShowSettings(false); setActiveView('editor') }}
+                className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-accent/10 hover:bg-accent/15 border border-accent/25 text-accent text-sm font-medium transition-colors mt-2"
+              >
+                <PenLine size={15} />
+                Become an Editor
+              </button>
+            )}
           </section>
         </div>
       </div>
