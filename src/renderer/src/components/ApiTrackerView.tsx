@@ -57,6 +57,7 @@ function SongRow({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; o
   const track = songToTrack(song)
   const title = song.track_titles?.[0] || song.name
   const altTitles = song.track_titles?.slice(1) ?? []
+  const canPlay = !!song.path
 
   return (
     <div
@@ -67,13 +68,15 @@ function SongRow({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; o
       <div className="relative shrink-0 w-10 h-10 md:w-9 md:h-9 rounded overflow-hidden bg-surface-overlay">
         <AlbumArtThumbnail track={track} size={36} shimmer={false} />
         {/* Desktop: hover overlay play button */}
-        <button
-          className="absolute inset-0 items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
-          onClick={() => onPlay(song)}
-          title="Play"
-        >
-          <Play size={14} fill="white" className="text-white ml-0.5" />
-        </button>
+        {canPlay && (
+          <button
+            className="absolute inset-0 items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+            onClick={() => onPlay(song)}
+            title="Play"
+          >
+            <Play size={14} fill="white" className="text-white ml-0.5" />
+          </button>
+        )}
       </div>
 
       {/* Title + mobile subtitle */}
@@ -120,13 +123,15 @@ function SongRow({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; o
         >
           <Info size={16} />
         </button>
-        <button
-          className="p-2 text-text-muted active:text-accent transition-colors"
-          onClick={() => onPlay(song)}
-          title="Play"
-        >
-          <Play size={17} />
-        </button>
+        {canPlay && (
+          <button
+            className="p-2 text-text-muted active:text-accent transition-colors"
+            onClick={() => onPlay(song)}
+            title="Play"
+          >
+            <Play size={17} />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -136,6 +141,7 @@ function SongRow({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; o
 function SongCard({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; onPlay: (song: JWApiSong) => void; onCategoryClick: (cat: Category) => void; onInfo: (song: JWApiSong) => void }): JSX.Element {
   const track = songToTrack(song)
   const title = song.track_titles?.[0] || song.name
+  const canPlay = !!song.path
 
   return (
     <div className="group flex flex-col rounded-xl overflow-hidden bg-surface-overlay hover:bg-surface-raised transition-colors cursor-default">
@@ -143,22 +149,26 @@ function SongCard({ song, onPlay, onCategoryClick, onInfo }: { song: JWApiSong; 
       <div className="relative w-full aspect-square bg-surface-raised">
         <AlbumArtThumbnail track={track} size={160} shimmer={false} />
         {/* Desktop: hover overlay */}
-        <button
-          className="absolute inset-0 items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
-          onClick={() => onPlay(song)}
-          title="Play"
-        >
-          <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shadow-lg">
-            <Play size={18} fill="black" className="text-black ml-0.5" />
-          </div>
-        </button>
+        {canPlay && (
+          <button
+            className="absolute inset-0 items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
+            onClick={() => onPlay(song)}
+            title="Play"
+          >
+            <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shadow-lg">
+              <Play size={18} fill="black" className="text-black ml-0.5" />
+            </div>
+          </button>
+        )}
         {/* Mobile: always-visible play button in corner */}
-        <button
-          className="md:hidden absolute bottom-1.5 right-1.5 w-8 h-8 rounded-full bg-accent flex items-center justify-center shadow-lg active:scale-95 transition-transform"
-          onClick={() => onPlay(song)}
-        >
-          <Play size={14} fill="black" className="text-black ml-0.5" />
-        </button>
+        {canPlay && (
+          <button
+            className="md:hidden absolute bottom-1.5 right-1.5 w-8 h-8 rounded-full bg-accent flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+            onClick={() => onPlay(song)}
+          >
+            <Play size={14} fill="black" className="text-black ml-0.5" />
+          </button>
+        )}
       </div>
 
       {/* Info */}

@@ -139,7 +139,7 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
           {/* Core */}
           <div>
             <Row label="Artist" value={song.credited_artists || 'Juice WRLD'} />
-            <Row label="Duration" value={song.length ? `${song.length} (${duration})` : null} />
+            <Row label="Duration" value={parseDuration(song.length) ? duration : null} />
             <Row label="Leak type" value={song.leak_type} />
             <Row label="Date leaked" value={song.date_leaked} />
             <Row label="Bitrate" value={song.bitrate} />
