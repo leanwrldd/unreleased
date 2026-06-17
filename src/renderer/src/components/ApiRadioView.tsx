@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Play, SkipForward, Loader2, Radio } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { apiFetch, songToTrack, parseDuration, CATEGORY_LABELS, JWApiRadioResponse } from '../lib/juicewrldApi'
+import { apiFetch, songToTrack, parseDuration, CATEGORY_LABELS, JWApiSong, JWApiPaginatedResponse } from '../lib/juicewrldApi'
 
 function formatDur(secs: number): string {
   if (!secs) return '--:--'
@@ -13,28 +13,27 @@ function formatDur(secs: number): string {
 export default function ApiRadioView(): JSX.Element {
   const { playTrack, currentTrack, isPlaying } = useStore()
 
-  const [radio, setRadio] = useState<JWApiRadioResponse | null>(null)
+  const [song, setSong] = useState<JWApiSong | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasPlayed, setHasPlayed] = useState(false)
+
+  // Playable categories — recording_session is never included
+  const PLAYABLE = ['released', 'unreleased', 'unsurfaced'] as const
 
   const fetchRandom = useCallback(async (autoPlay = false): Promise<void> => {
     setLoading(true)
     setError(null)
     try {
-      // Retry until we get a non-session song (max 10 attempts)
-      let data: JWApiRadioResponse | null = null
-      for (let i = 0; i < 10; i++) {
-        const candidate = await apiFetch<JWApiRadioResponse>('/radio/random/')
-        if (candidate.song.category !== 'recording_session') {
-          data = candidate
-          break
-        }
-      }
-      if (!data) data = await apiFetch<JWApiRadioResponse>('/radio/random/')
-      setRadio(data)
+      // Pick a random playable category, then a random song within it
+      const category = PLAYABLE[Math.floor(Math.random() * PLAYABLE.length)]
+      const countResp = await apiFetch<JWApiPaginatedResponse>('/songs/', { category, limit: 1 })
+      const offset = Math.floor(Math.random() * countResp.count)
+      const songResp = await apiFetch<JWApiPaginatedResponse>('/songs/', { category, limit: 1, offset })
+      const picked = songResp.results[0]
+      setSong(picked)
       if (autoPlay) {
-        const track = songToTrack(data.song)
+        const track = songToTrack(picked)
         playTrack(track, [track])
         setHasPlayed(true)
       }
@@ -49,17 +48,16 @@ export default function ApiRadioView(): JSX.Element {
   useEffect(() => { fetchRandom(false) }, [])
 
   const handlePlay = useCallback((): void => {
-    if (!radio) return
-    const track = songToTrack(radio.song)
+    if (!song) return
+    const track = songToTrack(song)
     playTrack(track, [track])
     setHasPlayed(true)
-  }, [radio, playTrack])
+  }, [song, playTrack])
 
   const handleSkip = useCallback((): void => {
     fetchRandom(hasPlayed)
   }, [fetchRandom, hasPlayed])
 
-  const song = radio?.song
   const track = song ? songToTrack(song) : null
   const isCurrentlyPlaying = track && currentTrack?.id === track.id && isPlaying
 
