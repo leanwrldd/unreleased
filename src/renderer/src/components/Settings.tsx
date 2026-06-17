@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { CHANGELOG } from '../lib/changelog'
 
 const ACCENT_PRESETS = [
   '#1db954', '#7c3aed', '#2563eb', '#dc2626',
@@ -208,7 +207,7 @@ export default function Settings(): JSX.Element {
               <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">About</h3>
             </div>
             <p className="text-text-muted text-xs mb-3">
-              unreleased v{CHANGELOG[0].version} — powered by{' '}
+              unreleased v1.2.3 — powered by{' '}
               <a href="https://juicewrldapi.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                 juicewrldapi.com
               </a>
@@ -241,23 +240,6 @@ export default function Settings(): JSX.Element {
                 <span className="w-3 h-3 flex items-center justify-center">▲</span>
                 Vercel
               </a>
-            </div>
-            <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
-              {CHANGELOG.slice(0, 5).map((entry) => (
-                <div key={entry.version}>
-                  <p className="text-text-primary text-xs font-semibold mb-1">v{entry.version}</p>
-                  <ul className="space-y-0.5">
-                    {entry.changes.map((c, i) => (
-                      <li key={i} className="flex items-start gap-1.5 text-[11px] text-text-muted">
-                        <span className={`shrink-0 font-medium ${c.type === 'new' ? 'text-green-400' : c.type === 'fix' ? 'text-blue-400' : 'text-yellow-400'}`}>
-                          {c.type === 'new' ? 'New' : c.type === 'fix' ? 'Fix' : '↑'}
-                        </span>
-                        {c.text}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
             </div>
           </section>
         </div>

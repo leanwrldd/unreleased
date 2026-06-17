@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.3',
+    date: '2026-06-17',
+    changes: [
+      { type: 'fix', text: 'Mobile bottom nav labels no longer hidden on small screens — text truncates cleanly instead of overflowing' },
+      { type: 'improve', text: 'Changelog removed from Settings — cleaner About section' },
+    ]
+  },
+  {
     version: '1.2.2',
     date: '2026-06-17',
     changes: [

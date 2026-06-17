@@ -20,7 +20,7 @@ export default function BottomNav(): JSX.Element {
           <button
             key={view}
             onClick={() => setActiveView(view)}
-            className="flex-1 flex flex-col items-center justify-center py-2.5 gap-1 transition-colors relative"
+            className="flex-1 flex flex-col items-center justify-center py-2.5 gap-1 transition-colors relative overflow-hidden"
             style={{ color: active ? 'var(--accent)' : undefined }}
           >
             {/* Active indicator line at top */}
@@ -32,7 +32,7 @@ export default function BottomNav(): JSX.Element {
             )}
             <span className={active ? '' : 'text-text-muted'}>{icon}</span>
             <span
-              className="text-[10px] font-semibold leading-none"
+              className="text-[10px] font-semibold leading-none w-full text-center truncate px-0.5"
               style={{ color: active ? 'var(--accent)' : undefined }}
             >
               {label}
@@ -42,10 +42,10 @@ export default function BottomNav(): JSX.Element {
       })}
       <button
         onClick={() => setShowSettings(true)}
-        className="flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-text-muted transition-colors"
+        className="flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-text-muted transition-colors overflow-hidden"
       >
         <Settings size={22} />
-        <span className="text-[10px] font-semibold leading-none">Settings</span>
+        <span className="text-[10px] font-semibold leading-none w-full text-center truncate px-0.5">Settings</span>
       </button>
     </nav>
   )

@@ -6,6 +6,13 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.2.3] — 2026-06-17
+
+- **Fix** Mobile bottom nav labels no longer hidden on small screens — text truncates cleanly instead of overflowing
+- **Improve** Changelog removed from Settings — cleaner About section
+
+---
+
 ## [1.2.2] — 2026-06-17
 
 - **Fix** Mobile bottom nav no longer hidden by the browser address bar — uses dynamic viewport height and safe-area insets
