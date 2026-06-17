@@ -6,6 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.9',
+    date: '2026-06-17',
+    changes: [
+      { type: 'fix', text: 'Compilation: album covers now load correctly — lazily browses into each folder to find the first audio file' },
+      { type: 'fix', text: 'Compilation: Singles and Unreleased tabs fall back to the Tracker API when no matching folder is found' },
+      { type: 'new', text: 'Compilation: Studio Albums & Mixtapes tab now shows two labeled sections' },
+      { type: 'new', text: 'Supabase database — supplemental song data (context, samples, trivia, links, verified corrections, quality rating)' },
+      { type: 'new', text: 'Editor page — search for any song and submit supplemental data directly to the database' },
+      { type: 'improve', text: 'Song info modal now shows Supabase data (context, samples, trivia, links, editor notes) when available' },
+    ]
+  },
+  {
     version: '1.2.8',
     date: '2026-06-17',
     changes: [

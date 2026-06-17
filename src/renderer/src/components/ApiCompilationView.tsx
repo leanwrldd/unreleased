@@ -5,24 +5,38 @@ import {
   apiFetch,
   buildStreamUrl,
   buildCoverArtUrl,
+  buildImageUrl,
   JWApiFileEntry,
   JWApiBrowseResponse,
+  JWApiPaginatedResponse,
+  JWApiSong,
+  songToTrack,
 } from '../lib/juicewrldApi'
 import { Track } from '../types'
+
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 type Tab = 'albums' | 'unreleased' | 'singles'
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'albums',    label: 'Studio Albums & Mixtapes' },
-  { id: 'unreleased',label: 'Unreleased' },
-  { id: 'singles',   label: 'Singles' },
+  { id: 'albums',     label: 'Studio Albums & Mixtapes' },
+  { id: 'unreleased', label: 'Unreleased' },
+  { id: 'singles',    label: 'Singles' },
 ]
 
-function classifyFolder(name: string): Tab {
-  const lower = name.toLowerCase()
-  if (lower.includes('unreleased') || lower.includes('leak') || lower.includes('vault')) return 'unreleased'
-  if (lower.includes('single') || lower.includes(' ep')) return 'singles'
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function classifyFolderTab(name: string): Tab {
+  const l = name.toLowerCase()
+  if (l.includes('unreleased') || l.includes('leak') || l.includes('vault')) return 'unreleased'
+  if (l.includes('single') || l.includes(' ep') || l.includes('mainstream') || l.includes('feature') || l.includes('collab')) return 'singles'
   return 'albums'
+}
+
+function albumType(name: string): 'studio' | 'mixtape' {
+  const l = name.toLowerCase()
+  if (l.includes('mixtape') || l.includes('999') || l.includes('freeband') || l.includes('sick mode') || l.includes('wishing well')) return 'mixtape'
+  return 'studio'
 }
 
 function parseEntries(data: JWApiBrowseResponse): JWApiFileEntry[] {
@@ -35,44 +49,144 @@ function isAudio(name: string): boolean {
   return /\.(mp3|flac|wav|m4a|ogg|aac)$/i.test(name)
 }
 
-// Per-tab navigation: each tab has its own path + name stacks
-interface TabNav { path: string; nameStack: string[] }
+// ── Cover art — lazy browse into folder to find first audio file ───────────────
 
-function initTabNav(): Record<Tab, TabNav> {
-  return { albums: { path: '', nameStack: [] }, unreleased: { path: '', nameStack: [] }, singles: { path: '', nameStack: [] } }
+const coverCache = new Map<string, string | null>()
+
+function FolderCover({ path }: { path: string }): JSX.Element {
+  const cached = coverCache.has(path) ? coverCache.get(path) : undefined
+  const [src, setSrc] = useState<string | null>(cached ?? null)
+  const [imgErr, setImgErr] = useState(false)
+
+  useEffect(() => {
+    if (coverCache.has(path)) return
+    apiFetch<JWApiBrowseResponse>('/files/browse/', { path })
+      .then(data => {
+        const entries = parseEntries(data)
+        const first = entries.find(e => e.type === 'file' && isAudio(e.name))
+        const url = first ? buildCoverArtUrl(first.path) : null
+        coverCache.set(path, url)
+        setSrc(url)
+      })
+      .catch(() => { coverCache.set(path, null) })
+  }, [path])
+
+  if (src && !imgErr) {
+    return (
+      <img
+        src={src}
+        alt=""
+        className="w-full h-full object-cover"
+        onError={() => setImgErr(true)}
+      />
+    )
+  }
+  return <Music2 size={32} className="text-text-muted opacity-20" />
 }
 
-function AlbumCover({ path }: { path: string }): JSX.Element {
-  const [ok, setOk] = useState(true)
-  return ok ? (
-    <img
-      src={buildCoverArtUrl(path)}
-      alt=""
-      className="w-full h-full object-cover"
-      onError={() => setOk(false)}
-    />
-  ) : (
-    <Music2 size={36} className="text-text-muted opacity-20" />
+// ── Tracker fallback (when no folder found for a tab) ─────────────────────────
+
+function TrackerList({
+  category,
+  onPlay,
+}: {
+  category: 'released' | 'unreleased'
+  onPlay: (song: JWApiSong, all: JWApiSong[]) => void
+}): JSX.Element {
+  const [songs, setSongs] = useState<JWApiSong[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    apiFetch<JWApiPaginatedResponse>('/songs/', { category, limit: 200 })
+      .then(data => setSongs(data.results.filter(s => !!s.path)))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [category])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-40 gap-2 text-text-muted">
+        <Loader2 size={18} className="animate-spin" />
+        <span className="text-sm">Loading…</span>
+      </div>
+    )
+  }
+  if (!songs.length) {
+    return (
+      <div className="flex flex-col items-center justify-center h-40 gap-2 text-text-muted">
+        <Music2 size={32} className="opacity-20" />
+        <p className="text-sm">Nothing here yet</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-0.5 pt-1">
+      {songs.map((song) => {
+        const title = song.track_titles?.[0] || song.name
+        const cover = buildImageUrl(song.image_url)
+        return (
+          <div
+            key={song.id}
+            className="group flex items-center gap-3 px-3 py-2 hover:bg-surface-overlay rounded-lg transition-colors"
+          >
+            <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-surface-overlay shrink-0 flex items-center justify-center">
+              {cover
+                ? <img src={cover} alt="" className="w-full h-full object-cover" />
+                : <Music2 size={14} className="text-text-muted opacity-40" />}
+              <button
+                onClick={() => onPlay(song, songs)}
+                className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 hidden md:flex items-center justify-center transition-opacity"
+              >
+                <Play size={12} fill="white" className="text-white ml-0.5" />
+              </button>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-text-primary text-sm truncate">{title}</p>
+              {song.era?.name && (
+                <p className="text-text-muted text-[11px] truncate">{song.era.name}</p>
+              )}
+            </div>
+            <button
+              onClick={() => onPlay(song, songs)}
+              className="md:hidden p-2 text-text-muted active:text-accent shrink-0"
+            >
+              <Play size={16} />
+            </button>
+          </div>
+        )
+      })}
+    </div>
   )
 }
+
+// ── Per-tab nav state ──────────────────────────────────────────────────────────
+
+interface TabNav { path: string; nameStack: string[] }
+
+function initNav(): Record<Tab, TabNav> {
+  return {
+    albums:     { path: '', nameStack: [] },
+    unreleased: { path: '', nameStack: [] },
+    singles:    { path: '', nameStack: [] },
+  }
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
 
 export default function ApiCompilationView(): JSX.Element {
   const { playTrack } = useStore()
   const [activeTab, setActiveTab] = useState<Tab>('albums')
 
-  // Root paths discovered on mount (section folder per tab)
   const [tabRoots, setTabRoots] = useState<Record<Tab, string>>({ albums: '', unreleased: '', singles: '' })
   const [discovering, setDiscovering] = useState(true)
   const [discoverError, setDiscoverError] = useState(false)
 
-  // Per-tab navigation state
-  const [nav, setNav] = useState<Record<Tab, TabNav>>(initTabNav)
-
-  // Browsed entries + loading for current tab
+  const [nav, setNav] = useState<Record<Tab, TabNav>>(initNav)
   const [entries, setEntries] = useState<JWApiFileEntry[]>([])
   const [browsing, setBrowsing] = useState(false)
 
-  // Discover section folder roots on mount
+  // Discover root folders on mount
   useEffect(() => {
     ;(async () => {
       let items: JWApiFileEntry[] = []
@@ -81,29 +195,27 @@ export default function ApiCompilationView(): JSX.Element {
           const data = await apiFetch<JWApiBrowseResponse>('/files/browse/', { path })
           const parsed = parseEntries(data)
           if (parsed.some(i => i.type === 'directory')) { items = parsed; break }
-        } catch { /* try next */ }
+        } catch { /* try next path */ }
       }
-
       if (!items.length) { setDiscoverError(true); setDiscovering(false); return }
 
       const roots: Record<Tab, string> = { albums: '', unreleased: '', singles: '' }
       for (const item of items.filter(i => i.type === 'directory')) {
-        const tab = classifyFolder(item.name)
+        const tab = classifyFolderTab(item.name)
         if (!roots[tab]) roots[tab] = item.path
       }
 
-      // Seed each tab's path with its root
       setTabRoots(roots)
       setNav({
-        albums:    { path: roots.albums,    nameStack: [] },
-        unreleased:{ path: roots.unreleased,nameStack: [] },
-        singles:   { path: roots.singles,   nameStack: [] },
+        albums:     { path: roots.albums,     nameStack: [] },
+        unreleased: { path: roots.unreleased, nameStack: [] },
+        singles:    { path: roots.singles,    nameStack: [] },
       })
       setDiscovering(false)
     })()
   }, [])
 
-  // Browse the active tab's current path whenever it changes
+  // Browse the current tab's path
   const activePath = nav[activeTab].path
   useEffect(() => {
     if (discovering) return
@@ -119,10 +231,7 @@ export default function ApiCompilationView(): JSX.Element {
   const navigateTo = useCallback((entry: JWApiFileEntry) => {
     setNav(prev => ({
       ...prev,
-      [activeTab]: {
-        path: entry.path,
-        nameStack: [...prev[activeTab].nameStack, entry.name],
-      },
+      [activeTab]: { path: entry.path, nameStack: [...prev[activeTab].nameStack, entry.name] },
     }))
   }, [activeTab])
 
@@ -130,14 +239,10 @@ export default function ApiCompilationView(): JSX.Element {
     setNav(prev => {
       const tab = prev[activeTab]
       const newStack = tab.nameStack.slice(0, -1)
-      // Walk back: each step strips the last path segment
       const parentPath = tab.path.includes('/')
         ? tab.path.slice(0, tab.path.lastIndexOf('/'))
         : tabRoots[activeTab]
-      return {
-        ...prev,
-        [activeTab]: { path: parentPath, nameStack: newStack },
-      }
+      return { ...prev, [activeTab]: { path: parentPath, nameStack: newStack } }
     })
   }, [activeTab, tabRoots])
 
@@ -158,6 +263,14 @@ export default function ApiCompilationView(): JSX.Element {
     if (tracks[idx]) playTrack(tracks[idx], tracks)
   }, [entries, activePath, playTrack])
 
+  const playTrackerSong = useCallback((song: JWApiSong, all: JWApiSong[]) => {
+    const tracks = all.map(s => songToTrack(s))
+    const idx = all.findIndex(s => s.id === song.id)
+    const track = tracks[Math.max(0, idx)]
+    if (track) playTrack(track, tracks)
+  }, [playTrack])
+
+  // Derived state
   const isAtRoot = nav[activeTab].nameStack.length === 0
   const nameStack = nav[activeTab].nameStack
   const hasRoot = !!tabRoots[activeTab]
@@ -165,6 +278,101 @@ export default function ApiCompilationView(): JSX.Element {
 
   const folders = entries.filter(e => e.type === 'directory')
   const audioFiles = entries.filter(e => e.type === 'file' && isAudio(e.name))
+  const studioAlbums = folders.filter(f => albumType(f.name) === 'studio')
+  const mixtapes = folders.filter(f => albumType(f.name) === 'mixtape')
+
+  // ── Render helpers ──────────────────────────────────────────────────────────
+
+  const renderAlbumCard = (folder: JWApiFileEntry) => (
+    <button
+      key={folder.path}
+      onClick={() => navigateTo(folder)}
+      className="group flex flex-col text-left bg-surface-overlay hover:bg-surface-raised rounded-xl overflow-hidden transition-colors"
+    >
+      <div className="w-full aspect-square bg-surface-raised flex items-center justify-center relative overflow-hidden">
+        <FolderCover path={folder.path} />
+        <div className="absolute inset-0 bg-accent/0 group-hover:bg-accent/5 transition-colors" />
+      </div>
+      <div className="px-3 py-2.5">
+        <p className="text-text-primary text-xs font-semibold leading-tight truncate">{folder.name}</p>
+      </div>
+    </button>
+  )
+
+  const renderGrid = (items: JWApiFileEntry[], label?: string) => (
+    <div className="mb-5">
+      {label && (
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-2.5 px-0.5">
+          {label}
+        </p>
+      )}
+      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))' }}>
+        {items.map(renderAlbumCard)}
+      </div>
+    </div>
+  )
+
+  const renderAudioRow = (file: JWApiFileEntry) => (
+    <div
+      key={file.path}
+      className="group flex items-center gap-3 px-3 py-2.5 hover:bg-surface-overlay rounded-lg transition-colors"
+    >
+      <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-surface-overlay shrink-0 flex items-center justify-center">
+        <img
+          src={buildCoverArtUrl(file.path)}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+        />
+        <button
+          onClick={() => playFile(file)}
+          className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 hidden md:flex items-center justify-center transition-opacity"
+        >
+          <Play size={12} fill="white" className="text-white ml-0.5" />
+        </button>
+      </div>
+      <span className="text-text-primary text-sm flex-1 truncate">
+        {file.name.replace(/\.[^.]+$/, '')}
+      </span>
+      <button
+        onClick={() => playFile(file)}
+        className="md:hidden p-2 text-text-muted active:text-accent shrink-0"
+      >
+        <Play size={16} />
+      </button>
+    </div>
+  )
+
+  // ── Root album grid content ─────────────────────────────────────────────────
+
+  const renderRootGrid = () => {
+    const showSections = activeTab === 'albums' && studioAlbums.length > 0 && mixtapes.length > 0
+
+    if (folders.length === 0 && audioFiles.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-40 gap-2 text-text-muted">
+          <Music2 size={32} className="opacity-20" />
+          <p className="text-sm">Nothing here</p>
+        </div>
+      )
+    }
+
+    return (
+      <>
+        {showSections ? (
+          <>
+            {studioAlbums.length > 0 && renderGrid(studioAlbums, 'Studio Albums')}
+            {mixtapes.length > 0 && renderGrid(mixtapes, 'Mixtapes')}
+          </>
+        ) : (
+          renderGrid(folders)
+        )}
+        {audioFiles.map(renderAudioRow)}
+      </>
+    )
+  }
+
+  // ── Main render ─────────────────────────────────────────────────────────────
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -189,10 +397,13 @@ export default function ApiCompilationView(): JSX.Element {
           ))}
         </div>
 
-        {/* Back + breadcrumb */}
+        {/* Breadcrumb */}
         {!isAtRoot && (
           <div className="flex items-center gap-2 pb-3 min-w-0">
-            <button onClick={goBack} className="text-text-muted hover:text-text-primary transition-colors shrink-0">
+            <button
+              onClick={goBack}
+              className="text-text-muted hover:text-text-primary transition-colors shrink-0"
+            >
               <ArrowLeft size={16} />
             </button>
             <div className="flex items-center gap-0.5 text-xs text-text-muted min-w-0 overflow-hidden">
@@ -221,60 +432,21 @@ export default function ApiCompilationView(): JSX.Element {
             <span className="text-sm">Loading…</span>
           </div>
         ) : !hasRoot ? (
-          <div className="flex flex-col items-center justify-center h-40 gap-2 text-text-muted">
-            <Music2 size={32} className="opacity-20" />
-            <p className="text-sm">No content for this section</p>
-          </div>
+          // No folder found for this tab → fall back to Tracker API
+          activeTab === 'unreleased' ? (
+            <TrackerList category="unreleased" onPlay={playTrackerSong} />
+          ) : activeTab === 'singles' ? (
+            <TrackerList category="released" onPlay={playTrackerSong} />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-40 gap-2 text-text-muted">
+              <Music2 size={32} className="opacity-20" />
+              <p className="text-sm">No content found</p>
+            </div>
+          )
         ) : isAtRoot ? (
-          /* ── Album grid ── */
-          <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))' }}>
-            {folders.map(folder => (
-              <button
-                key={folder.path}
-                onClick={() => navigateTo(folder)}
-                className="group flex flex-col text-left bg-surface-overlay hover:bg-surface-raised rounded-xl overflow-hidden transition-colors"
-              >
-                <div className="w-full aspect-square bg-surface-raised flex items-center justify-center relative overflow-hidden">
-                  <Music2 size={36} className="text-text-muted opacity-20" />
-                  <div className="absolute inset-0 bg-accent/0 group-hover:bg-accent/5 transition-colors" />
-                </div>
-                <div className="px-3 py-2.5">
-                  <p className="text-text-primary text-xs font-semibold leading-tight truncate">{folder.name}</p>
-                </div>
-              </button>
-            ))}
-            {audioFiles.map(file => (
-              <div
-                key={file.path}
-                className="group flex flex-col bg-surface-overlay hover:bg-surface-raised rounded-xl overflow-hidden transition-colors"
-              >
-                <div className="w-full aspect-square bg-surface-raised flex items-center justify-center relative overflow-hidden">
-                  <AlbumCover path={file.path} />
-                  <button
-                    onClick={() => playFile(file)}
-                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shadow-lg">
-                      <Play size={18} fill="black" className="text-black ml-0.5" />
-                    </div>
-                  </button>
-                </div>
-                <div className="px-3 py-2.5">
-                  <p className="text-text-primary text-xs font-semibold leading-tight truncate">
-                    {file.name.replace(/\.[^.]+$/, '')}
-                  </p>
-                </div>
-              </div>
-            ))}
-            {folders.length === 0 && audioFiles.length === 0 && (
-              <div className="col-span-full flex flex-col items-center justify-center h-40 gap-2 text-text-muted">
-                <Music2 size={32} className="opacity-20" />
-                <p className="text-sm">No albums found</p>
-              </div>
-            )}
-          </div>
+          <div className="pt-1">{renderRootGrid()}</div>
         ) : (
-          /* ── File list inside a folder ── */
+          // ── Inside a folder: file list ──
           <div className="space-y-0.5 pt-1">
             {folders.map(folder => (
               <button
@@ -289,31 +461,7 @@ export default function ApiCompilationView(): JSX.Element {
                 <ChevronRight size={16} className="text-text-muted shrink-0" />
               </button>
             ))}
-            {audioFiles.map(file => (
-              <div
-                key={file.path}
-                className="group flex items-center gap-3 px-3 py-2.5 hover:bg-surface-overlay rounded-lg transition-colors"
-              >
-                <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-surface-overlay shrink-0">
-                  <AlbumCover path={file.path} />
-                  <button
-                    onClick={() => playFile(file)}
-                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 hidden md:flex items-center justify-center transition-opacity"
-                  >
-                    <Play size={12} fill="white" className="text-white ml-0.5" />
-                  </button>
-                </div>
-                <span className="text-text-primary text-sm flex-1 truncate">
-                  {file.name.replace(/\.[^.]+$/, '')}
-                </span>
-                <button
-                  onClick={() => playFile(file)}
-                  className="md:hidden p-2 text-text-muted active:text-accent transition-colors shrink-0"
-                >
-                  <Play size={16} />
-                </button>
-              </div>
-            ))}
+            {audioFiles.map(renderAudioRow)}
             {folders.length === 0 && audioFiles.length === 0 && (
               <div className="flex flex-col items-center justify-center h-40 gap-2 text-text-muted">
                 <Music2 size={32} className="opacity-20" />

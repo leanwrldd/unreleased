@@ -6,6 +6,24 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.2.9] — 2026-06-17
+
+- **Fix** Compilation: album covers now load correctly (lazy per-folder fetch)
+- **Fix** Compilation: Singles tab falls back to Tracker API released songs when no folder found
+- **Fix** Compilation: Unreleased tab falls back to Tracker API when no folder found
+- **New** Compilation: Studio Albums & Mixtapes split into separate labeled sections
+- **New** Supabase database — supplemental song data layer for editors
+
+---
+
+## [1.2.8] — 2026-06-17
+
+- **New** Compilation tab — browse Studio Albums & Mixtapes, Unreleased, and Singles with album grid and track file list views
+- **Fix** Song info modal: duration no longer duplicated, empty fields hidden, unsurfaced songs without files have no play button
+- **Improve** Song info modal UI overhaul — blurred hero backdrop, clean label/value rows, grouped sections
+
+---
+
 ## [1.2.7] — 2026-06-17
 
 - **Improve** Song info modal now shows all available API data — engineers, recording locations, recording dates, file names, instrumentals, additional info, important dates, session info, notes, and bitrate — each in a collapsible section

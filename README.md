@@ -5,7 +5,7 @@ A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com),
 > **This is the `web` branch** — API-only, no local library, deployable to any static host.  
 > For the full desktop app (Electron + local library), see the [`main` branch](https://github.com/leanwrldd/unreleased/tree/main).
 
-![Version](https://img.shields.io/badge/version-1.2.7-blue)
+![Version](https://img.shields.io/badge/version-1.2.9-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -21,7 +21,9 @@ A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com),
 - **File browser** — navigate the API filesystem, stream audio, and download files
 - **Now Playing panel** — album art, lyrics (fetched from the API), and track info
 - **Queue** — add songs, reorder, clear
+- **Compilation** — browse Studio Albums & Mixtapes, Unreleased, and Singles with album art grids
 - **Crossfade, playback speed, sleep timer, accent color, dark/light theme** — all settings persist via localStorage
+- **Supabase** — supplemental song data layer for editors
 
 ---
 
