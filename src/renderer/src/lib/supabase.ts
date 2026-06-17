@@ -15,7 +15,7 @@ export interface Profile {
   id: string
   email: string
   username: string | null
-  role: 'pending' | 'editor' | 'admin'
+  role: 'pending' | 'editor' | 'admin' | 'rejected'
   created_at: string
   approved_at: string | null
   approved_by: string | null
@@ -106,9 +106,16 @@ export async function getProfiles(): Promise<Profile[]> {
   return (data ?? []) as Profile[]
 }
 
+export async function changePassword(newPassword: string): Promise<{ error: string | null }> {
+  if (!supabase) return { error: 'Supabase not configured' }
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) return { error: error.message }
+  return { error: null }
+}
+
 export async function updateProfileRole(
   userId: string,
-  role: 'pending' | 'editor' | 'admin',
+  role: 'pending' | 'editor' | 'admin' | 'rejected',
   adminId?: string
 ): Promise<boolean> {
   if (!supabase) return false
@@ -116,6 +123,9 @@ export async function updateProfileRole(
   if (role === 'editor' || role === 'admin') {
     patch.approved_at = new Date().toISOString()
     if (adminId) patch.approved_by = adminId
+  } else if (role === 'pending' || role === 'rejected') {
+    patch.approved_at = null
+    patch.approved_by = null
   }
   const { error } = await supabase.from('profiles').update(patch).eq('id', userId)
   return !error

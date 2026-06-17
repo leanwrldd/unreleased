@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { ChevronLeft, Users, Clock, CheckCircle, XCircle, ShieldCheck, BarChart2, Loader2, RefreshCw } from 'lucide-react'
+import { ChevronLeft, Users, Clock, CheckCircle, XCircle, ShieldCheck, BarChart2, Loader2, RefreshCw, Trash2, Lock } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { getProfiles, getRecentSupplements, updateProfileRole, Profile, SongSupplement } from '../lib/supabase'
+import { getProfiles, getRecentSupplements, updateProfileRole, changePassword, Profile, SongSupplement, supabase } from '../lib/supabase'
 
-type Tab = 'pending' | 'editors' | 'submissions' | 'stats'
+type Tab = 'pending' | 'editors' | 'submissions' | 'stats' | 'account'
 
 export default function AdminPage(): JSX.Element {
   const { setActiveView, session, userProfile } = useStore()
@@ -12,6 +12,9 @@ export default function AdminPage(): JSX.Element {
   const [supplements, setSupplements] = useState<SongSupplement[]>([])
   const [loading, setLoading] = useState(true)
   const [actionId, setActionId] = useState<string | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [pwState, setPwState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [pwError, setPwError] = useState<string | null>(null)
 
   // Redirect non-admins
   const isAdmin = userProfile?.role === 'admin'
@@ -39,9 +42,25 @@ export default function AdminPage(): JSX.Element {
 
   const reject = async (userId: string): Promise<void> => {
     setActionId(userId)
-    // Keep in db but flag as rejected — for now we just remove editor role (already pending, no change needed)
-    // A real flow might delete or set role='rejected'. We'll just reload for now.
+    await updateProfileRole(userId, 'rejected')
+    await load()
     setActionId(null)
+  }
+
+  const deleteSupplement = async (id: string): Promise<void> => {
+    if (!supabase) return
+    await supabase.from('song_supplements').delete().eq('id', id)
+    setSupplements((prev) => prev.filter((s) => s.id !== id))
+  }
+
+  const savePassword = async (): Promise<void> => {
+    if (!newPassword || newPassword.length < 8) { setPwError('Password must be at least 8 characters'); return }
+    setPwState('saving')
+    setPwError(null)
+    const { error } = await changePassword(newPassword)
+    if (error) { setPwError(error); setPwState('error') }
+    else { setPwState('saved'); setNewPassword('') }
+    setTimeout(() => setPwState('idle'), 3000)
   }
 
   const revoke = async (userId: string): Promise<void> => {
@@ -64,11 +83,14 @@ export default function AdminPage(): JSX.Element {
     return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
+  const rejected = profiles.filter((p) => p.role === 'rejected')
+
   const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
     { id: 'pending',     label: 'Pending',     icon: <Clock size={14} />,       badge: pending.length },
     { id: 'editors',     label: 'Editors',      icon: <Users size={14} /> },
     { id: 'submissions', label: 'Submissions',  icon: <CheckCircle size={14} /> },
     { id: 'stats',       label: 'Stats',        icon: <BarChart2 size={14} /> },
+    { id: 'account',     label: 'Account',      icon: <Lock size={14} /> },
   ]
 
   if (!isAdmin) {
@@ -141,38 +163,56 @@ export default function AdminPage(): JSX.Element {
 
         {!loading && tab === 'pending' && (
           <div className="space-y-2">
-            {pending.length === 0 ? (
+            {pending.length === 0 && rejected.length === 0 && (
               <p className="text-text-muted text-sm text-center py-8">No pending requests.</p>
-            ) : (
-              pending.map((p) => (
-                <div key={p.id} className="bg-surface-overlay border border-[var(--border)] rounded-xl px-4 py-3 flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-text-primary text-sm font-medium truncate">{p.email}</p>
-                    <p className="text-text-muted text-xs">Signed up {fmt(p.created_at)}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {actionId === p.id ? (
-                      <Loader2 size={15} className="animate-spin text-text-muted" />
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => reject(p.id)}
-                          className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                          title="Reject"
-                        >
-                          <XCircle size={16} />
-                        </button>
-                        <button
-                          onClick={() => approve(p.id)}
-                          className="px-3 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 text-xs font-semibold transition-colors"
-                        >
-                          Approve
-                        </button>
-                      </>
-                    )}
-                  </div>
+            )}
+            {pending.map((p) => (
+              <div key={p.id} className="bg-surface-overlay border border-[var(--border)] rounded-xl px-4 py-3 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-text-primary text-sm font-medium truncate">{p.email}</p>
+                  <p className="text-text-muted text-xs">Signed up {fmt(p.created_at)}</p>
                 </div>
-              ))
+                <div className="flex items-center gap-2 shrink-0">
+                  {actionId === p.id ? (
+                    <Loader2 size={15} className="animate-spin text-text-muted" />
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => reject(p.id)}
+                        className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        title="Reject"
+                      >
+                        <XCircle size={16} />
+                      </button>
+                      <button
+                        onClick={() => approve(p.id)}
+                        className="px-3 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 text-xs font-semibold transition-colors"
+                      >
+                        Approve
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+            {rejected.length > 0 && (
+              <>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted pt-3">Rejected</p>
+                {rejected.map((p) => (
+                  <div key={p.id} className="bg-surface-overlay border border-[var(--border)] rounded-xl px-4 py-3 flex items-center gap-3 opacity-60">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-text-primary text-sm font-medium truncate">{p.email}</p>
+                      <p className="text-text-muted text-xs">Rejected • signed up {fmt(p.created_at)}</p>
+                    </div>
+                    <button
+                      onClick={() => approve(p.id)}
+                      className="px-2 py-1 rounded text-xs text-text-muted hover:text-emerald-400 transition-colors"
+                    >
+                      Approve anyway
+                    </button>
+                  </div>
+                ))}
+              </>
             )}
           </div>
         )}
@@ -237,11 +277,20 @@ export default function AdminPage(): JSX.Element {
                         Updated {fmt(s.updated_at)}{s.updated_by ? ` by ${s.updated_by}` : ''}
                       </p>
                     </div>
-                    {s.quality_rating && (
-                      <span className="text-xs bg-surface-raised px-2 py-0.5 rounded-full text-text-muted">
-                        ★ {s.quality_rating}/10
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {s.quality_rating && (
+                        <span className="text-xs bg-surface-raised px-2 py-0.5 rounded-full text-text-muted">
+                          ★ {s.quality_rating}/10
+                        </span>
+                      )}
+                      <button
+                        onClick={() => deleteSupplement(s.id)}
+                        className="p-1 rounded text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        title="Delete entry"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
                   {s.context && (
                     <p className="text-text-muted text-xs mt-2 line-clamp-2">{s.context}</p>
@@ -258,11 +307,40 @@ export default function AdminPage(): JSX.Element {
           </div>
         )}
 
+        {!loading && tab === 'account' && (
+          <div className="space-y-4 max-w-sm">
+            <div>
+              <p className="text-text-primary text-sm font-semibold mb-1">Change password</p>
+              <p className="text-text-muted text-xs mb-3">Must be at least 8 characters.</p>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => { setNewPassword(e.target.value); setPwError(null) }}
+                placeholder="New password"
+                className="w-full bg-surface-overlay border border-[var(--border)] rounded-lg px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent/50 mb-2"
+              />
+              {pwError && <p className="text-red-400 text-xs mb-2">{pwError}</p>}
+              <button
+                onClick={savePassword}
+                disabled={pwState === 'saving'}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                  pwState === 'saved'  ? 'bg-emerald-500/20 text-emerald-400' :
+                  pwState === 'error'  ? 'bg-red-500/20 text-red-400' :
+                  'bg-accent/15 hover:bg-accent/25 text-accent'
+                }`}
+              >
+                {pwState === 'saving' ? 'Saving…' : pwState === 'saved' ? 'Password changed!' : 'Update password'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {!loading && tab === 'stats' && (
           <div className="grid grid-cols-2 gap-3">
             {[
               { label: 'Total users',    value: profiles.length },
               { label: 'Pending',        value: pending.length },
+              { label: 'Rejected',       value: rejected.length },
               { label: 'Editors',        value: editors.filter((e) => e.role === 'editor').length },
               { label: 'Admins',         value: editors.filter((e) => e.role === 'admin').length },
               { label: 'Song entries',   value: supplements.length },
