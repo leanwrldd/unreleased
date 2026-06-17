@@ -1,4 +1,4 @@
-import { LayoutDashboard, SearchCode, Radio, HardDrive, Settings } from 'lucide-react'
+import { LayoutDashboard, SearchCode, Radio, HardDrive, Settings, Github } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
@@ -41,8 +41,8 @@ export default function Sidebar(): JSX.Element {
         ))}
       </nav>
 
-      {/* Settings button at bottom */}
-      <div className="px-3 pb-4">
+      {/* Bottom: Settings + GitHub */}
+      <div className="px-3 pb-4 space-y-1">
         <button
           onClick={() => setShowSettings(true)}
           className="flex items-center gap-3 w-full px-3 py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
@@ -50,6 +50,15 @@ export default function Sidebar(): JSX.Element {
           <Settings size={18} />
           <span>Settings</span>
         </button>
+        <a
+          href="https://github.com/leanwrldd/unreleased"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 w-full px-3 py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+        >
+          <Github size={18} />
+          <span>GitHub</span>
+        </a>
       </div>
     </aside>
   )

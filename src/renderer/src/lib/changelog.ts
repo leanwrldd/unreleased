@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.2.0',
+    date: '2026-06-17',
+    changes: [
+      { type: 'new', text: 'Deep URL routing for Files — navigating into a folder updates the URL to /files/FolderName/SubFolder; paste or refresh any folder URL to land directly in it' },
+      { type: 'new', text: 'Copy link button on every file and folder — chain icon copies the direct stream URL (files) or shareable app URL (folders)' },
+      { type: 'new', text: 'URL-based view routing — the address bar now shows /categories, /tracker, /radio, or /files as you navigate' },
+      { type: 'new', text: 'GitHub link added to the sidebar (desktop) and Settings About section (mobile)' },
+    ]
+  },
+  {
     version: '1.1.7',
     date: '2026-06-17',
     changes: [

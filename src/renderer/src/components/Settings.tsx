@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info } from 'lucide-react'
+import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { CHANGELOG } from '../lib/changelog'
 
@@ -207,12 +207,32 @@ export default function Settings(): JSX.Element {
               <Info size={14} className="text-text-muted" />
               <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">About</h3>
             </div>
-            <p className="text-text-muted text-xs mb-4">
+            <p className="text-text-muted text-xs mb-3">
               unreleased v{CHANGELOG[0].version} — powered by{' '}
               <a href="https://juicewrldapi.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                 juicewrldapi.com
               </a>
             </p>
+            <div className="flex gap-2 mb-4">
+              <a
+                href="https://github.com/leanwrldd/unreleased"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors px-2.5 py-1.5 rounded-lg bg-surface-overlay hover:bg-surface-raised border border-[var(--border)]"
+              >
+                <Github size={13} />
+                GitHub
+              </a>
+              <a
+                href="https://unreleased-juicewrldapi.vercel.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors px-2.5 py-1.5 rounded-lg bg-surface-overlay hover:bg-surface-raised border border-[var(--border)]"
+              >
+                <span className="w-3 h-3 flex items-center justify-center">▲</span>
+                Vercel
+              </a>
+            </div>
             <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
               {CHANGELOG.slice(0, 5).map((entry) => (
                 <div key={entry.version}>

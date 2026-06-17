@@ -4,12 +4,15 @@ All notable changes to this project are documented here.
 
 ---
 
-## [Unreleased] — Web Branch
+## [1.2.0] — 2026-06-17
+
+> Deployed on [Vercel](https://unreleased-juicewrldapi.vercel.app) · Source on [GitHub](https://github.com/leanwrldd/unreleased)
 
 ### Added
 - **Deep URL routing for Files**: Navigating into a folder now updates the URL to `/files/FolderName/SubFolder`. Direct access to any folder URL loads the correct path on mount; browser back/forward navigates folder history.
 - **Copy link button on files and folders**: Each file and folder row/card now has a copy-link button (chain icon). For files it copies the direct stream URL; for folders it copies the shareable app URL.
 - **URL-based view routing**: Navigating to Categories, Tracker, Radio, or Files syncs the browser URL (`/categories`, `/tracker`, `/radio`, `/files`). Refreshing or sharing the URL opens the correct view.
+- **GitHub link**: Repository link added to the sidebar (desktop) and Settings panel (mobile).
 - **Mobile app layout**: Sidebar hidden on mobile with a bottom navigation bar (Categories, Tracker, Radio, Files, Settings). Active tab highlighted with an accent indicator.
 - **Mobile compact player**: Full-width player bar on mobile with a 2 px progress strip, artwork thumbnail, and previous/play/next controls.
 - **Mobile full-screen overlays**: Now Playing and Queue panels open as full-screen overlays on mobile instead of side panels.
