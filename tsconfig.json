@@ -12,5 +12,5 @@
     "skipLibCheck": true,
     "baseUrl": "."
   },
-  "include": ["src/renderer/src/**/*", "vite.config.ts"]
+  "include": ["src/renderer/src/**/*"]
 }
