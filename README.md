@@ -59,15 +59,13 @@ npm run preview
 
 - **[juicewrldapi.com](https://juicewrldapi.com)** — the API powering everything: song metadata, streaming, lyrics, eras, categories, and the file browser.
 - **juicewrldapi** on Discord — for the help and support building the integration.
+- Built by **freakylatif** — find me on Discord.
+- Join the **[Discord](https://discord.gg/qq7DMNkBJ4)** server
 
-## Community
+##
 
-Join the Discord server: **[discord.gg/qq7DMNkBJ4](https://discord.gg/qq7DMNkBJ4)**
-
-Built by **freakylatif** — find me on Discord.
-
----
-
+- Add synced lyrics from API
+- Add make synced lyrics
 ## Changelog
 
 ### v1.4.0 — 2026-06-18
