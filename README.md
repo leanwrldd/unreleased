@@ -21,7 +21,6 @@ A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com),
 - **Queue** — add songs from any view, reorder, clear
 - **Compilation** — browse Studio Albums & Mixtapes, Unreleased, and Singles with album art grids
 - **Crossfade, playback speed, sleep timer, accent color, dark/light theme** — all settings persist via localStorage
-- **Supabase** — supplemental song data layer for editors
 
 ---
 
