@@ -18,10 +18,8 @@ A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com),
 - **Tracker** — search, filter, and sort thousands of songs by category, era, and column headers; collapsible category sidebar
 - **File browser** — navigate the API filesystem, stream audio, and download files
 - **Now Playing panel** — album art, lyrics (fetched from the API), and track info
-- **Queue** — add songs from any view, reorder, clear
 - **Compilation** — browse Studio Albums & Mixtapes, Unreleased, and Singles with album art grids
 - **Crossfade, playback speed, sleep timer, accent color, dark/light theme** — all settings persist via localStorage
-- **Supabase** — supplemental song data layer for editors
 
 ---
 
@@ -65,7 +63,20 @@ npm run preview
 ## To-dos
 
 - Add synced lyrics from API
-- Add make synced lyrics
+- Add synced lyrics editor
+- Clean up the UI
+- Add submission page
+- Remove page navigation in the tracker and make it endless isntead
+- Add radio mode
+- in a songlist, context menu to add to queue, add to playlist, show in files and edit
+- transfer liked songs to playlists
+- make the side menu closeable
+- fix sorting, fix search
+- add dashboard (to show how many songs still dont have lyrics etc.)
+- make playlists shareable. have their cover customizable
+- rework playlists ui
+- rework compilation ui
+
 ## Changelog
 
 ### v1.4.0 — 2026-06-18
