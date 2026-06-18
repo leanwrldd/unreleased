@@ -1,21 +1,23 @@
-import { SearchCode, HardDrive, Settings, Github, MessageCircle, Archive, ShieldCheck } from 'lucide-react'
+import { SearchCode, HardDrive, Settings, Github, MessageCircle, Archive, ShieldCheck, PenLine, Heart, ListMusic, LogIn, LogOut } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
 
 export default function Sidebar(): JSX.Element {
-  const { activeView, setActiveView, setShowSettings, userProfile } = useStore()
-  const isAdmin = userProfile?.role === 'admin'
+  const { activeView, setActiveView, setShowSettings, account, logoutAccount, setShowUserAuth } = useStore()
+  const isAdmin = !!account?.is_administrator
 
   const items: { icon: React.ReactNode; label: string; view: ViewType }[] = [
     { icon: <SearchCode size={18} />, label: 'Tracker', view: 'api-tracker' },
     { icon: <Archive size={18} />, label: 'Compilation', view: 'compilation' },
     { icon: <HardDrive size={18} />, label: 'Files', view: 'api-files' },
+    { icon: <Heart size={18} />, label: 'Liked Songs', view: 'liked' },
+    { icon: <ListMusic size={18} />, label: 'Playlists', view: 'playlists' },
+    { icon: <PenLine size={18} />, label: 'Contribute', view: 'editor' },
   ]
 
   return (
     <aside className="hidden md:flex flex-col h-full bg-sidebar w-60 shrink-0 border-r border-[var(--border)]">
-      {/* Logo */}
       <div className="px-5 pt-6 pb-4">
         <div className="flex flex-col items-center gap-1">
           <img src={logo} alt="unreleased" className="h-32 w-auto object-contain" />
@@ -28,7 +30,6 @@ export default function Sidebar(): JSX.Element {
         </div>
       </div>
 
-      {/* Nav */}
       <nav className="px-3 space-y-1 flex-1">
         {items.map(({ icon, label, view }) => (
           <button
@@ -46,8 +47,30 @@ export default function Sidebar(): JSX.Element {
         ))}
       </nav>
 
-      {/* Bottom: Admin + Settings + GitHub */}
       <div className="px-3 pb-4 space-y-1">
+        {account ? (
+          <div className="flex items-center gap-2 px-3 py-2 rounded text-sm">
+            {account.discord_avatar ? (
+              <img src={account.discord_avatar} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-semibold shrink-0">
+                {(account.display_name || account.discord_username || '?').charAt(0).toUpperCase()}
+              </div>
+            )}
+            <span className="flex-1 min-w-0 truncate text-text-secondary">{account.display_name || account.discord_username}</span>
+            <button onClick={() => logoutAccount()} title="Log out" className="text-text-muted hover:text-text-primary transition-colors shrink-0">
+              <LogOut size={16} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowUserAuth(true)}
+            className="flex items-center gap-3 w-full px-3 py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+          >
+            <LogIn size={18} />
+            <span>Log in</span>
+          </button>
+        )}
         {isAdmin && (
           <button
             onClick={() => setActiveView('admin')}

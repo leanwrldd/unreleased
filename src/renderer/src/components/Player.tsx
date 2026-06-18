@@ -15,11 +15,14 @@ import {
   Heart,
   ChevronUp,
   Check,
+  Plus
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { formatDuration } from '../lib/lyrics'
 import { apiFetch, JWApiSong } from '../lib/juicewrldApi'
+import { trackIdToSongId } from '../lib/userApi'
 import { FullTrack } from '../types'
+import AddToPlaylistMenu from './AddToPlaylistMenu'
 
 let _seek: ((t: number) => void) | null = null
 export function seekAudio(t: number): void { _seek?.(t) }
@@ -61,6 +64,9 @@ export default function Player(): JSX.Element {
     toggleLike,
     setActiveView,
   } = useStore()
+
+  const [showAddToPlaylist, setShowAddToPlaylist] = useState(false)
+  const currentSongId = currentTrack ? trackIdToSongId(currentTrack.id) : null
 
   // Two audio slots — ping-pong between them for crossfade
   const slotA = useRef<HTMLAudioElement>(null)
@@ -540,6 +546,21 @@ export default function Player(): JSX.Element {
           >
             <Heart size={16} fill={currentTrack && likedTrackIds.includes(currentTrack.id) ? 'currentColor' : 'none'} />
           </button>
+
+          {currentSongId != null && (
+            <div className="relative shrink-0">
+              <button
+                className="ml-1 text-text-muted hover:text-accent transition-colors"
+                onClick={() => setShowAddToPlaylist((v) => !v)}
+                title="Add to playlist"
+              >
+                <Plus size={16} />
+              </button>
+              {showAddToPlaylist && (
+                <AddToPlaylistMenu songId={currentSongId} placement="top" onClose={() => setShowAddToPlaylist(false)} />
+              )}
+            </div>
+          )}
         </div>
 
         {/* Center: controls + progress */}

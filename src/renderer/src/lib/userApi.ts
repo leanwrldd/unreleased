@@ -1,0 +1,444 @@
+import { Track } from '../types'
+import { JWAPI_BASE, buildStreamUrl, buildImageUrl, parseDuration } from './juicewrldApi'
+
+const ACCOUNT_BASE = `${JWAPI_BASE}/accounts`
+const LIBRARY_BASE = `${JWAPI_BASE}/library`
+const TOKEN_KEY = 'unreleased:authToken'
+
+export interface AccountUser {
+  id: number
+  display_name: string
+  discord_id: string
+  discord_username: string
+  discord_avatar: string
+  is_editor: boolean
+  is_administrator: boolean
+  otp_enabled: boolean
+}
+
+export interface ApiSongLite {
+  id: number
+  public_id: number | null
+  name: string
+  track_titles: string[]
+  path: string
+  length: string
+  credited_artists: string
+  category: string
+  image_url: string | null
+  era: { id: number; name: string } | null
+}
+
+export interface FavoriteEntry {
+  id: number
+  song: ApiSongLite
+  created_at: string
+}
+
+export interface PlaylistSummary {
+  id: number
+  name: string
+  track_count: number
+  cover_image_url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PlaylistItemEntry {
+  id: number
+  song: ApiSongLite
+  position: number
+  added_at: string
+}
+
+export interface PlaylistDetail {
+  id: number
+  name: string
+  items: PlaylistItemEntry[]
+  created_at: string
+  updated_at: string
+}
+
+export function getToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function setToken(token: string): void {
+  try {
+    localStorage.setItem(TOKEN_KEY, token)
+  } catch {}
+}
+
+export function clearToken(): void {
+  try {
+    localStorage.removeItem(TOKEN_KEY)
+  } catch {}
+}
+
+async function parseError(res: Response): Promise<string> {
+  try {
+    const body = await res.json()
+    if (typeof body === 'string') return body
+    if (body.detail) return String(body.detail)
+    const firstKey = Object.keys(body)[0]
+    if (firstKey) {
+      const val = body[firstKey]
+      return Array.isArray(val) ? String(val[0]) : String(val)
+    }
+  } catch {}
+  return `Request failed (${res.status})`
+}
+
+async function request<T>(url: string, options: RequestInit = {}, auth = true): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (auth) {
+    const token = getToken()
+    if (token) headers['Authorization'] = `Token ${token}`
+  }
+  const res = await fetch(url, { ...options, headers: { ...headers, ...(options.headers as Record<string, string>) } })
+  if (!res.ok) throw new Error(await parseError(res))
+  if (res.status === 204) return undefined as T
+  const text = await res.text()
+  return (text ? JSON.parse(text) : undefined) as T
+}
+
+export function liteSongToTrack(song: ApiSongLite): Track {
+  const title = song.track_titles?.[0] || song.name
+  return {
+    id: `jw-${song.id}`,
+    path: song.path,
+    streamUrl: buildStreamUrl(song.path),
+    imageUrl: buildImageUrl(song.image_url),
+    title,
+    artist: song.credited_artists || 'Juice WRLD',
+    album: song.era?.name || '',
+    albumArtist: 'Juice WRLD',
+    year: null,
+    trackNumber: null,
+    duration: parseDuration(song.length),
+    genre: song.category,
+    hasAlbumArt: !!song.image_url,
+  }
+}
+
+export function trackIdToSongId(trackId: string): number | null {
+  const match = trackId.match(/^jw-(\d+)$/)
+  return match ? Number(match[1]) : null
+}
+
+export const DISCORD_STATE_KEY = 'unreleased:discordState'
+
+export function discordRedirectUri(): string {
+  return `${window.location.origin}/auth/discord/callback`
+}
+
+export async function getDiscordAuthUrl(redirectUri: string): Promise<{ authorize_url: string; state: string }> {
+  const url = new URL(`${ACCOUNT_BASE}/auth/discord/url/`)
+  url.searchParams.set('redirect_uri', redirectUri)
+  return request(url.toString(), { method: 'GET' }, false)
+}
+
+export async function exchangeDiscord(
+  code: string,
+  state: string,
+  redirectUri: string,
+): Promise<{ token: string; user: AccountUser }> {
+  return request(`${ACCOUNT_BASE}/auth/discord/exchange/`, {
+    method: 'POST',
+    body: JSON.stringify({ code, state, redirect_uri: redirectUri }),
+  }, false)
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await request(`${ACCOUNT_BASE}/logout/`, { method: 'POST' })
+  } catch {}
+  clearToken()
+}
+
+export async function getMe(): Promise<AccountUser> {
+  return request(`${ACCOUNT_BASE}/account/me/`, { method: 'GET' })
+}
+
+export async function getFavorites(): Promise<FavoriteEntry[]> {
+  return request(`${LIBRARY_BASE}/favorites/`, { method: 'GET' })
+}
+
+export async function addFavorite(songId: number): Promise<FavoriteEntry> {
+  return request(`${LIBRARY_BASE}/favorites/`, {
+    method: 'POST',
+    body: JSON.stringify({ song_id: songId }),
+  })
+}
+
+export async function removeFavorite(songId: number): Promise<void> {
+  return request(`${LIBRARY_BASE}/favorites/${songId}/`, { method: 'DELETE' })
+}
+
+export async function getPlaylists(): Promise<PlaylistSummary[]> {
+  return request(`${LIBRARY_BASE}/playlists/`, { method: 'GET' })
+}
+
+export async function createPlaylist(name: string): Promise<PlaylistDetail> {
+  return request(`${LIBRARY_BASE}/playlists/`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function getPlaylist(id: number): Promise<PlaylistDetail> {
+  return request(`${LIBRARY_BASE}/playlists/${id}/`, { method: 'GET' })
+}
+
+export async function renamePlaylist(id: number, name: string): Promise<PlaylistDetail> {
+  return request(`${LIBRARY_BASE}/playlists/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function reorderPlaylist(id: number, songIds: number[]): Promise<PlaylistDetail> {
+  return request(`${LIBRARY_BASE}/playlists/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ order: songIds }),
+  })
+}
+
+export async function deletePlaylist(id: number): Promise<void> {
+  return request(`${LIBRARY_BASE}/playlists/${id}/`, { method: 'DELETE' })
+}
+
+export async function addToPlaylist(id: number, songId: number): Promise<PlaylistDetail> {
+  return request(`${LIBRARY_BASE}/playlists/${id}/items/`, {
+    method: 'POST',
+    body: JSON.stringify({ song_id: songId }),
+  })
+}
+
+export async function removeFromPlaylist(id: number, songId: number): Promise<void> {
+  return request(`${LIBRARY_BASE}/playlists/${id}/items/${songId}/`, { method: 'DELETE' })
+}
+
+export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'reversed'
+export type ProposalChangeType = 'create' | 'update' | 'delete'
+
+export interface EditorBadgeAward {
+  slug: string
+  name: string
+  description: string
+  icon: string
+  category: string
+  note: string
+  awarded_at: string
+  awarded_by_username: string | null
+}
+
+export interface SongEditProposal {
+  id: number
+  editor_username: string
+  editor_id: number
+  song: number | null
+  song_public_id: number | null
+  change_type: ProposalChangeType
+  title: string
+  proposed_data: Record<string, unknown>
+  original_proposed_data: Record<string, unknown>
+  applied_data: Record<string, unknown>
+  revised_by_admin: boolean
+  original_snapshot: Record<string, unknown>
+  editor_notes: string
+  status: ProposalStatus
+  reviewer_username: string | null
+  review_notes: string
+  edit_count: number
+  last_edited_at: string | null
+  created_at: string
+  reviewed_at: string | null
+}
+
+export type ApplicationStatus = 'pending' | 'approved' | 'rejected'
+
+export interface EditorApplication {
+  id: number
+  username: string
+  discord_id: string
+  discord_username: string
+  discord_avatar: string
+  display_name: string
+  contact: string
+  experience: string
+  motivation: string
+  areas: string
+  status: ApplicationStatus
+  reviewer_username: string | null
+  review_notes: string
+  created_at: string
+  reviewed_at: string | null
+}
+
+export interface AdminUser {
+  user_id: number
+  username: string
+  is_active: boolean
+  role: string
+  discord_id: string
+  discord_username: string
+  discord_avatar: string
+  otp_enabled: boolean
+  auto_approve_proposals: boolean
+  date_joined: string
+  last_login: string | null
+  proposal_count: number
+  approved_count: number
+  badges: EditorBadgeAward[]
+}
+
+export interface OtpSetupPayload {
+  otp_enabled: boolean
+  account_label?: string
+  otp_secret?: string
+  provisioning_uri?: string
+  qr_code?: string
+}
+
+export async function getMyApplication(): Promise<{ application: EditorApplication | null }> {
+  return request(`${ACCOUNT_BASE}/application/`, { method: 'GET' })
+}
+
+export async function submitApplication(payload: {
+  display_name?: string
+  contact?: string
+  experience?: string
+  motivation: string
+  areas?: string
+}): Promise<EditorApplication> {
+  return request(`${ACCOUNT_BASE}/application/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function getMyProposals(): Promise<SongEditProposal[]> {
+  return request(`${ACCOUNT_BASE}/editor/proposals/`, { method: 'GET' })
+}
+
+export async function createProposal(payload: {
+  song: number | null
+  change_type: ProposalChangeType
+  title?: string
+  proposed_data: Record<string, unknown>
+  editor_notes?: string
+}): Promise<SongEditProposal> {
+  return request(`${ACCOUNT_BASE}/editor/proposals/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateProposal(id: number, payload: {
+  title?: string
+  proposed_data?: Record<string, unknown>
+  editor_notes?: string
+}): Promise<SongEditProposal> {
+  return request(`${ACCOUNT_BASE}/editor/proposals/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function withdrawProposal(id: number): Promise<void> {
+  return request(`${ACCOUNT_BASE}/editor/proposals/${id}/`, { method: 'DELETE' })
+}
+
+export async function getLeaderboard(): Promise<Array<{
+  rank: number
+  user_id: number
+  username: string
+  discord_username: string
+  discord_avatar: string
+  approved_count: number
+  badges: EditorBadgeAward[]
+}>> {
+  return request(`${ACCOUNT_BASE}/editor/leaderboard/`, { method: 'GET' })
+}
+
+export async function getBadgeCatalog(): Promise<Array<{
+  slug: string
+  name: string
+  description: string
+  icon: string
+  category: string
+  threshold: number | null
+  is_manual: boolean
+}>> {
+  return request(`${ACCOUNT_BASE}/badges/`, { method: 'GET' })
+}
+
+export async function adminListProposals(statusFilter?: ProposalStatus): Promise<SongEditProposal[]> {
+  const url = new URL(`${ACCOUNT_BASE}/admin/proposals/`)
+  if (statusFilter) url.searchParams.set('status', statusFilter)
+  return request(url.toString(), { method: 'GET' })
+}
+
+export async function adminReviewProposal(id: number, payload: {
+  action: 'approve' | 'reject' | 'revise'
+  review_notes?: string
+  revised_data?: Record<string, unknown>
+}): Promise<SongEditProposal> {
+  return request(`${ACCOUNT_BASE}/admin/proposals/${id}/review/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function adminReverseProposal(id: number): Promise<SongEditProposal> {
+  return request(`${ACCOUNT_BASE}/admin/proposals/${id}/reverse/`, { method: 'POST' })
+}
+
+export async function adminListApplications(statusFilter?: ApplicationStatus): Promise<EditorApplication[]> {
+  const url = new URL(`${ACCOUNT_BASE}/admin/applications/`)
+  if (statusFilter) url.searchParams.set('status', statusFilter)
+  return request(url.toString(), { method: 'GET' })
+}
+
+export async function adminReviewApplication(id: number, payload: {
+  action: 'approve' | 'reject'
+  review_notes?: string
+}): Promise<EditorApplication> {
+  return request(`${ACCOUNT_BASE}/admin/applications/${id}/review/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function adminListUsers(roleFilter?: string): Promise<AdminUser[]> {
+  const url = new URL(`${ACCOUNT_BASE}/admin/users/`)
+  if (roleFilter) url.searchParams.set('role', roleFilter)
+  return request(url.toString(), { method: 'GET' })
+}
+
+export async function adminUpdateUser(userId: number, payload: {
+  role?: 'editor' | 'applicant'
+  is_active?: boolean
+  auto_approve_proposals?: boolean
+}): Promise<AdminUser> {
+  return request(`${ACCOUNT_BASE}/admin/users/${userId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function getOtpSetup(): Promise<OtpSetupPayload> {
+  return request(`${ACCOUNT_BASE}/otp/setup/`, { method: 'GET' })
+}
+
+export async function confirmOtpSetup(otpToken: string): Promise<{ otp_enabled: boolean }> {
+  return request(`${ACCOUNT_BASE}/otp/setup/`, {
+    method: 'POST',
+    body: JSON.stringify({ otp_token: otpToken }),
+  })
+}
