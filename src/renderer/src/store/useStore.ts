@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { Track, FullTrack, ViewType, SortField, SortDir, Cols } from '../types'
-import type { Session } from '@supabase/supabase-js'
-import type { Profile } from '../lib/supabase'
+import * as userApi from '../lib/userApi'
+import type { AccountUser, PlaylistSummary } from '../lib/userApi'
 
 type ColumnConfig = Cols
 
@@ -80,9 +80,13 @@ interface StoreActions {
   setApiTrackerCategory: (cat: string) => void
   setApiTrackerEra: (era: string) => void
 
-  // Auth
-  setSession: (session: Session | null) => void
-  setUserProfile: (profile: Profile | null) => void
+  // Public account (favorites + playlists)
+  setShowUserAuth: (show: boolean) => void
+  loadAccount: () => Promise<void>
+  loginWithDiscord: () => Promise<void>
+  completeDiscordLogin: (code: string, state: string) => Promise<void>
+  logoutAccount: () => Promise<void>
+  refreshPlaylists: () => Promise<void>
 
   // Editor
   setPendingEditorSongId: (id: number | null) => void
@@ -118,8 +122,9 @@ interface AppStore {
   likedTrackIds: string[]
   apiTrackerCategory: string
   apiTrackerEra: string
-  session: Session | null
-  userProfile: Profile | null
+  account: AccountUser | null
+  playlists: PlaylistSummary[]
+  showUserAuth: boolean
   pendingEditorSongId: number | null
 }
 
@@ -161,8 +166,9 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   likedTrackIds: ls.get<string[]>('likedTrackIds') ?? [],
   apiTrackerCategory: '',
   apiTrackerEra: '',
-  session: null,
-  userProfile: null,
+  account: null,
+  playlists: [],
+  showUserAuth: false,
   pendingEditorSongId: null,
 
   // ─── Playback ────────────────────────────────────────────────────────────────
@@ -244,6 +250,8 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
       'editor': '/editor',
       'compilation': '/compilation',
       'admin': '/admin',
+      'liked': '/liked',
+      'playlists': '/playlists',
     }
     const path = paths[view] ?? '/tracker'
     window.history.pushState({ view }, '', path)
@@ -309,21 +317,90 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
 
   setLikedTrackIds: (ids) => set({ likedTrackIds: ids }),
   toggleLike: (trackId) => {
-    const { likedTrackIds } = get()
-    const next = likedTrackIds.includes(trackId)
+    const { likedTrackIds, account } = get()
+    const wasLiked = likedTrackIds.includes(trackId)
+    const next = wasLiked
       ? likedTrackIds.filter((id) => id !== trackId)
       : [...likedTrackIds, trackId]
     set({ likedTrackIds: next })
     ls.set('likedTrackIds', next)
+
+    if (account) {
+      const songId = userApi.trackIdToSongId(trackId)
+      if (songId != null) {
+        const op = wasLiked ? userApi.removeFavorite(songId) : userApi.addFavorite(songId)
+        op.catch(() => {
+          const current = get().likedTrackIds
+          const reverted = wasLiked
+            ? [...current, trackId]
+            : current.filter((id) => id !== trackId)
+          set({ likedTrackIds: reverted })
+          ls.set('likedTrackIds', reverted)
+        })
+      }
+    }
   },
 
   // ─── API extras ──────────────────────────────────────────────────────────────
   setApiTrackerCategory: (cat) => set({ apiTrackerCategory: cat }),
   setApiTrackerEra: (era) => set({ apiTrackerEra: era }),
 
-  // ─── Auth ─────────────────────────────────────────────────────────────────────
-  setSession: (session) => set({ session }),
-  setUserProfile: (userProfile) => set({ userProfile }),
+  // ─── Public account ─────────────────────────────────────────────────────────────
+  setShowUserAuth: (showUserAuth) => set({ showUserAuth }),
+  loadAccount: async () => {
+    if (!userApi.getToken()) return
+    try {
+      const account = await userApi.getMe()
+      set({ account })
+    } catch {
+      userApi.clearToken()
+      set({ account: null, playlists: [] })
+      return
+    }
+    try {
+      const favorites = await userApi.getFavorites()
+      const serverIds = favorites.map((f) => `jw-${f.song.id}`)
+      const localOnly = get().likedTrackIds.filter((id) => !serverIds.includes(id))
+      await Promise.all(
+        localOnly
+          .map((id) => userApi.trackIdToSongId(id))
+          .filter((sid): sid is number => sid != null)
+          .map((sid) => userApi.addFavorite(sid).catch(() => undefined)),
+      )
+      const merged = Array.from(new Set([...serverIds, ...localOnly]))
+      set({ likedTrackIds: merged })
+      ls.set('likedTrackIds', merged)
+    } catch {}
+    await get().refreshPlaylists()
+  },
+
+  loginWithDiscord: async () => {
+    const redirectUri = userApi.discordRedirectUri()
+    const { authorize_url } = await userApi.getDiscordAuthUrl(redirectUri)
+    window.location.href = authorize_url
+  },
+
+  completeDiscordLogin: async (code, state) => {
+    const redirectUri = userApi.discordRedirectUri()
+    const { token, user } = await userApi.exchangeDiscord(code, state, redirectUri)
+    userApi.setToken(token)
+    set({ account: user })
+    await get().loadAccount()
+  },
+
+  logoutAccount: async () => {
+    await userApi.logout()
+    const localLikes = ls.get<string[]>('likedTrackIds') ?? []
+    set({ account: null, playlists: [], likedTrackIds: localLikes })
+  },
+
+  refreshPlaylists: async () => {
+    if (!get().account) return
+    try {
+      const playlists = await userApi.getPlaylists()
+      set({ playlists })
+    } catch {}
+  },
 
   // ─── Editor ───────────────────────────────────────────────────────────────────
   setPendingEditorSongId: (pendingEditorSongId) => set({ pendingEditorSongId }),

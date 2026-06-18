@@ -1,27 +1,41 @@
-import { useState, useEffect } from 'react'
-import { Search, Loader2, Check, AlertCircle, LogIn, Clock } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Search, Loader2, Check, AlertCircle, LogIn, Clock, X, Send, History, Award } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { apiFetch, JWApiPaginatedResponse, JWApiSong, buildImageUrl, CATEGORY_LABELS } from '../lib/juicewrldApi'
-import { getSupplement, upsertSupplement, supabaseReady, signOut, deleteAccount } from '../lib/supabase'
-import AuthModal from './AuthModal'
+import { apiFetch, JWApiPaginatedResponse, JWApiSong, JWApiEra, buildImageUrl, CATEGORY_LABELS } from '../lib/juicewrldApi'
+import * as userApi from '../lib/userApi'
+import type { SongEditProposal, EditorApplication } from '../lib/userApi'
 
-type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+type SubmitState = 'idle' | 'submitting' | 'submitted' | 'error'
 
 const CATEGORIES = [
-  { value: 'released',          label: 'Released' },
-  { value: 'unreleased',        label: 'Unreleased' },
-  { value: 'unsurfaced',        label: 'Unsurfaced' },
+  { value: 'released', label: 'Released' },
+  { value: 'unreleased', label: 'Unreleased' },
+  { value: 'unsurfaced', label: 'Unsurfaced' },
   { value: 'recording_session', label: 'Recording Session' },
 ]
 
-/** Strip leading word(s) like "Recorded" or "Released" that the API sometimes prepends */
 function cleanDate(raw: string | null | undefined): string {
   if (!raw) return ''
   return raw
-    .replace(/^[A-Za-z][a-z]+\s+(?=[A-Z]|\d)/g, '') // strip leading words before a capital/digit
+    .replace(/^[A-Za-z][a-z]+\s+(?=[A-Z]|\d)/g, '')
     .trim()
-    .replace(/\.$/, '')                                // strip trailing period
+    .replace(/\.$/, '')
     .trim()
+}
+
+function diffFields(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {}
+  for (const key of Object.keys(after)) {
+    const a = after[key]
+    const b = before[key]
+    if (a === '' && (b === '' || b == null)) continue
+    if (a == null && b == null) continue
+    if (JSON.stringify(a) !== JSON.stringify(b)) patch[key] = a === '' ? null : a
+  }
+  return patch
 }
 
 function Field({
@@ -48,10 +62,10 @@ function Field({
 }
 
 function SelectField({
-  label, value, onChange, options, hint,
+  label, value, onChange, options, hint, placeholder,
 }: {
   label: string; value: string; onChange: (v: string) => void
-  options: { value: string; label: string }[]; hint?: string
+  options: { value: string; label: string }[]; hint?: string; placeholder?: string
 }): JSX.Element {
   return (
     <div>
@@ -61,7 +75,7 @@ function SelectField({
       </label>
       <select value={value} onChange={(e) => onChange(e.target.value)}
         className="w-full bg-surface-overlay border border-[var(--border)] rounded-lg px-3 py-2 text-text-primary text-xs focus:outline-none focus:border-accent/50 appearance-none">
-        <option value="">— select —</option>
+        <option value="">{placeholder ?? '— select —'}</option>
         {options.map((o) => (
           <option key={o.value} value={o.value}>{o.label}</option>
         ))}
@@ -71,113 +85,116 @@ function SelectField({
 }
 
 export default function EditorPage(): JSX.Element {
-  const { setActiveView, session, userProfile, pendingEditorSongId, setPendingEditorSongId } = useStore()
+  const { account, pendingEditorSongId, setPendingEditorSongId, setShowUserAuth, logoutAccount } = useStore()
+  const isEditor = !!account?.is_editor
+  const isAdmin = !!account?.is_administrator
+
+  const [application, setApplication] = useState<EditorApplication | null>(null)
+  const [appLoading, setAppLoading] = useState(false)
 
   const [query, setQuery] = useState('')
   const [results, setSongs] = useState<JWApiSong[]>([])
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState<JWApiSong | null>(null)
-  const [loadingSupplement, setLoadingSupplement] = useState(false)
-  const [showAuth, setShowAuth] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const [eras, setEras] = useState<JWApiEra[]>([])
 
-  // ── Correction fields ──────────────────────────────────────────────────────
-  const [correctedTitle, setCorrectedTitle] = useState('')
-  const [correctedArtist, setCorrectedArtist] = useState('')
-  const [correctedAlbum, setCorrectedAlbum] = useState('')
-  const [correctedEra, setCorrectedEra] = useState('')
-  const [correctedCategory, setCorrectedCategory] = useState('')
-  const [verifiedProducers, setVerifiedProducers] = useState('')
-  const [verifiedEngineers, setVerifiedEngineers] = useState('')
-  const [verifiedReleaseDate, setVerifiedReleaseDate] = useState('')
-  const [verifiedRecordingDate, setVerifiedRecordingDate] = useState('')
-  const [verifiedLocation, setVerifiedLocation] = useState('')
-  const [verifiedLeakType, setVerifiedLeakType] = useState('')
-
-  // ── Supplemental fields ────────────────────────────────────────────────────
-  const [context, setContext] = useState('')
-  const [sampleInfo, setSampleInfo] = useState('')
-  const [trivia, setTrivia] = useState('')
-  const [youtubeUrl, setYoutubeUrl] = useState('')
-  const [soundcloudUrl, setSoundcloudUrl] = useState('')
+  const [name, setName] = useState('')
+  const [creditedArtists, setCreditedArtists] = useState('')
+  const [category, setCategory] = useState('')
+  const [eraId, setEraId] = useState('')
+  const [producers, setProducers] = useState('')
+  const [engineers, setEngineers] = useState('')
+  const [recordingLocations, setRecordingLocations] = useState('')
+  const [recordDates, setRecordDates] = useState('')
+  const [releaseDate, setReleaseDate] = useState('')
+  const [leakType, setLeakType] = useState('')
   const [lyrics, setLyrics] = useState('')
-  const [syncedLyrics, setSyncedLyrics] = useState('')
-  const [qualityRating, setQualityRating] = useState('')
+  const [additionalInfo, setAdditionalInfo] = useState('')
+  const [notes, setNotes] = useState('')
   const [editorNotes, setEditorNotes] = useState('')
 
-  const canEdit = supabaseReady && (userProfile?.role === 'editor' || userProfile?.role === 'admin')
+  const [submitState, setSubmitState] = useState<SubmitState>('idle')
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [proposals, setProposals] = useState<SongEditProposal[]>([])
 
-  const resetForm = (): void => {
-    setCorrectedTitle(''); setCorrectedArtist(''); setCorrectedAlbum('')
-    setCorrectedEra(''); setCorrectedCategory(''); setVerifiedProducers('')
-    setVerifiedEngineers(''); setVerifiedReleaseDate(''); setVerifiedRecordingDate('')
-    setVerifiedLocation(''); setVerifiedLeakType(''); setContext(''); setSampleInfo('')
-    setTrivia(''); setYoutubeUrl(''); setSoundcloudUrl('')
-    setLyrics(''); setSyncedLyrics(''); setQualityRating(''); setEditorNotes('')
-  }
+  const baseline = useCallback((song: JWApiSong | null): Record<string, unknown> => {
+    if (!song) return {}
+    return {
+      name: song.track_titles?.[0] || song.name,
+      credited_artists: song.credited_artists || '',
+      category: song.category || '',
+      era_id: song.era?.id ?? '',
+      producers: song.producers || '',
+      engineers: song.engineers || '',
+      recording_locations: song.recording_locations || '',
+      record_dates: song.record_dates || '',
+      release_date: cleanDate(song.release_date),
+      leak_type: song.leak_type || '',
+      lyrics: song.lyrics || '',
+      additional_information: song.additional_information || '',
+      notes: song.notes || '',
+    }
+  }, [])
 
-  const populateFromSong = (song: JWApiSong): void => {
-    setCorrectedTitle(song.track_titles?.[0] || song.name)
-    setCorrectedArtist(song.credited_artists || '')
-    setCorrectedEra(song.era?.name || '')
-    setCorrectedCategory(song.category || '')
-    setVerifiedProducers(song.producers || '')
-    setVerifiedEngineers(song.engineers || '')
-    setVerifiedReleaseDate(cleanDate(song.release_date))
-    setVerifiedRecordingDate(cleanDate(song.record_dates))
-    setVerifiedLocation(song.recording_locations || '')
-    setVerifiedLeakType(song.leak_type || '')
-    // Pull additional_information into context if present
-    if (song.additional_information) setContext(song.additional_information)
-    // Pull lyrics from API if present
-    if (song.lyrics) setLyrics(song.lyrics)
-  }
+  const populate = useCallback((song: JWApiSong): void => {
+    setName(song.track_titles?.[0] || song.name)
+    setCreditedArtists(song.credited_artists || '')
+    setCategory(song.category || '')
+    setEraId(song.era?.id ? String(song.era.id) : '')
+    setProducers(song.producers || '')
+    setEngineers(song.engineers || '')
+    setRecordingLocations(song.recording_locations || '')
+    setRecordDates(song.record_dates || '')
+    setReleaseDate(cleanDate(song.release_date))
+    setLeakType(song.leak_type || '')
+    setLyrics(song.lyrics || '')
+    setAdditionalInfo(song.additional_information || '')
+    setNotes(song.notes || '')
+    setEditorNotes('')
+  }, [])
 
-  const selectSong = async (song: JWApiSong): Promise<void> => {
+  const selectSong = useCallback((song: JWApiSong): void => {
     setSelected(song)
     setSongs([])
     setQuery(song.track_titles?.[0] || song.name)
-    resetForm()
-    populateFromSong(song)
+    populate(song)
+    setSubmitState('idle')
+    setSubmitError(null)
+  }, [populate])
 
-    setLoadingSupplement(true)
+  const refreshProposals = useCallback(async (): Promise<void> => {
+    if (!isEditor) return
     try {
-      const sup = await getSupplement(song.id)
-      if (sup) {
-        if (sup.corrected_title)             setCorrectedTitle(sup.corrected_title)
-        if (sup.corrected_artist)            setCorrectedArtist(sup.corrected_artist)
-        if (sup.corrected_album)             setCorrectedAlbum(sup.corrected_album)
-        if (sup.corrected_era)               setCorrectedEra(sup.corrected_era)
-        if (sup.corrected_category)          setCorrectedCategory(sup.corrected_category)
-        if (sup.verified_producers)          setVerifiedProducers(sup.verified_producers)
-        if (sup.verified_engineers)          setVerifiedEngineers(sup.verified_engineers)
-        if (sup.verified_release_date)       setVerifiedReleaseDate(sup.verified_release_date)
-        if (sup.verified_recording_date)     setVerifiedRecordingDate(sup.verified_recording_date)
-        if (sup.verified_recording_location) setVerifiedLocation(sup.verified_recording_location)
-        if (sup.verified_leak_type)          setVerifiedLeakType(sup.verified_leak_type)
-        if (sup.context)                     setContext(sup.context)
-        if (sup.sample_info)                 setSampleInfo(sup.sample_info)
-        if (sup.trivia)                      setTrivia(sup.trivia.join('\n'))
-        if (sup.youtube_url)                 setYoutubeUrl(sup.youtube_url)
-        if (sup.soundcloud_url)              setSoundcloudUrl(sup.soundcloud_url)
-        if (sup.lyrics)                      setLyrics(sup.lyrics)
-        if (sup.synced_lyrics)               setSyncedLyrics(sup.synced_lyrics)
-        if (sup.quality_rating)              setQualityRating(String(sup.quality_rating))
-        if (sup.editor_notes)                setEditorNotes(sup.editor_notes)
-      }
-    } catch { /* silently fail */ }
-    finally { setLoadingSupplement(false) }
-  }
+      setProposals(await userApi.getMyProposals())
+    } catch {}
+  }, [isEditor])
 
   useEffect(() => {
-    if (!pendingEditorSongId) return
+    if (!isEditor) return
+    apiFetch<JWApiEra[] | { results: JWApiEra[] }>('/eras/')
+      .then((d) => setEras(Array.isArray(d) ? d : (d as { results: JWApiEra[] }).results ?? []))
+      .catch(() => undefined)
+    refreshProposals()
+  }, [isEditor, refreshProposals])
+
+  useEffect(() => {
+    if (!account || isEditor) {
+      setApplication(null)
+      return
+    }
+    setAppLoading(true)
+    userApi.getMyApplication()
+      .then((r) => setApplication(r.application))
+      .catch(() => setApplication(null))
+      .finally(() => setAppLoading(false))
+  }, [account, isEditor])
+
+  useEffect(() => {
+    if (!pendingEditorSongId || !isEditor) return
     const id = pendingEditorSongId
     setPendingEditorSongId(null)
-    apiFetch<JWApiSong>(`/songs/${id}/`)
-      .then((song) => selectSong(song))
-      .catch(() => {})
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    apiFetch<JWApiSong>(`/songs/${id}/`).then(selectSong).catch(() => undefined)
+  }, [pendingEditorSongId, isEditor, setPendingEditorSongId, selectSong])
 
   const search = async (): Promise<void> => {
     if (!query.trim()) return
@@ -186,235 +203,350 @@ export default function EditorPage(): JSX.Element {
     try {
       const data = await apiFetch<JWApiPaginatedResponse>('/songs/', { search: query, limit: 20 })
       setSongs(data.results)
-    } catch { /* silently fail */ }
-    finally { setSearching(false) }
+    } catch {} finally {
+      setSearching(false)
+    }
   }
 
-  const save = async (): Promise<void> => {
-    if (!selected || !canEdit) return
-    setSaveState('saving')
-    const triviaArray = trivia.split('\n').map((s) => s.trim()).filter(Boolean)
-    const result = await upsertSupplement(selected.id, {
-      corrected_title: correctedTitle || null,
-      corrected_artist: correctedArtist || null,
-      corrected_album: correctedAlbum || null,
-      corrected_era: correctedEra || null,
-      corrected_category: correctedCategory || null,
-      verified_producers: verifiedProducers || null,
-      verified_engineers: verifiedEngineers || null,
-      verified_release_date: verifiedReleaseDate || null,
-      verified_recording_date: verifiedRecordingDate || null,
-      verified_recording_location: verifiedLocation || null,
-      verified_leak_type: verifiedLeakType || null,
-      context: context || null,
-      sample_info: sampleInfo || null,
-      trivia: triviaArray.length ? triviaArray : null,
-      youtube_url: youtubeUrl || null,
-      soundcloud_url: soundcloudUrl || null,
-      lyrics: lyrics || null,
-      synced_lyrics: syncedLyrics || null,
-      quality_rating: qualityRating ? parseInt(qualityRating) : null,
-      editor_notes: editorNotes || null,
-      updated_by: userProfile?.username || userProfile?.email || null,
-    })
-    setSaveState(result ? 'saved' : 'error')
-    setTimeout(() => setSaveState('idle'), 3000)
+  const submit = async (): Promise<void> => {
+    if (!selected) return
+    setSubmitState('submitting')
+    setSubmitError(null)
+    const before = baseline(selected)
+    const after: Record<string, unknown> = {
+      name,
+      credited_artists: creditedArtists,
+      category,
+      era_id: eraId ? Number(eraId) : '',
+      producers,
+      engineers,
+      recording_locations: recordingLocations,
+      record_dates: recordDates,
+      release_date: releaseDate,
+      leak_type: leakType,
+      lyrics,
+      additional_information: additionalInfo,
+      notes,
+    }
+    const patch = diffFields(before, after)
+    if (Object.keys(patch).length === 0) {
+      setSubmitState('error')
+      setSubmitError('No changes to propose.')
+      setTimeout(() => setSubmitState('idle'), 3000)
+      return
+    }
+    try {
+      await userApi.createProposal({
+        song: selected.id,
+        change_type: 'update',
+        title: name || selected.name,
+        proposed_data: patch,
+        editor_notes: editorNotes,
+      })
+      setSubmitState('submitted')
+      await refreshProposals()
+      setTimeout(() => setSubmitState('idle'), 3000)
+    } catch (e) {
+      setSubmitState('error')
+      setSubmitError(e instanceof Error ? e.message : 'Submission failed')
+      setTimeout(() => setSubmitState('idle'), 4000)
+    }
   }
 
-  const handleDeleteAccount = async (): Promise<void> => {
-    if (!confirm('Delete your account? This cannot be undone.')) return
-    setDeleting(true)
-    await deleteAccount()
-    setDeleting(false)
+  if (!account) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center">
+          <LogIn size={22} className="text-accent" />
+        </div>
+        <div>
+          <p className="text-text-primary font-semibold mb-1">Log in to contribute</p>
+          <p className="text-text-muted text-sm">Editors propose corrections and additions to song entries. Admins review and apply them.</p>
+        </div>
+        <button onClick={() => setShowUserAuth(true)} className="px-4 py-2 rounded-xl bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-semibold transition-colors">
+          Continue with Discord
+        </button>
+      </div>
+    )
+  }
+
+  if (!isEditor) {
+    return <ApplicationView application={application} loading={appLoading} onSubmitted={(a) => setApplication(a)} onSignOut={() => logoutAccount()} />
   }
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-      {/* Header */}
       <div className="px-5 pt-5 pb-3 shrink-0 flex items-center gap-3 border-b border-[var(--border)]">
         <h1 className="text-text-primary text-xl font-bold">Contribute</h1>
-        {session && (
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-text-muted">{userProfile?.username || userProfile?.email}</span>
-            {userProfile?.role && (
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${
-                userProfile.role === 'admin'  ? 'bg-accent/20 text-accent' :
-                userProfile.role === 'editor' ? 'bg-emerald-500/20 text-emerald-400' :
-                'bg-yellow-500/20 text-yellow-400'
-              }`}>{userProfile.role}</span>
-            )}
-            <button onClick={() => signOut()} className="text-xs text-text-muted hover:text-text-primary transition-colors">Log out</button>
-            <button onClick={handleDeleteAccount} disabled={deleting} className="text-xs text-red-400/60 hover:text-red-400 transition-colors">
-              {deleting ? 'Deleting…' : 'Delete account'}
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-xs text-text-muted">{account.display_name || account.discord_username}</span>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${
+            isAdmin ? 'bg-accent/20 text-accent' : 'bg-emerald-500/20 text-emerald-400'
+          }`}>{isAdmin ? 'admin' : 'editor'}</span>
+          <button onClick={() => logoutAccount()} className="text-xs text-text-muted hover:text-text-primary transition-colors">Log out</button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+        <div>
+          <label className="block text-xs text-text-muted mb-1">Song</label>
+          <div className="relative">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); if (!e.target.value) setSelected(null) }}
+              onKeyDown={(e) => e.key === 'Enter' && search()}
+              placeholder="Search for a song…"
+              className="w-full bg-surface-overlay border border-[var(--border)] rounded-lg pl-3 pr-10 py-2 text-text-primary text-sm focus:outline-none focus:border-accent/50"
+            />
+            <button onClick={search} disabled={searching} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors">
+              {searching ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
             </button>
+          </div>
+          {results.length > 0 && (
+            <div className="mt-1 bg-surface-overlay border border-[var(--border)] rounded-lg overflow-hidden shadow-lg">
+              {results.map((song) => (
+                <button key={song.id} onClick={() => selectSong(song)}
+                  className="w-full text-left px-3 py-2 hover:bg-surface-raised text-sm text-text-primary transition-colors border-b border-[var(--border)] last:border-0">
+                  <span className="font-medium">{song.track_titles?.[0] || song.name}</span>
+                  {song.era?.name && <span className="text-text-muted text-xs ml-2">{song.era.name}</span>}
+                  <span className="text-text-muted/50 text-xs ml-2">#{song.id}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {selected && (
+          <>
+            <div className="flex gap-3 items-start p-3 bg-surface-overlay rounded-xl border border-[var(--border)]">
+              {selected.image_url && (
+                <img src={buildImageUrl(selected.image_url)} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-text-primary font-semibold text-sm truncate">{selected.track_titles?.[0] || selected.name}</p>
+                <p className="text-text-muted text-xs truncate">{selected.credited_artists}</p>
+                <div className="flex gap-1.5 mt-1 flex-wrap">
+                  {selected.era?.name && <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-raised text-text-muted">{selected.era.name}</span>}
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-raised text-text-muted capitalize">{CATEGORY_LABELS[selected.category] || selected.category}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-raised text-text-muted">#{selected.id}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Edits</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Title" value={name} onChange={setName} />
+                <Field label="Credited artists" value={creditedArtists} onChange={setCreditedArtists} />
+                <SelectField label="Category" value={category} onChange={setCategory} options={CATEGORIES} />
+                <SelectField
+                  label="Era"
+                  value={eraId}
+                  onChange={setEraId}
+                  options={eras.map((e) => ({ value: String(e.id), label: e.name }))}
+                  placeholder={selected.era?.name || '— select era —'}
+                />
+              </div>
+              <Field label="Producers" value={producers} onChange={setProducers} />
+              <Field label="Engineers" value={engineers} onChange={setEngineers} />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Recording date" value={recordDates} onChange={setRecordDates} placeholder="YYYY-MM-DD" />
+                <Field label="Release date" value={releaseDate} onChange={setReleaseDate} placeholder="YYYY-MM-DD" />
+              </div>
+              <Field label="Recording location" value={recordingLocations} onChange={setRecordingLocations} placeholder="Studio / city" />
+              <Field label="Leak type" value={leakType} onChange={setLeakType} placeholder="HQ, LQ, snippet, stem…" />
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Lyrics & info</p>
+              <Field label="Lyrics" value={lyrics} onChange={setLyrics} rows={8} />
+              <Field label="Additional information" value={additionalInfo} onChange={setAdditionalInfo} rows={4} />
+              <Field label="Notes" value={notes} onChange={setNotes} rows={3} />
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Submission</p>
+              <Field label="Editor notes" value={editorNotes} onChange={setEditorNotes} rows={2}
+                hint="visible to admins" placeholder="What did you change and why?" />
+            </div>
+
+            {submitError && (
+              <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+                <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                {submitError}
+              </div>
+            )}
+
+            <button onClick={submit} disabled={submitState === 'submitting'}
+              className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
+                submitState === 'submitted' ? 'bg-emerald-500/20 text-emerald-400' :
+                submitState === 'error' ? 'bg-red-500/20 text-red-400' :
+                'bg-accent/15 hover:bg-accent/25 text-accent'
+              }`}>
+              {submitState === 'submitting' && <Loader2 size={15} className="animate-spin" />}
+              {submitState === 'submitted' && <Check size={15} />}
+              {submitState === 'error' && <AlertCircle size={15} />}
+              {submitState === 'idle' && <Send size={14} />}
+              {submitState === 'idle' && 'Submit proposal'}
+              {submitState === 'submitting' && 'Submitting…'}
+              {submitState === 'submitted' && 'Submitted!'}
+              {submitState === 'error' && 'Try again'}
+            </button>
+          </>
+        )}
+
+        {proposals.length > 0 && (
+          <div className="space-y-2 pt-4 border-t border-[var(--border)]">
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+              <History size={12} /> Your recent proposals
+            </div>
+            {proposals.slice(0, 10).map((p) => (
+              <ProposalRow key={p.id} proposal={p} onWithdraw={async () => { await userApi.withdrawProposal(p.id).catch(() => undefined); refreshProposals() }} />
+            ))}
           </div>
         )}
       </div>
+    </div>
+  )
+}
 
-      {/* Auth gate — not signed in */}
-      {!session ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center">
-            <LogIn size={22} className="text-accent" />
-          </div>
-          <div>
-            <p className="text-text-primary font-semibold mb-1">Sign in to contribute</p>
-            <p className="text-text-muted text-sm">Add context, trivia, lyrics sources and corrections to song entries.</p>
-          </div>
-          <button onClick={() => setShowAuth(true)} className="px-4 py-2 rounded-xl bg-accent/15 hover:bg-accent/25 text-accent text-sm font-semibold transition-colors">
-            Sign in / Sign up
+function ProposalRow({ proposal, onWithdraw }: { proposal: SongEditProposal; onWithdraw: () => Promise<void> }): JSX.Element {
+  const statusColor = {
+    pending: 'bg-yellow-500/15 text-yellow-400',
+    approved: 'bg-emerald-500/15 text-emerald-400',
+    rejected: 'bg-red-500/15 text-red-400',
+    reversed: 'bg-text-muted/10 text-text-muted',
+  }[proposal.status]
+  return (
+    <div className="bg-surface-overlay border border-[var(--border)] rounded-xl px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${statusColor}`}>{proposal.status}</span>
+        <p className="text-text-primary text-sm font-medium truncate flex-1">{proposal.title || `Proposal #${proposal.id}`}</p>
+        {proposal.status === 'pending' && (
+          <button onClick={onWithdraw} className="p-1 text-text-muted hover:text-red-400 transition-colors" title="Withdraw">
+            <X size={14} />
           </button>
-        </div>
-
-      /* Auth gate — pending */
-      ) : userProfile?.role === 'pending' ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center">
-            <Clock size={22} className="text-yellow-400" />
-          </div>
-          <div>
-            <p className="text-text-primary font-semibold mb-1">Pending approval</p>
-            <p className="text-text-muted text-sm">Your account is awaiting admin approval. You'll be able to edit once approved.</p>
-          </div>
-          <button onClick={() => signOut()} className="text-xs text-text-muted hover:text-text-primary transition-colors">Sign out</button>
-        </div>
-
-      /* Editor form */
-      ) : (
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-
-          {/* Song search */}
-          <div>
-            <label className="block text-xs text-text-muted mb-1">Song</label>
-            <div className="relative">
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => { setQuery(e.target.value); if (!e.target.value) { setSelected(null); resetForm() } }}
-                onKeyDown={(e) => e.key === 'Enter' && search()}
-                placeholder="Search for a song…"
-                className="w-full bg-surface-overlay border border-[var(--border)] rounded-lg pl-3 pr-10 py-2 text-text-primary text-sm focus:outline-none focus:border-accent/50"
-              />
-              <button onClick={search} disabled={searching} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors">
-                {searching ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
-              </button>
-            </div>
-            {results.length > 0 && (
-              <div className="mt-1 bg-surface-overlay border border-[var(--border)] rounded-lg overflow-hidden shadow-lg">
-                {results.map((song) => (
-                  <button key={song.id} onClick={() => selectSong(song)}
-                    className="w-full text-left px-3 py-2 hover:bg-surface-raised text-sm text-text-primary transition-colors border-b border-[var(--border)] last:border-0">
-                    <span className="font-medium">{song.track_titles?.[0] || song.name}</span>
-                    {song.era?.name && <span className="text-text-muted text-xs ml-2">{song.era.name}</span>}
-                    <span className="text-text-muted/50 text-xs ml-2">#{song.id}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {selected && (
-            <>
-              {/* Song preview card */}
-              <div className="flex gap-3 items-start p-3 bg-surface-overlay rounded-xl border border-[var(--border)]">
-                {selected.image_url && (
-                  <img src={buildImageUrl(selected.image_url)} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-text-primary font-semibold text-sm truncate">{selected.track_titles?.[0] || selected.name}</p>
-                  <p className="text-text-muted text-xs truncate">{selected.credited_artists}</p>
-                  <div className="flex gap-1.5 mt-1 flex-wrap">
-                    {selected.era?.name && <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-raised text-text-muted">{selected.era.name}</span>}
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-raised text-text-muted capitalize">{CATEGORY_LABELS[selected.category] || selected.category}</span>
-                    {selected.leak_type && <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-raised text-text-muted">{selected.leak_type}</span>}
-                  </div>
-                </div>
-                {loadingSupplement && <Loader2 size={14} className="animate-spin text-text-muted shrink-0 mt-1" />}
-              </div>
-
-              {/* ── Corrections ─────────────────────────────────────── */}
-              <div className="space-y-3">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
-                  Corrections <span className="font-normal normal-case tracking-normal text-text-muted/50">— pre-filled from API, edit to override</span>
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Title" value={correctedTitle} onChange={setCorrectedTitle} />
-                  <Field label="Artist" value={correctedArtist} onChange={setCorrectedArtist} />
-                  <Field label="Album" value={correctedAlbum} onChange={setCorrectedAlbum} hint="editor-only" placeholder="e.g. Goodbye & Good Riddance" />
-                  <Field label="Era" value={correctedEra} onChange={setCorrectedEra} />
-                </div>
-                <SelectField label="Category" value={correctedCategory} onChange={setCorrectedCategory} options={CATEGORIES} />
-                <Field label="Producers" value={verifiedProducers} onChange={setVerifiedProducers} />
-                <Field label="Engineers" value={verifiedEngineers} onChange={setVerifiedEngineers} />
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Release date" value={verifiedReleaseDate} onChange={setVerifiedReleaseDate} placeholder="YYYY-MM-DD" />
-                  <Field label="Recording date" value={verifiedRecordingDate} onChange={setVerifiedRecordingDate} placeholder="YYYY-MM-DD or approx." />
-                </div>
-                <Field label="Recording location" value={verifiedLocation} onChange={setVerifiedLocation} placeholder="Studio / city" />
-                <Field label="Leak type" value={verifiedLeakType} onChange={setVerifiedLeakType} placeholder="e.g. HQ, LQ, snippet, stem…" />
-              </div>
-
-              {/* ── Supplemental ────────────────────────────────────── */}
-              <div className="space-y-3">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Supplemental info</p>
-                <Field label="Context / Story" value={context} onChange={setContext} rows={4}
-                  hint="pre-filled from API additional info if available"
-                  placeholder="Historical background, recording story, etc." />
-                <Field label="Sample info" value={sampleInfo} onChange={setSampleInfo} rows={2} placeholder="What samples are used and where" />
-                <Field label="Trivia" value={trivia} onChange={setTrivia} rows={3} hint="one fact per line"
-                  placeholder={'The bridge was recorded in Atlanta\nOriginally titled "Test"'} />
-              </div>
-
-              {/* ── Lyrics ──────────────────────────────────────────── */}
-              <div className="space-y-3">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Lyrics</p>
-                <Field label="Lyrics" value={lyrics} onChange={setLyrics} rows={8}
-                  hint="pre-filled from API if available"
-                  placeholder="Plain text lyrics…" />
-                <Field label="Synced lyrics" value={syncedLyrics} onChange={setSyncedLyrics} rows={8}
-                  hint="LRC format"
-                  placeholder={'[00:12.34] First line\n[00:15.00] Second line…'} />
-              </div>
-
-              {/* ── Links ───────────────────────────────────────────── */}
-              <div className="space-y-3">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Links</p>
-                <Field label="YouTube URL" value={youtubeUrl} onChange={setYoutubeUrl} placeholder="https://youtube.com/watch?v=…" />
-                <Field label="SoundCloud URL" value={soundcloudUrl} onChange={setSoundcloudUrl} placeholder="https://soundcloud.com/…" />
-              </div>
-
-              {/* ── Editorial ───────────────────────────────────────── */}
-              <div className="space-y-3">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Editorial</p>
-                <div>
-                  <label className="block text-xs text-text-muted mb-1">Quality rating <span className="text-text-muted/50">1–10</span></label>
-                  <input type="number" min={1} max={10} value={qualityRating} onChange={(e) => setQualityRating(e.target.value)}
-                    className="w-20 bg-surface-overlay border border-[var(--border)] rounded-lg px-3 py-2 text-text-primary text-xs focus:outline-none focus:border-accent/50" />
-                </div>
-                <Field label="Editor notes" value={editorNotes} onChange={setEditorNotes} rows={3} hint="internal only" placeholder="Internal editorial notes" />
-              </div>
-
-              {/* Save */}
-              <button onClick={save} disabled={saveState === 'saving'}
-                className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
-                  saveState === 'saved'  ? 'bg-emerald-500/20 text-emerald-400' :
-                  saveState === 'error'  ? 'bg-red-500/20 text-red-400' :
-                  'bg-accent/15 hover:bg-accent/25 text-accent'
-                }`}>
-                {saveState === 'saving' && <Loader2 size={15} className="animate-spin" />}
-                {saveState === 'saved'  && <Check size={15} />}
-                {saveState === 'error'  && <AlertCircle size={15} />}
-                {saveState === 'idle'   && 'Save to database'}
-                {saveState === 'saving' && 'Saving…'}
-                {saveState === 'saved'  && 'Saved!'}
-                {saveState === 'error'  && 'Error saving'}
-              </button>
-            </>
-          )}
-        </div>
+        )}
+      </div>
+      {proposal.review_notes && (
+        <p className="text-text-muted text-xs mt-1.5 italic">{proposal.review_notes}</p>
       )}
+      <p className="text-text-muted/60 text-[10px] mt-1">
+        {Object.keys(proposal.proposed_data || {}).length} field{Object.keys(proposal.proposed_data || {}).length === 1 ? '' : 's'} · {new Date(proposal.created_at).toLocaleDateString()}
+      </p>
+    </div>
+  )
+}
 
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+function ApplicationView({
+  application, loading, onSubmitted, onSignOut,
+}: {
+  application: EditorApplication | null
+  loading: boolean
+  onSubmitted: (a: EditorApplication) => void
+  onSignOut: () => void
+}): JSX.Element {
+  const [displayName, setDisplayName] = useState('')
+  const [contact, setContact] = useState('')
+  const [experience, setExperience] = useState('')
+  const [motivation, setMotivation] = useState('')
+  const [areas, setAreas] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = async (): Promise<void> => {
+    setError(null)
+    if (motivation.trim().length < 20) {
+      setError('Please describe your motivation in at least 20 characters.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const created = await userApi.submitApplication({
+        display_name: displayName,
+        contact,
+        experience,
+        motivation,
+        areas,
+      })
+      onSubmitted(created)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Submission failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-text-muted">
+        <Loader2 size={18} className="animate-spin" />
+      </div>
+    )
+  }
+
+  if (application && application.status === 'pending') {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center">
+          <Clock size={22} className="text-yellow-400" />
+        </div>
+        <div>
+          <p className="text-text-primary font-semibold mb-1">Application pending</p>
+          <p className="text-text-muted text-sm max-w-md">Your editor application is under review. You'll be notified on Discord once an admin reviews it.</p>
+        </div>
+        <button onClick={onSignOut} className="text-xs text-text-muted hover:text-text-primary transition-colors">Log out</button>
+      </div>
+    )
+  }
+
+  if (application && application.status === 'rejected') {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center">
+          <X size={22} className="text-red-400" />
+        </div>
+        <div>
+          <p className="text-text-primary font-semibold mb-1">Application not approved</p>
+          {application.review_notes && <p className="text-text-muted text-sm mt-2 max-w-md italic">"{application.review_notes}"</p>}
+        </div>
+        <button onClick={onSignOut} className="text-xs text-text-muted hover:text-text-primary transition-colors">Log out</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div className="px-5 pt-5 pb-3 shrink-0 border-b border-[var(--border)]">
+        <h1 className="text-text-primary text-xl font-bold flex items-center gap-2">
+          <Award size={20} className="text-accent" /> Become an editor
+        </h1>
+        <p className="text-text-muted text-sm mt-1">Editors propose corrections and new song entries. Admins review and apply them.</p>
+      </div>
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 max-w-2xl">
+        <Field label="Display name" value={displayName} onChange={setDisplayName} placeholder="How you want to be credited" />
+        <Field label="Contact" value={contact} onChange={setContact} placeholder="Discord, email, etc." />
+        <Field label="Areas of focus" value={areas} onChange={setAreas} placeholder="Lyrics, sessions, recording dates…" />
+        <Field label="Relevant experience" value={experience} onChange={setExperience} rows={4}
+          placeholder="Other databases you've contributed to, sources you have access to, etc." />
+        <Field label="Why do you want to be an editor?" value={motivation} onChange={setMotivation} rows={5}
+          hint="at least 20 characters" placeholder="Tell us about your motivation…" />
+
+        {error && (
+          <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+            <AlertCircle size={13} className="shrink-0 mt-0.5" />
+            {error}
+          </div>
+        )}
+
+        <button onClick={submit} disabled={submitting}
+          className="w-full py-2.5 rounded-xl bg-accent/15 hover:bg-accent/25 text-accent text-sm font-semibold transition-colors flex items-center justify-center gap-2">
+          {submitting && <Loader2 size={14} className="animate-spin" />}
+          Submit application
+        </button>
+        <button onClick={onSignOut} className="w-full text-xs text-text-muted hover:text-text-primary transition-colors">Log out</button>
+      </div>
     </div>
   )
 }

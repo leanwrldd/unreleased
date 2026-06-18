@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { useStore } from './store/useStore'
 import { ViewType } from './types'
-import { onAuthStateChange, getSession, getProfile } from './lib/supabase'
 
 function getViewFromPath(pathname: string): ViewType {
   if (pathname.startsWith('/files')) return 'api-files'
@@ -9,6 +8,8 @@ function getViewFromPath(pathname: string): ViewType {
   if (pathname === '/editor') return 'editor'
   if (pathname === '/compilation') return 'compilation'
   if (pathname === '/admin') return 'admin'
+  if (pathname === '/liked') return 'liked'
+  if (pathname === '/playlists') return 'playlists'
   return 'api-tracker'
 }
 
@@ -20,6 +21,9 @@ import ApiCategoryView from './components/ApiCategoryView'
 import ApiCompilationView from './components/ApiCompilationView'
 import EditorPage from './components/EditorPage'
 import AdminPage from './components/AdminPage'
+import LikedSongsView from './components/LikedSongsView'
+import PlaylistsView from './components/PlaylistsView'
+import UserAuthModal from './components/UserAuthModal'
 import Player from './components/Player'
 import NowPlaying from './components/NowPlaying'
 import QueuePanel from './components/QueuePanel'
@@ -37,7 +41,7 @@ function lightenHex(hex: string, amount: number): string {
 }
 
 export default function App(): JSX.Element {
-  const { showNowPlaying, showQueue, showSettings, activeView, theme, accentColor, setSession, setUserProfile } = useStore()
+  const { showNowPlaying, showQueue, showSettings, activeView, theme, accentColor, loadAccount, completeDiscordLogin, showUserAuth, setShowUserAuth } = useStore()
 
   // Sync view from URL on mount + handle back/forward
   useEffect(() => {
@@ -49,29 +53,25 @@ export default function App(): JSX.Element {
     return () => window.removeEventListener('popstate', syncFromPath)
   }, [])
 
-  // Auth state listener
+  // Complete Discord OAuth redirect, then load the public account
   useEffect(() => {
-    // Load existing session on mount
-    getSession().then(async (session) => {
-      setSession(session)
-      if (session) {
-        const profile = await getProfile(session.user.id)
-        setUserProfile(profile)
+    if (window.location.pathname === '/auth/discord/callback') {
+      const params = new URLSearchParams(window.location.search)
+      const code = params.get('code')
+      const state = params.get('state')
+      const finish = (): void => {
+        window.history.replaceState({}, '', '/tracker')
+        useStore.setState({ activeView: 'api-tracker' })
       }
-    })
-
-    // Listen for auth changes
-    const unsubscribe = onAuthStateChange(async (session) => {
-      setSession(session)
-      if (session) {
-        const profile = await getProfile(session.user.id)
-        setUserProfile(profile)
+      if (code && state) {
+        completeDiscordLogin(code, state).catch(() => undefined).finally(finish)
       } else {
-        setUserProfile(null)
+        finish()
       }
-    })
-    return unsubscribe
-  }, [setSession, setUserProfile])
+      return
+    }
+    loadAccount()
+  }, [loadAccount, completeDiscordLogin])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
@@ -99,6 +99,8 @@ export default function App(): JSX.Element {
               : activeView === 'editor' ? <EditorPage />
               : activeView === 'compilation' ? <ApiCompilationView />
               : activeView === 'admin' ? <AdminPage />
+              : activeView === 'liked' ? <LikedSongsView />
+              : activeView === 'playlists' ? <PlaylistsView />
               : <ApiTrackerView />}
           </ErrorBoundary>
           {showNowPlaying && <ErrorBoundary><NowPlaying /></ErrorBoundary>}
@@ -108,6 +110,7 @@ export default function App(): JSX.Element {
       <Player />
       <BottomNav />
       {showSettings && <Settings />}
+      {showUserAuth && <UserAuthModal onClose={() => setShowUserAuth(false)} />}
     </div>
   )
 }

@@ -1,13 +1,15 @@
-import { SearchCode, HardDrive, Settings, Archive, ShieldCheck } from 'lucide-react'
+import { SearchCode, HardDrive, Settings, Archive, ShieldCheck, Heart, ListMusic } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
 
 export default function BottomNav(): JSX.Element {
-  const { activeView, setActiveView, setShowSettings, userProfile } = useStore()
-  const isAdmin = userProfile?.role === 'admin'
+  const { activeView, setActiveView, setShowSettings, account } = useStore()
+  const isAdmin = !!account?.is_administrator
 
   const items: { icon: React.ReactNode; label: string; view: ViewType }[] = [
     { icon: <SearchCode size={24} />, label: 'Tracker', view: 'api-tracker' },
+    { icon: <Heart size={24} />, label: 'Liked', view: 'liked' },
+    { icon: <ListMusic size={24} />, label: 'Playlists', view: 'playlists' },
     { icon: <Archive size={24} />, label: 'Compilation', view: 'compilation' },
     { icon: <HardDrive size={24} />, label: 'Files', view: 'api-files' },
   ]

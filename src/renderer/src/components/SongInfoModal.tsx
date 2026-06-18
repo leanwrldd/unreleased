@@ -1,7 +1,6 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef } from 'react'
 import { X, Music2 } from 'lucide-react'
 import { JWApiSong, CATEGORY_LABELS, buildImageUrl, parseDuration } from '../lib/juicewrldApi'
-import { getSupplement, SongSupplement } from '../lib/supabase'
 
 function formatDur(secs: number): string {
   if (!secs) return '—'
@@ -42,13 +41,6 @@ interface Props {
 
 export default function SongInfoModal({ song, onClose }: Props): JSX.Element | null {
   const overlayRef = useRef<HTMLDivElement>(null)
-  const [supplement, setSupplement] = useState<SongSupplement | null>(null)
-
-  useEffect(() => {
-    setSupplement(null)
-    if (!song) return
-    getSupplement(song.id).then(setSupplement)
-  }, [song?.id])
 
   if (!song) return null
 
@@ -80,8 +72,6 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
       notesDisplay = song.notes
     }
   }
-
-  const hasExtraLinks = supplement && (supplement.youtube_url || supplement.soundcloud_url)
 
   return (
     <div
@@ -130,11 +120,6 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
                     {song.era.name}
                   </span>
                 )}
-                {supplement?.quality_rating && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/60 border border-white/15">
-                    {supplement.quality_rating}/10
-                  </span>
-                )}
               </div>
             </div>
           </div>
@@ -155,8 +140,8 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
             <>
               <GroupLabel>Credits</GroupLabel>
               <div>
-                <Row label="Producers" value={supplement?.verified_producers || song.producers} />
-                <Row label="Engineers" value={supplement?.verified_engineers || song.engineers} />
+                <Row label="Producers" value={song.producers} />
+                <Row label="Engineers" value={song.engineers} />
               </div>
             </>
           )}
@@ -165,8 +150,8 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
             <>
               <GroupLabel>Recording</GroupLabel>
               <div>
-                <Row label="Location" value={supplement?.verified_recording_location || song.recording_locations} />
-                <Row label="Date" value={supplement?.verified_recording_date || song.record_dates} />
+                <Row label="Location" value={song.recording_locations} />
+                <Row label="Date" value={song.record_dates} />
               </div>
             </>
           )}
@@ -175,7 +160,7 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
             <>
               <GroupLabel>Dates</GroupLabel>
               <div>
-                <Row label="Released" value={supplement?.verified_release_date || song.release_date} />
+                <Row label="Released" value={song.release_date} />
                 <Row label="Preview" value={song.preview_date} />
                 <Row label="Other" value={song.dates} />
               </div>
@@ -227,75 +212,6 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
               <GroupLabel>Notes</GroupLabel>
               <p className="text-text-primary text-xs leading-relaxed pb-2.5 border-b border-[var(--border)] whitespace-pre-wrap">
                 {notesDisplay}
-              </p>
-            </>
-          )}
-
-          {/* Supplement data from Supabase */}
-          {supplement?.context && (
-            <>
-              <GroupLabel>Context</GroupLabel>
-              <p className="text-text-primary text-xs leading-relaxed pb-2.5 border-b border-[var(--border)] whitespace-pre-wrap">
-                {supplement.context}
-              </p>
-            </>
-          )}
-
-          {supplement?.sample_info && (
-            <>
-              <GroupLabel>Samples</GroupLabel>
-              <p className="text-text-primary text-xs leading-relaxed pb-2.5 border-b border-[var(--border)] whitespace-pre-wrap">
-                {supplement.sample_info}
-              </p>
-            </>
-          )}
-
-          {supplement?.trivia && supplement.trivia.length > 0 && (
-            <>
-              <GroupLabel>Trivia</GroupLabel>
-              <ul className="pb-2.5 border-b border-[var(--border)] space-y-1">
-                {supplement.trivia.map((fact, i) => (
-                  <li key={i} className="text-text-primary text-xs leading-relaxed flex gap-2">
-                    <span className="text-text-muted shrink-0">·</span>
-                    <span>{fact}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-
-          {hasExtraLinks && (
-            <>
-              <GroupLabel>Links</GroupLabel>
-              <div>
-                {supplement!.youtube_url && (
-                  <div className="flex gap-3 py-2.5 border-b border-[var(--border)] last:border-0">
-                    <span className="text-text-muted text-xs shrink-0 w-28 pt-px">YouTube</span>
-                    <a href={supplement!.youtube_url!} target="_blank" rel="noopener noreferrer" className="text-accent text-xs hover:underline truncate flex-1">
-                      {supplement!.youtube_url}
-                    </a>
-                  </div>
-                )}
-                {supplement!.soundcloud_url && (
-                  <div className="flex gap-3 py-2.5 border-b border-[var(--border)] last:border-0">
-                    <span className="text-text-muted text-xs shrink-0 w-28 pt-px">SoundCloud</span>
-                    <a href={supplement!.soundcloud_url!} target="_blank" rel="noopener noreferrer" className="text-accent text-xs hover:underline truncate flex-1">
-                      {supplement!.soundcloud_url}
-                    </a>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
-          {supplement?.editor_notes && (
-            <>
-              <GroupLabel>Editor Notes</GroupLabel>
-              <p className="text-text-primary text-xs leading-relaxed pb-2.5 border-b border-[var(--border)] whitespace-pre-wrap">
-                {supplement.editor_notes}
-                {supplement.updated_by && (
-                  <span className="text-text-muted"> — {supplement.updated_by}</span>
-                )}
               </p>
             </>
           )}

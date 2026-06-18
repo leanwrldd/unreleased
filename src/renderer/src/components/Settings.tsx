@@ -10,7 +10,7 @@ const ACCENT_PRESETS = [
 export default function Settings(): JSX.Element {
   const {
     setShowSettings, setActiveView,
-    userProfile,
+    account,
     theme, setTheme,
     accentColor, setAccentColor,
     audioOutput, setAudioOutput,
@@ -243,7 +243,7 @@ export default function Settings(): JSX.Element {
               </a>
             </div>
 
-            {(!userProfile || (userProfile.role !== 'editor' && userProfile.role !== 'admin')) && (
+            {(!account || (!account.is_editor && !account.is_administrator)) && (
               <button
                 onClick={() => { setShowSettings(false); setActiveView('editor') }}
                 className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-accent/10 hover:bg-accent/15 border border-accent/25 text-accent text-sm font-medium transition-colors mt-2"

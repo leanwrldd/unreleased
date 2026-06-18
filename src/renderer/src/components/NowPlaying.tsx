@@ -11,7 +11,7 @@ export default function NowPlaying(): JSX.Element {
     currentTrack,
     currentTrackFull,
     setShowNowPlaying,
-    userProfile,
+    account,
     setPendingEditorSongId,
     setActiveView,
   } = useStore()
@@ -43,7 +43,7 @@ export default function NowPlaying(): JSX.Element {
   }
 
   const jwMatch = currentTrack?.id.match(/^jw-(\d+)$/)
-  const canEdit = userProfile?.role === 'editor' || userProfile?.role === 'admin'
+  const canEdit = !!account?.is_editor
 
   return (
     <div
