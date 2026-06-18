@@ -62,7 +62,7 @@ npm run preview
 - Built by **freakylatif** — find me on Discord.
 - Join the **[Discord](https://discord.gg/qq7DMNkBJ4)** server
 
-##
+## To-dos
 
 - Add synced lyrics from API
 - Add make synced lyrics
