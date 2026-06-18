@@ -1,8 +1,8 @@
 # unreleased — web
 
-A browser-based music player for the [Juice WRLD API](https://juicewrldapi.com), built with React, Vite, and TypeScript.
+A browser-based music player for the [Juice WRLD API](https://player.juicewrldapi.com), built with React, Vite, and TypeScript.
 
-> **This is the `web` branch** — API-only, no local library, deployable to any static host.  
+> **This is the `web` branch** — API-only, no local library
 > For the full desktop app (Electron + local library), see the [`main` branch](https://github.com/leanwrldd/unreleased/tree/main).
 
 ![Version](https://img.shields.io/badge/version-1.4.0-blue)
@@ -76,6 +76,8 @@ npm run preview
 - make playlists shareable. have their cover customizable
 - rework playlists ui
 - rework compilation ui
+- add "similar songs"
+- add cdq remasters of unsurfaced songs
 
 ## Changelog
 
