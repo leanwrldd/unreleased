@@ -222,6 +222,7 @@ export default function ApiCompilationView(): JSX.Element {
   const [nav, setNav] = useState<Record<Tab, TabNav>>(initNav)
   const [entries, setEntries] = useState<JWApiFileEntry[]>([])
   const [browsing, setBrowsing] = useState(false)
+  const [singlesFlat, setSinglesFlat] = useState<JWApiFileEntry[]>([])
 
   // Discover root folders on mount
   useEffect(() => {
@@ -279,6 +280,27 @@ export default function ApiCompilationView(): JSX.Element {
       .finally(() => setBrowsing(false))
   }, [activePath, discovering])
 
+  // For the singles tab at root: flatten all sub-platform folders into one list
+  const singlesRoot = tabRoots.singles
+  const singlesNavDepth = nav.singles.nameStack.length
+  useEffect(() => {
+    if (discovering || !singlesRoot || singlesNavDepth > 0) return
+    setSinglesFlat([])
+    apiFetch<JWApiBrowseResponse>('/files/browse/', { path: singlesRoot })
+      .then(async (data) => {
+        const subFolders = parseEntries(data).filter(e => e.type === 'directory')
+        const results = await Promise.all(
+          subFolders.map(f =>
+            apiFetch<JWApiBrowseResponse>('/files/browse/', { path: f.path })
+              .then(d => parseEntries(d).filter(e => e.type === 'file' && isAudio(e.name)))
+              .catch(() => [] as JWApiFileEntry[])
+          )
+        )
+        setSinglesFlat(results.flat())
+      })
+      .catch(() => {})
+  }, [singlesRoot, singlesNavDepth, discovering])
+
   const navigateTo = useCallback((entry: JWApiFileEntry) => {
     setNav(prev => ({
       ...prev,
@@ -297,8 +319,8 @@ export default function ApiCompilationView(): JSX.Element {
     })
   }, [activeTab, tabRoots])
 
-  const playFile = useCallback((file: JWApiFileEntry) => {
-    const audioFiles = entries.filter(e => e.type === 'file' && isAudio(e.name))
+  const playFile = useCallback((file: JWApiFileEntry, contextFiles?: JWApiFileEntry[]) => {
+    const audioFiles = contextFiles ?? entries.filter(e => e.type === 'file' && isAudio(e.name))
     const tracks: Track[] = audioFiles.map(f => ({
       id: `jw-file-${f.path}`,
       path: f.path,
@@ -370,7 +392,7 @@ export default function ApiCompilationView(): JSX.Element {
     </div>
   )
 
-  const renderAudioRow = (file: JWApiFileEntry) => {
+  const renderAudioRow = (file: JWApiFileEntry, contextFiles?: JWApiFileEntry[]) => {
     const title = file.name.replace(/\.[^.]+$/, '')
     const fileTrack: Track = {
       id: `jw-file-${file.path}`,
@@ -396,7 +418,7 @@ export default function ApiCompilationView(): JSX.Element {
             onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
           />
           <button
-            onClick={() => playFile(file)}
+            onClick={() => playFile(file, contextFiles)}
             className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 hidden md:flex items-center justify-center transition-opacity"
           >
             <Play size={12} fill="white" className="text-white ml-0.5" />
@@ -428,7 +450,7 @@ export default function ApiCompilationView(): JSX.Element {
         {/* Mobile buttons */}
         <div className="md:hidden flex items-center">
           <button className="p-2 text-text-muted active:text-accent" onClick={() => addToQueue(fileTrack)} title="Queue"><ListPlus size={15} /></button>
-          <button className="p-2 text-text-muted active:text-accent" onClick={() => playFile(file)} title="Play"><Play size={15} /></button>
+          <button className="p-2 text-text-muted active:text-accent" onClick={() => playFile(file, contextFiles)} title="Play"><Play size={15} /></button>
         </div>
       </div>
     )
@@ -458,7 +480,7 @@ export default function ApiCompilationView(): JSX.Element {
         ) : (
           renderGrid(folders)
         )}
-        {audioFiles.map(renderAudioRow)}
+        {audioFiles.map(f => renderAudioRow(f))}
       </>
     )
   }
@@ -534,6 +556,18 @@ export default function ApiCompilationView(): JSX.Element {
               <p className="text-sm">No content found</p>
             </div>
           )
+        ) : isAtRoot && activeTab === 'singles' ? (
+          // Singles tab: flat list of all singles from all platform subfolders
+          <div className="space-y-0.5 pt-1">
+            {singlesFlat.length === 0 ? (
+              <div className="flex items-center justify-center h-40 gap-2 text-text-muted">
+                <Loader2 size={18} className="animate-spin" />
+                <span className="text-sm">Loading singles…</span>
+              </div>
+            ) : (
+              singlesFlat.map(file => renderAudioRow(file, singlesFlat))
+            )}
+          </div>
         ) : isAtRoot ? (
           <div className="pt-1">{renderRootGrid()}</div>
         ) : (
@@ -552,7 +586,7 @@ export default function ApiCompilationView(): JSX.Element {
                 <ChevronRight size={16} className="text-text-muted shrink-0" />
               </button>
             ))}
-            {audioFiles.map(renderAudioRow)}
+            {audioFiles.map(f => renderAudioRow(f))}
             {folders.length === 0 && audioFiles.length === 0 && (
               <div className="flex flex-col items-center justify-center h-40 gap-2 text-text-muted">
                 <Music2 size={32} className="opacity-20" />
