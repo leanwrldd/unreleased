@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Search, Play, Loader2, Music2, X,
   LayoutList, LayoutGrid, Info, Download, ListPlus, PanelLeft,
@@ -583,15 +583,16 @@ export default function ApiTrackerView(): JSX.Element {
 
   const handleSort = (field: OrderField): void => {
     if (orderField === field) {
-      setOrderDir((d) => d === 'asc' ? 'desc' : 'asc')
+      if (orderDir === 'desc') {
+        // Third click: clear sort, go back to infinite scroll
+        setOrderField(null); setOrderDir('asc'); resetSongs()
+      } else {
+        setOrderDir('desc')
+      }
     } else {
-      setOrderField(field)
-      setOrderDir('asc')
+      setOrderField(field); setOrderDir('asc')
     }
-    resetSongs()
   }
-
-  const ordering = orderField ? (orderDir === 'desc' ? `-${orderField}` : orderField) : undefined
 
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -625,17 +626,51 @@ export default function ApiTrackerView(): JSX.Element {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [search, resetSongs])
 
-  // Fetch — accumulates pages
+  // ── SORT MODE: load the entire library sequentially, sort client-side ──────────
+  // The API has no ordering param, so we fetch all pages and sort in memory.
   useEffect(() => {
+    if (!orderField) return
+    let cancelled = false
+    loadingRef.current = true
+    setLoading(true); setError(null); setSongs([]); setHasMore(false); setCount(0)
+    ;(async () => {
+      const all: JWApiSong[] = []
+      let p = 1
+      try {
+        while (!cancelled) {
+          const data = await apiFetch<JWApiPaginatedResponse>('/songs/', {
+            searchall: debouncedSearch || undefined,
+            category: category || undefined,
+            era: era || undefined,
+            page: p,
+            page_size: 200, // bigger batches to reduce round-trips
+          })
+          if (cancelled) return
+          all.push(...data.results)
+          setSongs([...all]) // progressive display while loading
+          setCount(data.count)
+          if (!data.next) break
+          p++
+        }
+      } catch (e) {
+        if (!cancelled) setError((e as Error).message)
+      } finally {
+        if (!cancelled) { loadingRef.current = false; setLoading(false) }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [orderField, debouncedSearch, category, era])
+
+  // ── SCROLL MODE: infinite scroll, accumulates pages ──────────────────────────
+  useEffect(() => {
+    if (orderField) return // sort mode handles fetching
     let cancelled = false
     loadingRef.current = true
     setLoading(true); setError(null)
     apiFetch<JWApiPaginatedResponse>('/songs/', {
-      // searchall searches all fields including producers (vs. search which only checks name/titles)
       searchall: debouncedSearch || undefined,
       category: category || undefined,
       era: era || undefined,
-      ordering,
       page,
       page_size: PAGE_SIZE,
     })
@@ -653,14 +688,13 @@ export default function ApiTrackerView(): JSX.Element {
         if (!cancelled) {
           loadingRef.current = false
           setLoading(false)
-          // Sentinel stayed in viewport the whole time — load next page immediately
           if (sentinelVisibleRef.current && hasMoreRef.current) {
             setPage((p) => p + 1)
           }
         }
       })
     return () => { cancelled = true }
-  }, [debouncedSearch, category, era, ordering, page])
+  }, [debouncedSearch, category, era, page, orderField])
 
   // Observe sentinel for infinite scroll
   useEffect(() => {
@@ -677,10 +711,47 @@ export default function ApiTrackerView(): JSX.Element {
     return () => obs.disconnect()
   }, [])
 
+  // Client-side sort applied over accumulated songs (sort mode only)
+  const sortedSongs = useMemo(() => {
+    if (!orderField) return songs
+    return [...songs].sort((a, b) => {
+      let av: string | number, bv: string | number
+      switch (orderField) {
+        case 'name':
+          av = (a.track_titles?.[0] || a.name).toLowerCase()
+          bv = (b.track_titles?.[0] || b.name).toLowerCase()
+          break
+        case 'credited_artists':
+          av = (a.credited_artists || '').toLowerCase()
+          bv = (b.credited_artists || '').toLowerCase()
+          break
+        case 'era__name':
+          av = (a.era?.name || '').toLowerCase()
+          bv = (b.era?.name || '').toLowerCase()
+          break
+        case 'category':
+          av = a.category; bv = b.category
+          break
+        case 'length':
+          av = parseDuration(a.length); bv = parseDuration(b.length)
+          break
+        default: return 0
+      }
+      const cmp = typeof av === 'number' ? av - (bv as number) : (av as string).localeCompare(bv as string)
+      return orderDir === 'desc' ? -cmp : cmp
+    })
+  }, [songs, orderField, orderDir])
+
   const handlePlay = useCallback((song: JWApiSong) => {
     const track = songToTrack(song)
-    playTrack(track, songs.map(songToTrack))
-  }, [playTrack, songs])
+    // Exclude unsurfaced + recording_session from shuffle context unless user explicitly filtered to them
+    const context = sortedSongs.filter((s) => {
+      if (!s.path) return false
+      if (!category) return s.category === 'released' || s.category === 'unreleased'
+      return true
+    }).map(songToTrack)
+    playTrack(track, context.length > 0 ? context : [track])
+  }, [playTrack, sortedSongs, category])
 
   const handleInfo = useCallback((song: JWApiSong) => { setSelectedSong(song) }, [])
   const handleQueue = useCallback((track: Track) => { addToQueue(track) }, [addToQueue])
@@ -796,7 +867,7 @@ export default function ApiTrackerView(): JSX.Element {
       {/* Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {showSidebar && (
-          <div className="hidden md:block">
+          <div className="hidden md:flex min-h-0">
             <CategorySidebar
               stats={stats}
               eras={eras}
@@ -844,24 +915,24 @@ export default function ApiTrackerView(): JSX.Element {
 
           {/* Song list / grid */}
           <div className="flex-1 overflow-y-auto px-3 md:px-5 pb-4">
-            {loading && songs.length === 0 ? (
+            {loading && sortedSongs.length === 0 ? (
               <div className="flex items-center justify-center h-40 gap-2 text-text-muted">
                 <Loader2 size={18} className="animate-spin" />
-                <span className="text-sm">Loading…</span>
+                <span className="text-sm">{orderField ? 'Loading full library for sorting…' : 'Loading…'}</span>
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center h-40 gap-2 text-center">
                 <p className="text-text-muted text-sm">Failed to load: {error}</p>
                 <button onClick={resetSongs} className="text-accent text-sm underline">Retry</button>
               </div>
-            ) : songs.length === 0 ? (
+            ) : sortedSongs.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-2">
                 <Music2 size={32} className="text-text-muted opacity-30" />
                 <p className="text-text-muted text-sm">No songs found</p>
               </div>
             ) : viewMode === 'list' ? (
               <div className="space-y-0.5">
-                {songs.map((song) => (
+                {sortedSongs.map((song) => (
                   <SongRow
                     key={song.id}
                     song={song}
@@ -874,7 +945,7 @@ export default function ApiTrackerView(): JSX.Element {
               </div>
             ) : (
               <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-                {songs.map((song) => (
+                {sortedSongs.map((song) => (
                   <SongCard
                     key={song.id}
                     song={song}
@@ -888,8 +959,15 @@ export default function ApiTrackerView(): JSX.Element {
             )}
             {/* Sentinel always in DOM so IntersectionObserver is set up from mount */}
             <div ref={sentinelRef} className="h-4" />
-            {loading && songs.length > 0 && <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-text-muted" /></div>}
-            {!hasMore && songs.length > 0 && <p className="text-center text-text-muted text-xs py-4">{count.toLocaleString()} songs total</p>}
+            {loading && sortedSongs.length > 0 && (
+              <div className="flex items-center justify-center gap-2 py-4 text-text-muted">
+                <Loader2 size={16} className="animate-spin" />
+                {orderField && <span className="text-xs">{sortedSongs.length.toLocaleString()} / {count.toLocaleString()} loaded</span>}
+              </div>
+            )}
+            {!loading && !hasMore && sortedSongs.length > 0 && (
+              <p className="text-center text-text-muted text-xs py-4">{count.toLocaleString()} songs total</p>
+            )}
           </div>
         </div>
       </div>
