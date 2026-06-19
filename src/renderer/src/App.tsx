@@ -11,6 +11,7 @@ function getViewFromPath(pathname: string): ViewType {
   if (pathname === '/admin') return 'admin'
   if (pathname === '/liked') return 'liked'
   if (pathname === '/playlists') return 'playlists'
+  if (pathname.startsWith('/shared/')) return 'shared-playlist'
   return 'api-tracker'
 }
 
@@ -24,6 +25,7 @@ import EditorPage from './components/EditorPage'
 import AdminPage from './components/AdminPage'
 import LikedSongsView from './components/LikedSongsView'
 import PlaylistsView from './components/PlaylistsView'
+import SharedPlaylistView from './components/SharedPlaylistView'
 import UserAuthModal from './components/UserAuthModal'
 import Player from './components/Player'
 import NowPlaying from './components/NowPlaying'
@@ -131,6 +133,7 @@ export default function App(): JSX.Element {
               : activeView === 'admin' ? <AdminPage />
               : activeView === 'liked' ? <LikedSongsView />
               : activeView === 'playlists' ? <PlaylistsView />
+              : activeView === 'shared-playlist' ? <SharedPlaylistView />
               : <ApiTrackerView />}
           </ErrorBoundary>
           {showNowPlaying && <ErrorBoundary><NowPlaying /></ErrorBoundary>}

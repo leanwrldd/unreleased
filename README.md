@@ -5,7 +5,7 @@ A browser-based music player for the [Juice WRLD API](https://player.juicewrldap
 > **This is the `web` branch** â€” API-only, no local library
 > For the full desktop app (Electron + local library), see the [`main` branch](https://github.com/leanwrldd/unreleased/tree/main).
 
-![Version](https://img.shields.io/badge/version-1.5.3-blue)
+![Version](https://img.shields.io/badge/version-1.5.4-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -75,6 +75,15 @@ npm run preview
 
 ## Changelog
 
+
+### v1.5.4 — 2026-06-20
+- **New** Playlists: right-click any track for a context menu — Play, Add to Queue, Song Info, Add to Playlist, Remove, Download
+- **New** Playlists: drag tracks to reorder (replaces up/down arrow buttons)
+- **New** Playlists: zip and download all API tracks in a playlist at once
+- **New** Playlists: share a playlist via a public link (copy link button in hero)
+- **New** Playlists: right-click a playlist card in the library to add all its songs to another playlist
+- **New** Playlists: add all songs from the open playlist to another playlist (folder icon in hero)
+- **New** Shared playlist view — opening a share link shows a read-only playlist anyone can play
 ### v1.5.3 â€” 2026-06-19
 - **New** Playlist page: full Spotify-style hero â€” large 2Ã—2 cover mosaic, gradient background, bold name, song count + total duration, Play and Shuffle buttons
 - **New** Player: next song preloads into the inactive audio slot while the current track is playing â€” no gap on track change (linear/repeat modes)
@@ -301,3 +310,4 @@ npm run preview
 - **New** Metadata editor with lyrics and cover art
 - **New** Dark / light theme
 - **New** Frameless window with custom titlebar
+
