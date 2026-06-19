@@ -79,6 +79,8 @@ interface StoreActions {
   // API extras
   setApiTrackerCategory: (cat: string) => void
   setApiTrackerEra: (era: string) => void
+  apiFilesPath: string
+  setApiFilesPath: (path: string) => void
 
   // Public account (favorites + playlists)
   setShowUserAuth: (show: boolean) => void
@@ -166,6 +168,7 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   likedTrackIds: ls.get<string[]>('likedTrackIds') ?? [],
   apiTrackerCategory: '',
   apiTrackerEra: '',
+  apiFilesPath: '',
   account: null,
   playlists: [],
   showUserAuth: false,
@@ -344,6 +347,7 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   // ─── API extras ──────────────────────────────────────────────────────────────
   setApiTrackerCategory: (cat) => set({ apiTrackerCategory: cat }),
   setApiTrackerEra: (era) => set({ apiTrackerEra: era }),
+  setApiFilesPath: (path) => set({ apiFilesPath: path }),
 
   // ─── Public account ─────────────────────────────────────────────────────────────
   setShowUserAuth: (showUserAuth) => set({ showUserAuth }),

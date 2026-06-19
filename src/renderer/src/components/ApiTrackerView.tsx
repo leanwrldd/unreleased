@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  Search, Play, ChevronLeft, ChevronRight, Loader2, Music2, X,
+  Search, Play, Loader2, Music2, X,
   LayoutList, LayoutGrid, Info, Download, ListPlus, PanelLeft,
-  ChevronUp, ChevronDown,
+  ChevronUp, ChevronDown, MoreHorizontal, Folder, Pencil, Plus, ListMusic,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
@@ -12,6 +12,7 @@ import {
   JWApiSong, JWApiPaginatedResponse, JWApiStats, JWApiEra,
 } from '../lib/juicewrldApi'
 import { Track } from '../types'
+import * as userApi from '../lib/userApi'
 
 type Category = 'released' | 'unreleased' | 'unsurfaced' | 'recording_session' | ''
 type ViewMode = 'list' | 'grid'
@@ -94,7 +95,6 @@ function CategorySidebar({
 
   return (
     <div className="w-44 shrink-0 border-r border-[var(--border)] overflow-y-auto flex flex-col py-2">
-      {/* Categories */}
       <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted px-3 pt-1 pb-2">Category</p>
       {CAT_SIDEBAR.map((cat) => (
         <button
@@ -113,7 +113,6 @@ function CategorySidebar({
         </button>
       ))}
 
-      {/* Eras */}
       {eras.length > 0 && (
         <>
           <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted px-3 pt-4 pb-2">Era</p>
@@ -142,13 +141,205 @@ function CategorySidebar({
   )
 }
 
+// ─── Context menu ─────────────────────────────────────────────────────────────
+interface ContextMenuState {
+  song: JWApiSong
+  x: number
+  y: number
+  showPlaylists: boolean
+}
+
+function SongContextMenu({
+  state,
+  onClose,
+  onInfo,
+  onQueue,
+  onShowInFiles,
+  onEdit,
+  canEdit,
+  onTogglePlaylists,
+}: {
+  state: ContextMenuState
+  onClose: () => void
+  onInfo: () => void
+  onQueue: () => void
+  onShowInFiles: () => void
+  onEdit: () => void
+  canEdit: boolean
+  onTogglePlaylists: () => void
+}): JSX.Element {
+  const { playlists, account, refreshPlaylists, setShowUserAuth } = useStore()
+  const menuRef = useRef<HTMLDivElement>(null)
+  const songId = userApi.trackIdToSongId(`jw-${state.song.id}`)
+  const [busyId, setBusyId] = useState<number | null>(null)
+  const [doneId, setDoneId] = useState<number | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+
+  useEffect(() => {
+    const handle = (e: MouseEvent): void => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose()
+    }
+    const handleKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('mousedown', handle)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handle)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [onClose])
+
+  const addTo = async (id: number): Promise<void> => {
+    if (songId == null) return
+    setBusyId(id)
+    try {
+      await userApi.addToPlaylist(id, songId)
+      setDoneId(id)
+      await refreshPlaylists()
+    } catch {}
+    finally { setBusyId(null) }
+  }
+
+  const createAndAdd = async (): Promise<void> => {
+    const name = newName.trim()
+    if (!name || songId == null) return
+    setBusyId(-1)
+    try {
+      const playlist = await userApi.createPlaylist(name)
+      await userApi.addToPlaylist(playlist.id, songId)
+      await refreshPlaylists()
+      onClose()
+    } catch {}
+    finally { setBusyId(null) }
+  }
+
+  // Adjust to stay on screen
+  const menuWidth = state.showPlaylists ? 208 : 208
+  const menuHeight = state.showPlaylists ? 320 : 200
+  const top = Math.min(state.y, window.innerHeight - menuHeight - 8)
+  const left = Math.min(state.x, window.innerWidth - menuWidth - 8)
+
+  const MenuItem = ({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }): JSX.Element => (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+    >
+      {icon}
+      {label}
+    </button>
+  )
+
+  return (
+    <div
+      ref={menuRef}
+      style={{ position: 'fixed', zIndex: 9999, top, left }}
+      className="w-52 bg-surface border border-[var(--border)] rounded-xl shadow-2xl overflow-hidden py-1"
+    >
+      {/* Song header */}
+      <div className="px-3 py-2 border-b border-[var(--border)] mb-1">
+        <p className="text-text-primary text-xs font-semibold truncate">{state.song.track_titles?.[0] || state.song.name}</p>
+        <p className="text-text-muted text-[10px] truncate">{state.song.credited_artists || 'Juice WRLD'}</p>
+      </div>
+
+      {state.showPlaylists ? (
+        /* Playlist sub-panel */
+        <>
+          <button
+            onClick={(e) => { e.stopPropagation(); onTogglePlaylists() }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-muted hover:text-text-primary transition-colors"
+          >
+            <ChevronDown size={12} className="rotate-90" /> Back
+          </button>
+          {!account ? (
+            <div className="px-3 pb-2">
+              <p className="text-xs text-text-muted mb-2">Log in to save to playlists.</p>
+              <button
+                onClick={() => { setShowUserAuth(true); onClose() }}
+                className="w-full py-1.5 rounded-lg bg-accent/15 text-accent text-xs font-semibold"
+              >
+                Log in
+              </button>
+            </div>
+          ) : (
+            <div className="max-h-44 overflow-y-auto">
+              {playlists.length === 0 && (
+                <p className="px-3 py-2 text-xs text-text-muted">No playlists yet.</p>
+              )}
+              {playlists.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={(e) => { e.stopPropagation(); addTo(p.id) }}
+                  disabled={busyId === p.id}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                >
+                  <ListMusic size={13} className="shrink-0 text-text-muted" />
+                  <span className="flex-1 truncate text-xs">{p.name}</span>
+                  {busyId === p.id ? <Loader2 size={12} className="animate-spin" /> : doneId === p.id ? <span className="text-accent text-[10px]">✓</span> : null}
+                </button>
+              ))}
+            </div>
+          )}
+          {account && (
+            <div className="border-t border-[var(--border)] pt-1 px-2 pb-1">
+              {creating ? (
+                <div className="flex gap-1">
+                  <input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && createAndAdd()}
+                    placeholder="Playlist name"
+                    autoFocus
+                    className="flex-1 min-w-0 bg-surface-overlay border border-[var(--border)] rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
+                  />
+                  <button onClick={createAndAdd} disabled={busyId === -1} className="p-1.5 rounded bg-accent/15 text-accent">
+                    {busyId === -1 ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setCreating(true)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-accent hover:bg-surface-raised rounded transition-colors"
+                >
+                  <Plus size={12} /> New playlist
+                </button>
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        /* Main menu */
+        <>
+          <MenuItem icon={<Info size={14} />} label="Song info" onClick={() => { onInfo(); onClose() }} />
+          {state.song.path && (
+            <MenuItem icon={<ListPlus size={14} />} label="Add to queue" onClick={() => { onQueue(); onClose() }} />
+          )}
+          <MenuItem icon={<Plus size={14} />} label="Add to playlist" onClick={onTogglePlaylists} />
+          {state.song.path && (
+            <MenuItem icon={<Folder size={14} />} label="Show in Files" onClick={() => { onShowInFiles(); onClose() }} />
+          )}
+          {canEdit && (
+            <MenuItem icon={<Pencil size={14} />} label="Edit" onClick={() => { onEdit(); onClose() }} />
+          )}
+          {state.song.path && (
+            <>
+              <div className="my-1 border-t border-[var(--border)]" />
+              <MenuItem icon={<Download size={14} />} label="Download" onClick={() => { downloadSong(state.song); onClose() }} />
+            </>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── Action buttons (shared) ──────────────────────────────────────────────────
 function SongActions({
-  song, onInfo, onQueue, size = 14,
+  song, onInfo, onQueue, onContextMenu, size = 14,
 }: {
   song: JWApiSong
   onInfo: () => void
   onQueue: (track: Track) => void
+  onContextMenu: (e: React.MouseEvent) => void
   size?: number
 }): JSX.Element {
   return (
@@ -161,36 +352,35 @@ function SongActions({
         <Info size={size} />
       </button>
       {song.path && (
-        <>
-          <button
-            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all shrink-0"
-            onClick={(e) => { e.stopPropagation(); onQueue(songToTrack(song)) }}
-            title="Add to queue"
-          >
-            <ListPlus size={size} />
-          </button>
-          <button
-            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all shrink-0"
-            onClick={(e) => { e.stopPropagation(); downloadSong(song) }}
-            title="Download"
-          >
-            <Download size={size} />
-          </button>
-        </>
+        <button
+          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all shrink-0"
+          onClick={(e) => { e.stopPropagation(); onQueue(songToTrack(song)) }}
+          title="Add to queue"
+        >
+          <ListPlus size={size} />
+        </button>
       )}
+      <button
+        className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all shrink-0"
+        onClick={(e) => { e.stopPropagation(); onContextMenu(e) }}
+        title="More options"
+      >
+        <MoreHorizontal size={size} />
+      </button>
     </>
   )
 }
 
 // ─── Song row (list mode) ─────────────────────────────────────────────────────
 function SongRow({
-  song, onPlay, onCategoryClick, onInfo, onQueue,
+  song, onPlay, onCategoryClick, onInfo, onQueue, onContextMenu,
 }: {
   song: JWApiSong
   onPlay: (song: JWApiSong) => void
   onCategoryClick: (cat: Category) => void
   onInfo: (song: JWApiSong) => void
   onQueue: (track: Track) => void
+  onContextMenu: (song: JWApiSong, e: React.MouseEvent) => void
 }): JSX.Element {
   const track = songToTrack(song)
   const title = song.track_titles?.[0] || song.name
@@ -201,6 +391,7 @@ function SongRow({
     <div
       className="group flex items-center gap-3 px-3 py-2.5 md:py-2 hover:bg-surface-overlay active:bg-surface-overlay rounded-lg transition-colors cursor-default"
       onDoubleClick={() => onInfo(song)}
+      onContextMenu={(e) => { e.preventDefault(); onContextMenu(song, e) }}
     >
       {/* Cover art */}
       <div className="relative shrink-0 w-10 h-10 md:w-9 md:h-9 rounded overflow-hidden bg-surface-overlay">
@@ -242,35 +433,26 @@ function SongRow({
 
       {/* Desktop action buttons */}
       <div className="hidden md:flex items-center gap-0.5 shrink-0">
-        <SongActions song={song} onInfo={() => onInfo(song)} onQueue={onQueue} />
+        <SongActions song={song} onInfo={() => onInfo(song)} onQueue={onQueue} onContextMenu={(e) => onContextMenu(song, e)} />
       </div>
 
-      {/* Mobile: info + play buttons */}
+      {/* Mobile: more + play */}
       <div className="md:hidden flex items-center shrink-0">
         <button
           className="p-2 text-text-muted active:text-accent transition-colors"
-          onClick={(e) => { e.stopPropagation(); onInfo(song) }}
-          title="Song info"
+          onClick={(e) => { e.stopPropagation(); onContextMenu(song, e) }}
+          title="More options"
         >
-          <Info size={16} />
+          <MoreHorizontal size={16} />
         </button>
         {canPlay && (
-          <>
-            <button
-              className="p-2 text-text-muted active:text-accent transition-colors"
-              onClick={() => onQueue(songToTrack(song))}
-              title="Add to queue"
-            >
-              <ListPlus size={16} />
-            </button>
-            <button
-              className="p-2 text-text-muted active:text-accent transition-colors"
-              onClick={() => onPlay(song)}
-              title="Play"
-            >
-              <Play size={17} />
-            </button>
-          </>
+          <button
+            className="p-2 text-text-muted active:text-accent transition-colors"
+            onClick={() => onPlay(song)}
+            title="Play"
+          >
+            <Play size={17} />
+          </button>
         )}
       </div>
     </div>
@@ -279,20 +461,24 @@ function SongRow({
 
 // ─── Song card (grid mode) ────────────────────────────────────────────────────
 function SongCard({
-  song, onPlay, onCategoryClick, onInfo, onQueue,
+  song, onPlay, onCategoryClick, onInfo, onQueue, onContextMenu,
 }: {
   song: JWApiSong
   onPlay: (song: JWApiSong) => void
   onCategoryClick: (cat: Category) => void
   onInfo: (song: JWApiSong) => void
   onQueue: (track: Track) => void
+  onContextMenu: (song: JWApiSong, e: React.MouseEvent) => void
 }): JSX.Element {
   const track = songToTrack(song)
   const title = song.track_titles?.[0] || song.name
   const canPlay = !!song.path
 
   return (
-    <div className="group flex flex-col rounded-xl overflow-hidden bg-surface-overlay hover:bg-surface-raised transition-colors cursor-default">
+    <div
+      className="group flex flex-col rounded-xl overflow-hidden bg-surface-overlay hover:bg-surface-raised transition-colors cursor-default"
+      onContextMenu={(e) => { e.preventDefault(); onContextMenu(song, e) }}
+    >
       <div className="relative w-full aspect-square bg-surface-raised">
         <AlbumArtThumbnail track={track} size={160} shimmer={false} />
         {canPlay && (
@@ -314,6 +500,13 @@ function SongCard({
             <Play size={14} fill="black" className="text-black ml-0.5" />
           </button>
         )}
+        <button
+          className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 md:flex hidden transition-opacity"
+          onClick={(e) => { e.stopPropagation(); onContextMenu(song, e) }}
+          title="More options"
+        >
+          <MoreHorizontal size={13} className="text-white" />
+        </button>
       </div>
 
       <div className="p-2.5 flex flex-col gap-1 min-w-0">
@@ -340,23 +533,21 @@ function SongCard({
               <Info size={11} />
             </button>
             {canPlay && (
-              <>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onQueue(songToTrack(song)) }}
-                  className="p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text-primary transition-colors"
-                  title="Add to queue"
-                >
-                  <ListPlus size={11} />
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); downloadSong(song) }}
-                  className="p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text-primary transition-colors"
-                  title="Download"
-                >
-                  <Download size={11} />
-                </button>
-              </>
+              <button
+                onClick={(e) => { e.stopPropagation(); onQueue(songToTrack(song)) }}
+                className="p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text-primary transition-colors"
+                title="Add to queue"
+              >
+                <ListPlus size={11} />
+              </button>
             )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onContextMenu(song, e) }}
+              className="p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text-primary transition-colors"
+              title="More options"
+            >
+              <MoreHorizontal size={11} />
+            </button>
           </div>
         </div>
       </div>
@@ -364,43 +555,30 @@ function SongCard({
   )
 }
 
-// ─── Page jumper ──────────────────────────────────────────────────────────────
-function PageJumper({ page, totalPages, onJump }: { page: number; totalPages: number; onJump: (p: number) => void }): JSX.Element {
-  const [value, setValue] = useState(String(page))
-  useEffect(() => { setValue(String(page)) }, [page])
-
-  const commit = (): void => {
-    const n = parseInt(value, 10)
-    if (!isNaN(n) && n >= 1 && n <= totalPages) onJump(n)
-    else setValue(String(page))
-  }
-
-  return (
-    <div className="flex items-center gap-1 text-xs text-text-muted">
-      <input
-        type="text" inputMode="numeric" value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Enter') { commit(); (e.target as HTMLInputElement).blur() } }}
-        className="w-10 text-center bg-surface-overlay text-text-primary text-xs py-0.5 rounded outline-none focus:ring-1 ring-accent border border-transparent focus:border-accent/40"
-      />
-      <span>/ {totalPages}</span>
-    </div>
-  )
-}
-
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function ApiTrackerView(): JSX.Element {
-  const { playTrack, addToQueue, apiTrackerCategory, setApiTrackerCategory, apiTrackerEra, setApiTrackerEra } = useStore()
+  const {
+    playTrack, addToQueue, account,
+    apiTrackerCategory, setApiTrackerCategory,
+    apiTrackerEra, setApiTrackerEra,
+    setActiveView, setApiFilesPath,
+  } = useStore()
+
+  const canEdit = !!(account?.is_editor || account?.is_administrator)
 
   const [selectedSong, setSelectedSong] = useState<JWApiSong | null>(null)
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [stats, setStats] = useState<JWApiStats | null>(null)
   const [eras, setEras] = useState<JWApiEra[]>([])
   const [songs, setSongs] = useState<JWApiSong[]>([])
   const [count, setCount] = useState(0)
   const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const [intersecting, setIntersecting] = useState(false)
 
   const [viewMode, setViewModeState] = useState<ViewMode>(
     () => (localStorage.getItem(LS_TRACKER_VIEW) as ViewMode) || 'list'
@@ -412,10 +590,15 @@ export default function ApiTrackerView(): JSX.Element {
   const setViewMode = (v: ViewMode): void => { setViewModeState(v); localStorage.setItem(LS_TRACKER_VIEW, v) }
   const setShowSidebar = (v: boolean): void => { setShowSidebarState(v); localStorage.setItem(LS_TRACKER_SIDEBAR, String(v)) }
 
-  // Column sort: field name maps to DRF `ordering` param; prefix `-` for desc
   type OrderField = 'name' | 'credited_artists' | 'era__name' | 'category' | 'length'
   const [orderField, setOrderField] = useState<OrderField | null>(null)
   const [orderDir, setOrderDir] = useState<'asc' | 'desc'>('asc')
+
+  // Reset accumulated songs and go back to page 1
+  const resetSongs = useCallback((): void => {
+    setSongs([])
+    setPage(1)
+  }, [])
 
   const handleSort = (field: OrderField): void => {
     if (orderField === field) {
@@ -424,7 +607,7 @@ export default function ApiTrackerView(): JSX.Element {
       setOrderField(field)
       setOrderDir('asc')
     }
-    setPage(1)
+    resetSongs()
   }
 
   const ordering = orderField ? (orderDir === 'desc' ? `-${orderField}` : orderField) : undefined
@@ -439,8 +622,7 @@ export default function ApiTrackerView(): JSX.Element {
     if (apiTrackerEra) { setEra(apiTrackerEra); setApiTrackerEra('') }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleCategoryClick = useCallback((cat: Category) => { setCategory(cat); setPage(1) }, [])
-  const handleEraClick = useCallback((eraName: string) => { setEra(eraName); setPage(1) }, [])
+  const handleCategoryClick = useCallback((cat: Category) => { setCategory(cat); resetSongs() }, [resetSongs])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -452,39 +634,76 @@ export default function ApiTrackerView(): JSX.Element {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 400)
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(search)
+      resetSongs()
+    }, 400)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [search])
+  }, [search, resetSongs])
 
-  useEffect(() => { setPage(1) }, [category, era])
-
+  // Fetch — accumulates pages
   useEffect(() => {
     let cancelled = false
     setLoading(true); setError(null)
     apiFetch<JWApiPaginatedResponse>('/songs/', {
-      search: debouncedSearch || undefined,
+      // searchall searches all fields including producers (vs. search which only checks name/titles)
+      searchall: debouncedSearch || undefined,
       category: category || undefined,
       era: era || undefined,
       ordering,
       page,
       page_size: PAGE_SIZE,
     })
-      .then((data) => { if (!cancelled) { setSongs(data.results); setCount(data.count) } })
+      .then((data) => {
+        if (!cancelled) {
+          setSongs((prev) => page === 1 ? data.results : [...prev, ...data.results])
+          setCount(data.count)
+          setHasMore(data.next !== null)
+        }
+      })
       .catch((err) => { if (!cancelled) setError(err.message) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [debouncedSearch, category, era, ordering, page])
 
+  // Observe sentinel for infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([entry]) => setIntersecting(entry.isIntersecting),
+      { threshold: 0.1 }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
+  // Trigger next page when sentinel is visible
+  useEffect(() => {
+    if (intersecting && hasMore && !loading) {
+      setPage((p) => p + 1)
+    }
+  }, [intersecting, hasMore, loading])
+
   const handlePlay = useCallback((song: JWApiSong) => {
     const track = songToTrack(song)
-    const allTracks = songs.map(songToTrack)
-    playTrack(track, allTracks)
+    playTrack(track, songs.map(songToTrack))
   }, [playTrack, songs])
 
   const handleInfo = useCallback((song: JWApiSong) => { setSelectedSong(song) }, [])
   const handleQueue = useCallback((track: Track) => { addToQueue(track) }, [addToQueue])
 
-  const totalPages = Math.ceil(count / PAGE_SIZE)
+  const handleContextMenu = useCallback((song: JWApiSong, e: React.MouseEvent): void => {
+    setContextMenu({ song, x: e.clientX, y: e.clientY, showPlaylists: false })
+  }, [])
+
+  const handleShowInFiles = useCallback((song: JWApiSong): void => {
+    if (!song.path) return
+    const parts = song.path.split('/')
+    const folderPath = parts.slice(0, -1).join('/')
+    setApiFilesPath(folderPath)
+    setActiveView('api-files')
+  }, [setApiFilesPath, setActiveView])
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -494,7 +713,7 @@ export default function ApiTrackerView(): JSX.Element {
         <StatsBar stats={stats} />
 
         <div className="flex flex-col gap-2">
-          {/* Search */}
+          {/* Search — uses searchall to include producers */}
           <div className="relative w-full">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
             <input
@@ -511,9 +730,8 @@ export default function ApiTrackerView(): JSX.Element {
             )}
           </div>
 
-          {/* Second row: era + toggles */}
+          {/* Second row */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Categories sidebar toggle — desktop only */}
             <button
               onClick={() => setShowSidebar(!showSidebar)}
               className={`hidden md:flex items-center gap-1.5 px-2.5 py-2.5 md:py-2 rounded-lg text-xs transition-colors shrink-0 ${
@@ -527,10 +745,9 @@ export default function ApiTrackerView(): JSX.Element {
               <span className="hidden sm:inline">Categories</span>
             </button>
 
-            {/* Mobile: category dropdown */}
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value as Category)}
+              onChange={(e) => { setCategory(e.target.value as Category); resetSongs() }}
               className="md:hidden flex-1 min-w-0 bg-surface-overlay text-text-primary text-sm px-3 py-2.5 rounded-lg outline-none border border-transparent focus:ring-1 ring-accent focus:border-accent/40 cursor-pointer"
             >
               <option value="">All categories</option>
@@ -540,7 +757,7 @@ export default function ApiTrackerView(): JSX.Element {
               <option value="recording_session">Sessions</option>
             </select>
 
-            <div className="flex items-center bg-surface-overlay rounded-lg p-0.5 shrink-0">
+            <div className="flex items-center bg-surface-overlay rounded-lg p-0.5 shrink-0 ml-auto">
               <button
                 onClick={() => setViewMode('list')}
                 className={`p-2 md:p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
@@ -558,12 +775,12 @@ export default function ApiTrackerView(): JSX.Element {
             </div>
           </div>
 
-          {/* Active filters chips */}
+          {/* Active filter chips */}
           {(category || era) && (
             <div className="flex gap-1.5 flex-wrap">
               {category && (
                 <button
-                  onClick={() => setCategory('')}
+                  onClick={() => { setCategory(''); resetSongs() }}
                   className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-xs font-medium"
                 >
                   {CATEGORY_LABELS[category] ?? category}
@@ -572,7 +789,7 @@ export default function ApiTrackerView(): JSX.Element {
               )}
               {era && (
                 <button
-                  onClick={() => setEra('')}
+                  onClick={() => { setEra(''); resetSongs() }}
                   className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-xs font-medium"
                 >
                   {era}
@@ -584,9 +801,8 @@ export default function ApiTrackerView(): JSX.Element {
         </div>
       </div>
 
-      {/* Body: sidebar + list */}
+      {/* Body */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Category sidebar — desktop only */}
         {showSidebar && (
           <div className="hidden md:block">
             <CategorySidebar
@@ -594,15 +810,14 @@ export default function ApiTrackerView(): JSX.Element {
               eras={eras}
               selectedCategory={category}
               selectedEra={era}
-              onCategory={(c) => { setCategory(c); setPage(1) }}
-              onEra={(e) => { setEra(e); setPage(1) }}
+              onCategory={(c) => { setCategory(c); resetSongs() }}
+              onEra={(e) => { setEra(e); resetSongs() }}
             />
           </div>
         )}
 
-        {/* Main content */}
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          {/* Column headers — desktop list only */}
+          {/* Column headers */}
           {viewMode === 'list' && (
             <div className="hidden md:block px-5 pb-1 shrink-0">
               {(() => {
@@ -637,7 +852,7 @@ export default function ApiTrackerView(): JSX.Element {
 
           {/* Song list / grid */}
           <div className="flex-1 overflow-y-auto px-3 md:px-5 pb-4">
-            {loading ? (
+            {loading && songs.length === 0 ? (
               <div className="flex items-center justify-center h-40 gap-2 text-text-muted">
                 <Loader2 size={18} className="animate-spin" />
                 <span className="text-sm">Loading…</span>
@@ -645,7 +860,7 @@ export default function ApiTrackerView(): JSX.Element {
             ) : error ? (
               <div className="flex flex-col items-center justify-center h-40 gap-2 text-center">
                 <p className="text-text-muted text-sm">Failed to load: {error}</p>
-                <button onClick={() => setPage((p) => p)} className="text-accent text-sm underline">Retry</button>
+                <button onClick={resetSongs} className="text-accent text-sm underline">Retry</button>
               </div>
             ) : songs.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-2">
@@ -653,41 +868,62 @@ export default function ApiTrackerView(): JSX.Element {
                 <p className="text-text-muted text-sm">No songs found</p>
               </div>
             ) : viewMode === 'list' ? (
-              <div className="space-y-0.5">
-                {songs.map((song) => (
-                  <SongRow key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} onQueue={handleQueue} />
-                ))}
-              </div>
+              <>
+                <div className="space-y-0.5">
+                  {songs.map((song) => (
+                    <SongRow
+                      key={song.id}
+                      song={song}
+                      onPlay={handlePlay}
+                      onCategoryClick={handleCategoryClick}
+                      onInfo={handleInfo}
+                      onQueue={handleQueue}
+                      onContextMenu={handleContextMenu}
+                    />
+                  ))}
+                </div>
+                <div ref={sentinelRef} className="h-4" />
+                {loading && <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-text-muted" /></div>}
+                {!hasMore && songs.length > 0 && <p className="text-center text-text-muted text-xs py-4">{count.toLocaleString()} songs total</p>}
+              </>
             ) : (
-              <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-                {songs.map((song) => (
-                  <SongCard key={song.id} song={song} onPlay={handlePlay} onCategoryClick={handleCategoryClick} onInfo={handleInfo} onQueue={handleQueue} />
-                ))}
-              </div>
+              <>
+                <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
+                  {songs.map((song) => (
+                    <SongCard
+                      key={song.id}
+                      song={song}
+                      onPlay={handlePlay}
+                      onCategoryClick={handleCategoryClick}
+                      onInfo={handleInfo}
+                      onQueue={handleQueue}
+                      onContextMenu={handleContextMenu}
+                    />
+                  ))}
+                </div>
+                <div ref={sentinelRef} className="h-4" />
+                {loading && <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-text-muted" /></div>}
+                {!hasMore && songs.length > 0 && <p className="text-center text-text-muted text-xs py-4">{count.toLocaleString()} songs total</p>}
+              </>
             )}
           </div>
-
-          {/* Pagination */}
-          {!loading && totalPages > 1 && (
-            <div className="px-4 md:px-5 py-3 shrink-0 border-t border-[var(--border)] flex items-center justify-between gap-2">
-              <span className="text-text-muted text-xs">
-                {((page - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(page * PAGE_SIZE, count).toLocaleString()} of {count.toLocaleString()}
-              </span>
-              <div className="flex items-center gap-1">
-                <button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className="p-2 rounded-lg hover:bg-surface-overlay disabled:opacity-30 disabled:pointer-events-none transition-colors">
-                  <ChevronLeft size={16} className="text-text-muted" />
-                </button>
-                <PageJumper page={page} totalPages={totalPages} onJump={setPage} />
-                <button disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className="p-2 rounded-lg hover:bg-surface-overlay disabled:opacity-30 disabled:pointer-events-none transition-colors">
-                  <ChevronRight size={16} className="text-text-muted" />
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
       <SongInfoModal song={selectedSong} onClose={() => setSelectedSong(null)} />
+
+      {contextMenu && (
+        <SongContextMenu
+          state={contextMenu}
+          onClose={() => setContextMenu(null)}
+          onInfo={() => handleInfo(contextMenu.song)}
+          onQueue={() => handleQueue(songToTrack(contextMenu.song))}
+          onShowInFiles={() => handleShowInFiles(contextMenu.song)}
+          onEdit={() => setActiveView('editor')}
+          canEdit={canEdit}
+          onTogglePlaylists={() => setContextMenu((prev) => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null)}
+        />
+      )}
     </div>
   )
 }

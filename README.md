@@ -5,7 +5,7 @@ A browser-based music player for the [Juice WRLD API](https://player.juicewrldap
 > **This is the `web` branch** — API-only, no local library
 > For the full desktop app (Electron + local library), see the [`main` branch](https://github.com/leanwrldd/unreleased/tree/main).
 
-![Version](https://img.shields.io/badge/version-1.4.0-blue)
+![Version](https://img.shields.io/badge/version-1.5.0-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -66,20 +66,22 @@ npm run preview
 - Add synced lyrics editor
 - Clean up the UI
 - Add submission page
-- Remove page navigation in the tracker and make it endless isntead
-- Add radio mode
-- in a songlist, context menu to add to queue, add to playlist, show in files and edit
-- transfer liked songs to playlists
-- make the side menu closeable
-- fix sorting, fix search
-- add dashboard (to show how many songs still dont have lyrics etc.)
-- make playlists shareable. have their cover customizable
-- rework playlists ui
-- rework compilation ui
-- add "similar songs"
-- add cdq remasters of unsurfaced songs
+- Add dashboard (how many songs still need lyrics, etc.)
+- Make playlists shareable with customizable covers
+- Rework playlists UI
+- Rework compilation UI
+- Add "similar songs"
+- Add CDQ remasters of unsurfaced songs
 
 ## Changelog
+
+### v1.5.0 — 2026-06-19
+- **New** Tracker: infinite/endless scroll — no more page buttons; songs load automatically as you scroll
+- **New** Context menu — right-click any song (or tap ···) to: Song info, Add to queue, Add to playlist, Show in Files, Download, Edit (editors/admins only)
+- **New** Sidebar: collapsible to icon-only strip — click the chevron at the bottom to collapse/expand; state persists
+- **Fix** Search now finds producer names — uses the API's `searchall` param instead of `search`
+- **Fix** Sorting works correctly — clicking column headers sorts the full dataset via the API
+- **Remove** GitHub and Discord links removed from sidebar (still accessible in Settings)
 
 ### v1.4.0 — 2026-06-18
 - **Fix** Radio feature removed — radio tab and toggle button no longer appear

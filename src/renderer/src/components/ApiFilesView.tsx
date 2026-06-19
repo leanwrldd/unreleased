@@ -136,7 +136,7 @@ function urlToPath(pathname: string): string {
 }
 
 export default function ApiFilesView(): JSX.Element {
-  const { playTrack, addToQueue } = useStore()
+  const { playTrack, addToQueue, apiFilesPath, setApiFilesPath } = useStore()
 
   const [currentPath, setCurrentPath] = useState('')
   const [entries, setEntries] = useState<JWApiFileEntry[]>([])
@@ -197,9 +197,10 @@ export default function ApiFilesView(): JSX.Element {
   const navigateRef = useRef(navigate)
   useEffect(() => { navigateRef.current = navigate }, [navigate])
 
-  // On mount: read path from URL; listen for browser back/forward within /files
+  // On mount: read path from URL (or apiFilesPath from store); listen for browser back/forward
   useEffect(() => {
-    const initialPath = urlToPath(window.location.pathname)
+    const initialPath = apiFilesPath || urlToPath(window.location.pathname)
+    if (apiFilesPath) setApiFilesPath('')  // consume it
     navigateRef.current(initialPath, false)
 
     const handlePopstate = (): void => {

@@ -1,11 +1,24 @@
-import { SearchCode, HardDrive, Settings, Github, MessageCircle, Archive, ShieldCheck, ListMusic, LogIn, LogOut } from 'lucide-react'
+import { useState } from 'react'
+import { SearchCode, HardDrive, Settings, Archive, ShieldCheck, ListMusic, LogIn, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
 
+const LS_COLLAPSED = 'sidebar:collapsed'
+
 export default function Sidebar(): JSX.Element {
   const { activeView, setActiveView, setShowSettings, account, logoutAccount, setShowUserAuth } = useStore()
   const isAdmin = !!account?.is_administrator
+
+  const [collapsed, setCollapsed] = useState<boolean>(
+    () => localStorage.getItem(LS_COLLAPSED) === 'true'
+  )
+
+  const toggle = (): void => {
+    const next = !collapsed
+    setCollapsed(next)
+    localStorage.setItem(LS_COLLAPSED, String(next))
+  }
 
   const items: { icon: React.ReactNode; label: string; view: ViewType }[] = [
     { icon: <SearchCode size={18} />, label: 'Tracker', view: 'api-tracker' },
@@ -15,39 +28,45 @@ export default function Sidebar(): JSX.Element {
   ]
 
   return (
-    <aside className="hidden md:flex flex-col h-full bg-sidebar w-60 shrink-0 border-r border-[var(--border)]">
-      <div className="px-5 pt-6 pb-4">
-        <div className="flex flex-col items-center gap-1">
-          <img src={logo} alt="unreleased" className="h-32 w-auto object-contain" />
+    <aside
+      className={`hidden md:flex flex-col h-full bg-sidebar shrink-0 border-r border-[var(--border)] transition-all duration-200 ${collapsed ? 'w-16' : 'w-60'}`}
+    >
+      {/* Logo */}
+      <div className={`pt-5 pb-4 flex flex-col items-center gap-1 shrink-0 ${collapsed ? 'px-2' : 'px-5'}`}>
+        <img src={logo} alt="unreleased" className={`object-contain transition-all ${collapsed ? 'h-8 w-8' : 'h-32 w-auto'}`} />
+        {!collapsed && (
           <span
             className="text-text-primary text-sm uppercase select-none"
             style={{ fontFamily: "'Josefin Sans', sans-serif", fontWeight: 300, letterSpacing: '0.35em' }}
           >
             unreleased
           </span>
-        </div>
+        )}
       </div>
 
-      <nav className="px-3 space-y-1 flex-1">
+      {/* Nav items */}
+      <nav className={`space-y-1 flex-1 ${collapsed ? 'px-2' : 'px-3'}`}>
         {items.map(({ icon, label, view }) => (
           <button
             key={view}
             onClick={() => setActiveView(view)}
-            className={`flex items-center gap-3 w-full px-3 py-2 rounded text-sm font-medium transition-colors ${
+            title={collapsed ? label : undefined}
+            className={`flex items-center w-full py-2 rounded text-sm font-medium transition-colors ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'} ${
               activeView === view
                 ? 'bg-surface-raised text-text-primary'
                 : 'text-text-secondary hover:text-text-primary hover:bg-surface-raised'
             }`}
           >
             {icon}
-            <span className="flex-1 text-left">{label}</span>
+            {!collapsed && <span className="flex-1 text-left">{label}</span>}
           </button>
         ))}
       </nav>
 
-      <div className="px-3 pb-4 space-y-1">
+      {/* Bottom section */}
+      <div className={`pb-4 space-y-1 ${collapsed ? 'px-2' : 'px-3'}`}>
         {account ? (
-          <div className="flex items-center gap-2 px-3 py-2 rounded text-sm">
+          <div className={`flex items-center py-2 rounded text-sm ${collapsed ? 'justify-center px-2' : 'gap-2 px-3'}`}>
             {account.discord_avatar ? (
               <img src={account.discord_avatar} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
             ) : (
@@ -55,58 +74,57 @@ export default function Sidebar(): JSX.Element {
                 {(account.display_name || account.discord_username || '?').charAt(0).toUpperCase()}
               </div>
             )}
-            <span className="flex-1 min-w-0 truncate text-text-secondary">{account.display_name || account.discord_username}</span>
-            <button onClick={() => logoutAccount()} title="Log out" className="text-text-muted hover:text-text-primary transition-colors shrink-0">
-              <LogOut size={16} />
-            </button>
+            {!collapsed && (
+              <>
+                <span className="flex-1 min-w-0 truncate text-text-secondary">{account.display_name || account.discord_username}</span>
+                <button onClick={() => logoutAccount()} title="Log out" className="text-text-muted hover:text-text-primary transition-colors shrink-0">
+                  <LogOut size={16} />
+                </button>
+              </>
+            )}
           </div>
         ) : (
           <button
             onClick={() => setShowUserAuth(true)}
-            className="flex items-center gap-3 w-full px-3 py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+            title={collapsed ? 'Log in' : undefined}
+            className={`flex items-center w-full py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'}`}
           >
             <LogIn size={18} />
-            <span>Log in</span>
+            {!collapsed && <span>Log in</span>}
           </button>
         )}
         {isAdmin && (
           <button
             onClick={() => setActiveView('admin')}
-            className={`flex items-center gap-3 w-full px-3 py-2 rounded text-sm font-medium transition-colors ${
+            title={collapsed ? 'Admin' : undefined}
+            className={`flex items-center w-full py-2 rounded text-sm font-medium transition-colors ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'} ${
               activeView === 'admin'
                 ? 'bg-surface-raised text-text-primary'
                 : 'text-text-secondary hover:text-text-primary hover:bg-surface-raised'
             }`}
           >
             <ShieldCheck size={18} />
-            <span>Admin</span>
+            {!collapsed && <span>Admin</span>}
           </button>
         )}
         <button
           onClick={() => setShowSettings(true)}
-          className="flex items-center gap-3 w-full px-3 py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+          title={collapsed ? 'Settings' : undefined}
+          className={`flex items-center w-full py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'}`}
         >
           <Settings size={18} />
-          <span>Settings</span>
+          {!collapsed && <span>Settings</span>}
         </button>
-        <a
-          href="https://github.com/leanwrldd/unreleased"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-3 w-full px-3 py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+
+        {/* Collapse toggle */}
+        <button
+          onClick={toggle}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className={`flex items-center w-full py-2 rounded text-sm font-medium text-text-muted hover:text-text-primary hover:bg-surface-raised transition-colors ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'}`}
         >
-          <Github size={18} />
-          <span>GitHub</span>
-        </a>
-        <a
-          href="https://discord.gg/qq7DMNkBJ4"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-3 w-full px-3 py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-        >
-          <MessageCircle size={18} />
-          <span>Discord</span>
-        </a>
+          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          {!collapsed && <span>Collapse</span>}
+        </button>
       </div>
     </aside>
   )
