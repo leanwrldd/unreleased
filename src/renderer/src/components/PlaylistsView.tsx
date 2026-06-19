@@ -1,14 +1,16 @@
 import { useEffect, useState, useCallback } from 'react'
-import { ListMusic, Play, Loader2, Plus, Trash2, Pencil, ArrowLeft, ArrowUp, ArrowDown, X, Check, Music2 } from 'lucide-react'
+import { ListMusic, Play, Loader2, Plus, Trash2, Pencil, ArrowLeft, ArrowUp, ArrowDown, X, Check, Music2, Heart } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
 import type { PlaylistDetail } from '../lib/userApi'
 import { Track } from '../types'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 import { buildImageUrl } from '../lib/juicewrldApi'
+import LikedSongsView from './LikedSongsView'
 
 export default function PlaylistsView(): JSX.Element {
-  const { account, playlists, refreshPlaylists, playTrack, setShowUserAuth } = useStore()
+  const { account, playlists, refreshPlaylists, playTrack, setShowUserAuth, likedTrackIds } = useStore()
+  const [showLiked, setShowLiked] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [detail, setDetail] = useState<PlaylistDetail | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
@@ -86,6 +88,22 @@ export default function PlaylistsView(): JSX.Element {
       const updated = await userApi.reorderPlaylist(selectedId, ids)
       setDetail(updated)
     } catch {}
+  }
+
+  if (showLiked) {
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="px-5 pt-4 shrink-0">
+          <button
+            onClick={() => setShowLiked(false)}
+            className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-sm transition-colors"
+          >
+            <ArrowLeft size={15} /> Playlists
+          </button>
+        </div>
+        <LikedSongsView />
+      </div>
+    )
   }
 
   if (!account) {
@@ -237,6 +255,17 @@ export default function PlaylistsView(): JSX.Element {
             <button onClick={() => { setCreating(false); setNewName('') }} className="p-2.5 rounded-xl text-text-muted hover:text-text-primary"><X size={16} /></button>
           </div>
         )}
+
+        <div className="grid gap-4 mb-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
+          {/* Liked Songs — always shown, non-deletable */}
+          <button onClick={() => setShowLiked(true)} className="group text-left">
+            <div className="aspect-square rounded-xl bg-gradient-to-br from-accent/50 to-accent/10 flex items-center justify-center mb-2 group-hover:scale-[1.02] transition-transform">
+              <Heart size={36} className="text-accent" fill="currentColor" />
+            </div>
+            <p className="text-text-primary text-sm font-medium truncate">Liked Songs</p>
+            <p className="text-text-muted text-xs">{likedTrackIds.length} {likedTrackIds.length === 1 ? 'track' : 'tracks'}</p>
+          </button>
+        </div>
 
         {playlists.length === 0 ? (
           <p className="text-text-muted text-sm">No playlists yet. Create one to get started.</p>

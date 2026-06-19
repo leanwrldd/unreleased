@@ -1,4 +1,4 @@
-import { SearchCode, HardDrive, Settings, Github, MessageCircle, Archive, ShieldCheck, PenLine, Heart, ListMusic, LogIn, LogOut } from 'lucide-react'
+import { SearchCode, HardDrive, Settings, Github, MessageCircle, Archive, ShieldCheck, ListMusic, LogIn, LogOut } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
@@ -11,9 +11,7 @@ export default function Sidebar(): JSX.Element {
     { icon: <SearchCode size={18} />, label: 'Tracker', view: 'api-tracker' },
     { icon: <Archive size={18} />, label: 'Compilation', view: 'compilation' },
     { icon: <HardDrive size={18} />, label: 'Files', view: 'api-files' },
-    { icon: <Heart size={18} />, label: 'Liked Songs', view: 'liked' },
     { icon: <ListMusic size={18} />, label: 'Playlists', view: 'playlists' },
-    { icon: <PenLine size={18} />, label: 'Contribute', view: 'editor' },
   ]
 
   return (
