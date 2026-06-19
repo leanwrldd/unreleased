@@ -540,6 +540,7 @@ export default function ApiTrackerView(): JSX.Element {
     apiTrackerCategory, setApiTrackerCategory,
     apiTrackerEra, setApiTrackerEra,
     setActiveView, setApiFilesPath,
+    setQueueMode,
   } = useStore()
 
   const canEdit = !!(account?.is_editor || account?.is_administrator)
@@ -744,14 +745,32 @@ export default function ApiTrackerView(): JSX.Element {
 
   const handlePlay = useCallback((song: JWApiSong) => {
     const track = songToTrack(song)
-    // Exclude unsurfaced + recording_session from shuffle context unless user explicitly filtered to them
-    const context = sortedSongs.filter((s) => {
-      if (!s.path) return false
-      if (!category) return s.category === 'released' || s.category === 'unreleased'
-      return true
-    }).map(songToTrack)
-    playTrack(track, context.length > 0 ? context : [track])
-  }, [playTrack, sortedSongs, category])
+    const hasFilters = !!(category || era || debouncedSearch)
+    const playable = sortedSongs.filter((s) => !!s.path)
+
+    if (!hasFilters) {
+      // No filters → Random mode: shuffle through released + unreleased only
+      const context = playable
+        .filter((s) => s.category === 'released' || s.category === 'unreleased')
+        .map(songToTrack)
+      playTrack(track, context.length > 0 ? context : [track])
+      setQueueMode(true, null)
+    } else if (orderField) {
+      // Sort mode + filter → all songs already loaded, queue them all at once
+      const context = playable.map(songToTrack)
+      playTrack(track, context.length > 0 ? context : [track])
+      setQueueMode(false, null)
+    } else {
+      // Scroll mode + filter → queue first 50, lazy-fetch rest from API
+      const initial = playable.slice(0, 50).map(songToTrack)
+      playTrack(track, initial.length > 0 ? initial : [track])
+      const needsMore = count > sortedSongs.length || (hasMore && sortedSongs.length >= 50)
+      setQueueMode(false, needsMore ? {
+        category, era, search: debouncedSearch,
+        page: 2, hasMore: true, total: count,
+      } : null)
+    }
+  }, [playTrack, sortedSongs, category, era, debouncedSearch, count, hasMore, orderField, setQueueMode])
 
   const handleInfo = useCallback((song: JWApiSong) => { setSelectedSong(song) }, [])
   const handleQueue = useCallback((track: Track) => { addToQueue(track) }, [addToQueue])

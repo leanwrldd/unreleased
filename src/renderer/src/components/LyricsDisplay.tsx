@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore'
 import { seekAudio } from './Player'
 
 export default function LyricsDisplay(): JSX.Element {
-  const { currentTrackFull, currentTime } = useStore()
+  const { currentTrackFull, currentTime, account } = useStore()
   const containerRef = useRef<HTMLDivElement>(null)
   const activeRef = useRef<HTMLDivElement>(null)
 
@@ -28,14 +28,18 @@ export default function LyricsDisplay(): JSX.Element {
     }
   }, [currentLineIdx])
 
+  const isEditor = account?.is_editor || account?.is_administrator
+
   if (!rawLyrics) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-8">
         <div className="text-5xl opacity-20">♪</div>
         <p className="text-text-muted text-sm">No lyrics available</p>
-        <p className="text-text-muted text-xs">
-          Right-click a track → "Edit info & lyrics" to add lyrics
-        </p>
+        {isEditor && (
+          <p className="text-text-muted text-xs">
+            Right-click a track → "Edit info & lyrics" to add lyrics
+          </p>
+        )}
       </div>
     )
   }

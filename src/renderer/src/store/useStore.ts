@@ -82,6 +82,10 @@ interface StoreActions {
   apiFilesPath: string
   setApiFilesPath: (path: string) => void
 
+  // Queue mode
+  setQueueMode: (randomMode: boolean, filter: AppStore['queueFilter']) => void
+  appendQueueItems: (tracks: Track[]) => void
+
   // Public account (favorites + playlists)
   setShowUserAuth: (show: boolean) => void
   loadAccount: () => Promise<void>
@@ -124,6 +128,8 @@ interface AppStore {
   likedTrackIds: string[]
   apiTrackerCategory: string
   apiTrackerEra: string
+  isRandomMode: boolean
+  queueFilter: { category: string; era: string; search: string; page: number; hasMore: boolean; total: number } | null
   account: AccountUser | null
   playlists: PlaylistSummary[]
   showUserAuth: boolean
@@ -169,6 +175,8 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   apiTrackerCategory: '',
   apiTrackerEra: '',
   apiFilesPath: '',
+  isRandomMode: false,
+  queueFilter: null,
   account: null,
   playlists: [],
   showUserAuth: false,
@@ -348,6 +356,8 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   setApiTrackerCategory: (cat) => set({ apiTrackerCategory: cat }),
   setApiTrackerEra: (era) => set({ apiTrackerEra: era }),
   setApiFilesPath: (path) => set({ apiFilesPath: path }),
+  setQueueMode: (randomMode, filter) => set({ isRandomMode: randomMode, queueFilter: filter }),
+  appendQueueItems: (tracks) => set((s) => ({ queue: [...s.queue, ...tracks] })),
 
   // ─── Public account ─────────────────────────────────────────────────────────────
   setShowUserAuth: (showUserAuth) => set({ showUserAuth }),

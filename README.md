@@ -5,7 +5,7 @@ A browser-based music player for the [Juice WRLD API](https://player.juicewrldap
 > **This is the `web` branch** — API-only, no local library
 > For the full desktop app (Electron + local library), see the [`main` branch](https://github.com/leanwrldd/unreleased/tree/main).
 
-![Version](https://img.shields.io/badge/version-1.5.1-blue)
+![Version](https://img.shields.io/badge/version-1.5.2-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -75,12 +75,17 @@ npm run preview
 
 ## Changelog
 
-### v1.5.1 — 2026-06-19
-- **Fix** Tracker: songs now show on initial load (debounce was clearing songs 400ms after mount)
-- **Fix** Tracker: infinite scroll now works correctly — songs accumulate as you scroll
-- **Fix** Tracker: duration column alignment fixed for `--:--` (tabular-nums + wider column)
-- **Fix** Tracker: "Add to queue" removed from song row buttons — only available in context menu (···)
-- **Confirm** Context menu: "Show in Files" present ✓
+### v1.5.2 — 2026-06-19
+- **Fix** Tracker: songs show on initial load (debounce was clearing songs 400ms after mount)
+- **Fix** Tracker: infinite scroll works correctly — songs accumulate as you scroll
+- **Fix** Tracker: category sidebar is now scrollable so all eras are reachable
+- **Fix** Tracker: sorting loads the full library client-side (API has no `ordering` param) — first click asc, second desc, third clears sort
+- **Fix** Queue: shuffle/random mode excludes unsurfaced tracks by default
+- **Fix** Tracker: duration column alignment (`--:--` now right-aligned, tabular-nums)
+- **Fix** Tracker: "Add to queue" removed from song row — context menu only
+- **New** Queue: playing with no filters shows "Random mode" label in queue panel
+- **New** Queue: playing with filters lazy-loads the queue — starts with 50 songs, auto-fetches more as tracks end
+- **New** Lyrics: editor-only hint ("Right-click → Edit info & lyrics") hidden for regular users
 
 ### v1.5.0 — 2026-06-19
 - **New** Tracker: infinite/endless scroll — no more page buttons; songs load automatically as you scroll

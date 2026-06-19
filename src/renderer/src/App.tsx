@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useStore } from './store/useStore'
 import { ViewType } from './types'
+import { apiFetch, songToTrack, JWApiPaginatedResponse } from './lib/juicewrldApi'
 
 function getViewFromPath(pathname: string): ViewType {
   if (pathname.startsWith('/files')) return 'api-files'
@@ -42,6 +43,35 @@ function lightenHex(hex: string, amount: number): string {
 
 export default function App(): JSX.Element {
   const { showNowPlaying, showQueue, showSettings, activeView, theme, accentColor, loadAccount, completeDiscordLogin, showUserAuth, setShowUserAuth } = useStore()
+  const queueIndex = useStore((s) => s.queueIndex)
+  const queueLength = useStore((s) => s.queue.length)
+
+  // Auto-fetch next queue page when running low (lazy queue for filtered playback)
+  useEffect(() => {
+    const { queueFilter, queue, queueIndex: qi } = useStore.getState()
+    if (!queueFilter || !queueFilter.hasMore) return
+    const remaining = queue.length - (qi + 1)
+    if (remaining > 15) return
+
+    let cancelled = false
+    apiFetch<JWApiPaginatedResponse>('/songs/', {
+      searchall: queueFilter.search || undefined,
+      category: queueFilter.category || undefined,
+      era: queueFilter.era || undefined,
+      page: queueFilter.page,
+      page_size: 50,
+    }).then((data) => {
+      if (cancelled) return
+      const newTracks = data.results.filter((s) => !!s.path).map(songToTrack)
+      useStore.setState((s) => ({
+        queue: [...s.queue, ...newTracks],
+        queueFilter: s.queueFilter
+          ? { ...s.queueFilter, page: s.queueFilter.page + 1, hasMore: data.next !== null }
+          : null,
+      }))
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [queueIndex, queueLength])
 
   // Sync view from URL on mount + handle back/forward
   useEffect(() => {

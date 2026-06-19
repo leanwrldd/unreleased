@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
-import { X, GripVertical, ListMusic, Trash2 } from 'lucide-react'
+import { X, GripVertical, ListMusic, Trash2, Shuffle } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 import { formatDuration } from '../lib/lyrics'
@@ -8,7 +8,7 @@ import { useResizablePanel } from '../hooks/useResizablePanel'
 
 export default function QueuePanel(): JSX.Element {
   const {
-    queue, queueIndex, currentTrack, isPlaying,
+    queue, queueIndex, currentTrack, isPlaying, isRandomMode, queueFilter,
     setShowQueue, removeFromQueue, clearQueue, reorderQueue, playTrack
   } = useStore()
 
@@ -95,10 +95,13 @@ export default function QueuePanel(): JSX.Element {
           {/* Upcoming */}
           {upcoming.length > 0 ? (
             <div className="px-4 pb-6">
-              <p className="text-text-muted text-xs uppercase tracking-widest px-1 mb-2">
-                Next Up · {upcoming.length}
-              </p>
-              {upcoming.map((track, i) => (
+              <div className="flex items-center gap-1.5 px-1 mb-2">
+                {isRandomMode && <Shuffle size={11} className="text-accent" />}
+                <p className="text-text-muted text-xs uppercase tracking-widest">
+                  {isRandomMode ? 'Random mode' : 'Next Up'} · {upcoming.length}{queueFilter?.hasMore ? '+' : ''}
+                </p>
+              </div>
+              {upcoming.slice(0, 50).map((track, i) => (
                 <div
                   key={`${track.id}-${queueIndex + 1 + i}`}
                   draggable
@@ -118,6 +121,11 @@ export default function QueuePanel(): JSX.Element {
                   />
                 </div>
               ))}
+              {upcoming.length > 50 && (
+                <p className="text-text-muted text-xs text-center py-2 opacity-50">
+                  +{upcoming.length - 50}{queueFilter?.hasMore ? '+' : ''} more in queue
+                </p>
+              )}
             </div>
           ) : (
             !currentTrack && (
