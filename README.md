@@ -5,7 +5,7 @@ A browser-based music player for the [Juice WRLD API](https://player.juicewrldap
 > **This is the `web` branch** — API-only, no local library
 > For the full desktop app (Electron + local library), see the [`main` branch](https://github.com/leanwrldd/unreleased/tree/main).
 
-![Version](https://img.shields.io/badge/version-1.5.2-blue)
+![Version](https://img.shields.io/badge/version-1.5.3-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -74,6 +74,11 @@ npm run preview
 - Add CDQ remasters of unsurfaced songs
 
 ## Changelog
+
+### v1.5.3 — 2026-06-19
+- **New** Playlist page: full Spotify-style hero — large 2×2 cover mosaic, gradient background, bold name, song count + total duration, Play and Shuffle buttons
+- **New** Player: next song preloads into the inactive audio slot while the current track is playing — no gap on track change (linear/repeat modes)
+- **Improve** Playlist library grid: refined card design with hover effects and better placeholder art
 
 ### v1.5.2 — 2026-06-19
 - **Fix** Tracker: songs show on initial load (debounce was clearing songs 400ms after mount)

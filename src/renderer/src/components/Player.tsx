@@ -122,6 +122,28 @@ export default function Player(): JSX.Element {
     return next
   }
 
+  // Preload next track into inactive slot (skip shuffle mode — can't predict next)
+  useEffect(() => {
+    if (!isPlaying || queue.length === 0 || cfActive.current) return
+    let nextIdx: number
+    if (repeat === 'one') nextIdx = queueIndex
+    else if (shuffle) return // random — can't preload
+    else {
+      nextIdx = queueIndex + 1
+      if (nextIdx >= queue.length) {
+        if (repeat === 'all') nextIdx = 0
+        else return
+      }
+    }
+    const nextTrackData = queue[nextIdx]
+    if (!nextTrackData) return
+    const url = nextTrackData.streamUrl ?? `file:///${nextTrackData.path.replace(/\\/g, '/')}`
+    const na = getNext()
+    if (!na || na.src === url) return
+    na.src = url
+    na.load()
+  }, [queueIndex, queue.length, isPlaying, repeat, shuffle])
+
   // Expose seek to LyricsDisplay
   useEffect(() => {
     _seek = (t) => {
@@ -251,7 +273,8 @@ export default function Player(): JSX.Element {
             cfTargetIdx.current = nextIdx
 
             const url = nextTrackData.streamUrl ?? `file:///${nextTrackData.path.replace(/\\/g, '/')}`
-            na.src = url
+            // Only reassign src if not already preloaded
+            if (na.src !== url) na.src = url
             na.volume = 0
             na.play().catch(console.error)
 
