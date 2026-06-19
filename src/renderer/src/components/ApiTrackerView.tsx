@@ -556,7 +556,10 @@ export default function ApiTrackerView(): JSX.Element {
   const [error, setError] = useState<string | null>(null)
 
   const sentinelRef = useRef<HTMLDivElement>(null)
-  const [intersecting, setIntersecting] = useState(false)
+  // Refs for scroll logic — avoids stale closure issues in observer callback
+  const hasMoreRef = useRef(false)
+  const loadingRef = useRef(true)
+  const sentinelVisibleRef = useRef(false)
 
   const [viewMode, setViewModeState] = useState<ViewMode>(
     () => (localStorage.getItem(LS_TRACKER_VIEW) as ViewMode) || 'list'
@@ -625,7 +628,8 @@ export default function ApiTrackerView(): JSX.Element {
   // Fetch — accumulates pages
   useEffect(() => {
     let cancelled = false
-    setLoading(true); setError(null); setIntersecting(false)
+    loadingRef.current = true
+    setLoading(true); setError(null)
     apiFetch<JWApiPaginatedResponse>('/songs/', {
       // searchall searches all fields including producers (vs. search which only checks name/titles)
       searchall: debouncedSearch || undefined,
@@ -639,11 +643,22 @@ export default function ApiTrackerView(): JSX.Element {
         if (!cancelled) {
           setSongs((prev) => page === 1 ? data.results : [...prev, ...data.results])
           setCount(data.count)
-          setHasMore(data.next !== null)
+          const more = data.next !== null
+          setHasMore(more)
+          hasMoreRef.current = more
         }
       })
       .catch((err) => { if (!cancelled) setError(err.message) })
-      .finally(() => { if (!cancelled) setLoading(false) })
+      .finally(() => {
+        if (!cancelled) {
+          loadingRef.current = false
+          setLoading(false)
+          // Sentinel stayed in viewport the whole time — load next page immediately
+          if (sentinelVisibleRef.current && hasMoreRef.current) {
+            setPage((p) => p + 1)
+          }
+        }
+      })
     return () => { cancelled = true }
   }, [debouncedSearch, category, era, ordering, page])
 
@@ -651,20 +666,16 @@ export default function ApiTrackerView(): JSX.Element {
   useEffect(() => {
     const el = sentinelRef.current
     if (!el) return
-    const obs = new IntersectionObserver(
-      ([entry]) => setIntersecting(entry.isIntersecting),
-      { threshold: 0.1 }
-    )
+    const obs = new IntersectionObserver(([entry]) => {
+      sentinelVisibleRef.current = entry.isIntersecting
+      // User scrolled to sentinel while we weren't loading
+      if (entry.isIntersecting && hasMoreRef.current && !loadingRef.current) {
+        setPage((p) => p + 1)
+      }
+    }, { threshold: 0.1 })
     obs.observe(el)
     return () => obs.disconnect()
   }, [])
-
-  // Trigger next page when sentinel is visible
-  useEffect(() => {
-    if (intersecting && hasMore && !loading) {
-      setPage((p) => p + 1)
-    }
-  }, [intersecting, hasMore, loading])
 
   const handlePlay = useCallback((song: JWApiSong) => {
     const track = songToTrack(song)
