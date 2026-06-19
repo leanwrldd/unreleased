@@ -328,14 +328,7 @@ export default function ApiCompilationView(): JSX.Element {
   const hasRoot = !!tabRoots[activeTab]
   const isLoading = discovering || browsing
 
-  const allFolders = entries.filter(e => e.type === 'directory')
-  // In the singles tab, strip out anything that looks like a SoundCloud/mixtape folder
-  const folders = activeTab === 'singles'
-    ? allFolders.filter(f => {
-        const l = f.name.toLowerCase()
-        return !l.includes('soundcloud') && !l.includes('mixtape')
-      })
-    : allFolders
+  const folders = entries.filter(e => e.type === 'directory')
   const audioFiles = entries.filter(e => e.type === 'file' && isAudio(e.name))
   const studioAlbums = folders.filter(f => albumType(f.name) === 'studio')
   const mixtapes = folders.filter(f => albumType(f.name) === 'mixtape')
