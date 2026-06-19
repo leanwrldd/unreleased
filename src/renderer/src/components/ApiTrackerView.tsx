@@ -334,11 +334,9 @@ function SongContextMenu({
 
 // ─── Action buttons (shared) ──────────────────────────────────────────────────
 function SongActions({
-  song, onInfo, onQueue, onContextMenu, size = 14,
+  onInfo, onContextMenu, size = 14,
 }: {
-  song: JWApiSong
   onInfo: () => void
-  onQueue: (track: Track) => void
   onContextMenu: (e: React.MouseEvent) => void
   size?: number
 }): JSX.Element {
@@ -351,15 +349,6 @@ function SongActions({
       >
         <Info size={size} />
       </button>
-      {song.path && (
-        <button
-          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all shrink-0"
-          onClick={(e) => { e.stopPropagation(); onQueue(songToTrack(song)) }}
-          title="Add to queue"
-        >
-          <ListPlus size={size} />
-        </button>
-      )}
       <button
         className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all shrink-0"
         onClick={(e) => { e.stopPropagation(); onContextMenu(e) }}
@@ -373,13 +362,12 @@ function SongActions({
 
 // ─── Song row (list mode) ─────────────────────────────────────────────────────
 function SongRow({
-  song, onPlay, onCategoryClick, onInfo, onQueue, onContextMenu,
+  song, onPlay, onCategoryClick, onInfo, onContextMenu,
 }: {
   song: JWApiSong
   onPlay: (song: JWApiSong) => void
   onCategoryClick: (cat: Category) => void
   onInfo: (song: JWApiSong) => void
-  onQueue: (track: Track) => void
   onContextMenu: (song: JWApiSong, e: React.MouseEvent) => void
 }): JSX.Element {
   const track = songToTrack(song)
@@ -429,11 +417,11 @@ function SongRow({
       >
         {CATEGORY_LABELS[song.category] ?? song.category}
       </button>
-      <span className="hidden md:block text-text-muted text-xs w-10 text-right shrink-0">{formatDur(parseDuration(song.length))}</span>
+      <span className="hidden md:block text-text-muted text-xs w-12 text-right shrink-0 tabular-nums">{formatDur(parseDuration(song.length))}</span>
 
       {/* Desktop action buttons */}
       <div className="hidden md:flex items-center gap-0.5 shrink-0">
-        <SongActions song={song} onInfo={() => onInfo(song)} onQueue={onQueue} onContextMenu={(e) => onContextMenu(song, e)} />
+        <SongActions onInfo={() => onInfo(song)} onContextMenu={(e) => onContextMenu(song, e)} />
       </div>
 
       {/* Mobile: more + play */}
@@ -461,13 +449,12 @@ function SongRow({
 
 // ─── Song card (grid mode) ────────────────────────────────────────────────────
 function SongCard({
-  song, onPlay, onCategoryClick, onInfo, onQueue, onContextMenu,
+  song, onPlay, onCategoryClick, onInfo, onContextMenu,
 }: {
   song: JWApiSong
   onPlay: (song: JWApiSong) => void
   onCategoryClick: (cat: Category) => void
   onInfo: (song: JWApiSong) => void
-  onQueue: (track: Track) => void
   onContextMenu: (song: JWApiSong, e: React.MouseEvent) => void
 }): JSX.Element {
   const track = songToTrack(song)
@@ -532,15 +519,6 @@ function SongCard({
             >
               <Info size={11} />
             </button>
-            {canPlay && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onQueue(songToTrack(song)) }}
-                className="p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text-primary transition-colors"
-                title="Add to queue"
-              >
-                <ListPlus size={11} />
-              </button>
-            )}
             <button
               onClick={(e) => { e.stopPropagation(); onContextMenu(song, e) }}
               className="p-1 rounded hover:bg-surface-raised text-text-muted hover:text-text-primary transition-colors"
@@ -624,6 +602,7 @@ export default function ApiTrackerView(): JSX.Element {
 
   const handleCategoryClick = useCallback((cat: Category) => { setCategory(cat); resetSongs() }, [resetSongs])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isFirstDebounce = useRef(true)
 
   useEffect(() => {
     apiFetch<JWApiStats>('/stats/').then(setStats).catch(console.error)
@@ -636,6 +615,8 @@ export default function ApiTrackerView(): JSX.Element {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       setDebouncedSearch(search)
+      // Skip resetSongs on initial mount — only reset when user actually types
+      if (isFirstDebounce.current) { isFirstDebounce.current = false; return }
       resetSongs()
     }, 400)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
@@ -644,7 +625,7 @@ export default function ApiTrackerView(): JSX.Element {
   // Fetch — accumulates pages
   useEffect(() => {
     let cancelled = false
-    setLoading(true); setError(null)
+    setLoading(true); setError(null); setIntersecting(false)
     apiFetch<JWApiPaginatedResponse>('/songs/', {
       // searchall searches all fields including producers (vs. search which only checks name/titles)
       searchall: debouncedSearch || undefined,
@@ -842,8 +823,8 @@ export default function ApiTrackerView(): JSX.Element {
                     <SortBtn field="credited_artists" label="Artist" className="w-32 shrink-0" />
                     <SortBtn field="era__name" label="Era" className="w-36 shrink-0" />
                     <SortBtn field="category" label="Category" className="w-24 shrink-0 justify-center" />
-                    <SortBtn field="length" label="Time" className="w-10 shrink-0 justify-end" />
-                    <div className="w-20 shrink-0" />
+                    <SortBtn field="length" label="Time" className="w-12 shrink-0 justify-end" />
+                    <div className="w-14 shrink-0" />
                   </div>
                 )
               })()}
@@ -877,7 +858,6 @@ export default function ApiTrackerView(): JSX.Element {
                       onPlay={handlePlay}
                       onCategoryClick={handleCategoryClick}
                       onInfo={handleInfo}
-                      onQueue={handleQueue}
                       onContextMenu={handleContextMenu}
                     />
                   ))}
@@ -896,7 +876,6 @@ export default function ApiTrackerView(): JSX.Element {
                       onPlay={handlePlay}
                       onCategoryClick={handleCategoryClick}
                       onInfo={handleInfo}
-                      onQueue={handleQueue}
                       onContextMenu={handleContextMenu}
                     />
                   ))}
