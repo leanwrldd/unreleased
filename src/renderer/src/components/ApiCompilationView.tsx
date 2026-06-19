@@ -30,6 +30,8 @@ const TABS: { id: Tab; label: string }[] = [
 function classifyFolderTab(name: string): Tab {
   const l = name.toLowerCase()
   if (l.includes('unreleased') || l.includes('leak') || l.includes('vault')) return 'unreleased'
+  // Explicitly keep SoundCloud and mixtape folders out of singles
+  if (l.includes('soundcloud') || l.includes('mixtape')) return 'albums'
   if (l.includes('single') || l.includes(' ep') || l.includes('mainstream') || l.includes('feature') || l.includes('collab')) return 'singles'
   return 'albums'
 }
@@ -311,7 +313,14 @@ export default function ApiCompilationView(): JSX.Element {
   const hasRoot = !!tabRoots[activeTab]
   const isLoading = discovering || browsing
 
-  const folders = entries.filter(e => e.type === 'directory')
+  const allFolders = entries.filter(e => e.type === 'directory')
+  // In the singles tab, strip out anything that looks like a SoundCloud/mixtape folder
+  const folders = activeTab === 'singles'
+    ? allFolders.filter(f => {
+        const l = f.name.toLowerCase()
+        return !l.includes('soundcloud') && !l.includes('mixtape')
+      })
+    : allFolders
   const audioFiles = entries.filter(e => e.type === 'file' && isAudio(e.name))
   const studioAlbums = folders.filter(f => albumType(f.name) === 'studio')
   const mixtapes = folders.filter(f => albumType(f.name) === 'mixtape')
