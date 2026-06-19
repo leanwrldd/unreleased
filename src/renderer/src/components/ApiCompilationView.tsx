@@ -242,6 +242,20 @@ export default function ApiCompilationView(): JSX.Element {
         if (!roots[tab]) roots[tab] = item.path
       }
 
+      // If no singles root found at the top level, look one level deeper inside
+      // the albums folder (e.g. "Singles & Features" lives inside "Released Discography")
+      if (!roots.singles && roots.albums) {
+        try {
+          const inner = await apiFetch<JWApiBrowseResponse>('/files/browse/', { path: roots.albums })
+          for (const item of parseEntries(inner).filter(i => i.type === 'directory')) {
+            if (classifyFolderTab(item.name) === 'singles') {
+              roots.singles = item.path
+              break
+            }
+          }
+        } catch { /* ignore */ }
+      }
+
       setTabRoots(roots)
       setNav({
         albums:     { path: roots.albums,     nameStack: [] },
