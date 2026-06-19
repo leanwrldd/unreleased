@@ -860,42 +860,36 @@ export default function ApiTrackerView(): JSX.Element {
                 <p className="text-text-muted text-sm">No songs found</p>
               </div>
             ) : viewMode === 'list' ? (
-              <>
-                <div className="space-y-0.5">
-                  {songs.map((song) => (
-                    <SongRow
-                      key={song.id}
-                      song={song}
-                      onPlay={handlePlay}
-                      onCategoryClick={handleCategoryClick}
-                      onInfo={handleInfo}
-                      onContextMenu={handleContextMenu}
-                    />
-                  ))}
-                </div>
-                <div ref={sentinelRef} className="h-4" />
-                {loading && <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-text-muted" /></div>}
-                {!hasMore && songs.length > 0 && <p className="text-center text-text-muted text-xs py-4">{count.toLocaleString()} songs total</p>}
-              </>
+              <div className="space-y-0.5">
+                {songs.map((song) => (
+                  <SongRow
+                    key={song.id}
+                    song={song}
+                    onPlay={handlePlay}
+                    onCategoryClick={handleCategoryClick}
+                    onInfo={handleInfo}
+                    onContextMenu={handleContextMenu}
+                  />
+                ))}
+              </div>
             ) : (
-              <>
-                <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-                  {songs.map((song) => (
-                    <SongCard
-                      key={song.id}
-                      song={song}
-                      onPlay={handlePlay}
-                      onCategoryClick={handleCategoryClick}
-                      onInfo={handleInfo}
-                      onContextMenu={handleContextMenu}
-                    />
-                  ))}
-                </div>
-                <div ref={sentinelRef} className="h-4" />
-                {loading && <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-text-muted" /></div>}
-                {!hasMore && songs.length > 0 && <p className="text-center text-text-muted text-xs py-4">{count.toLocaleString()} songs total</p>}
-              </>
+              <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
+                {songs.map((song) => (
+                  <SongCard
+                    key={song.id}
+                    song={song}
+                    onPlay={handlePlay}
+                    onCategoryClick={handleCategoryClick}
+                    onInfo={handleInfo}
+                    onContextMenu={handleContextMenu}
+                  />
+                ))}
+              </div>
             )}
+            {/* Sentinel always in DOM so IntersectionObserver is set up from mount */}
+            <div ref={sentinelRef} className="h-4" />
+            {loading && songs.length > 0 && <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-text-muted" /></div>}
+            {!hasMore && songs.length > 0 && <p className="text-center text-text-muted text-xs py-4">{count.toLocaleString()} songs total</p>}
           </div>
         </div>
       </div>
