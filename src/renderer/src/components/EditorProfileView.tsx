@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Loader2, Trophy, FileEdit, ChevronLeft } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { getMyProposals, getLeaderboard, SongEditProposal, ProposalStatus } from '../lib/userApi'
@@ -13,19 +13,27 @@ type LeaderboardEntry = {
   badges: Array<{ slug: string; name: string; icon: string; description: string; category: string; note: string; awarded_at: string; awarded_by_username: string | null }>
 }
 
-const STATUS_STYLES: Record<ProposalStatus, { label: string; className: string }> = {
-  pending:  { label: 'Pending',  className: 'bg-yellow-500/15 text-yellow-400' },
-  approved: { label: 'Approved', className: 'bg-green-500/15 text-green-400' },
-  rejected: { label: 'Rejected', className: 'bg-red-500/15 text-red-400' },
-  reversed: { label: 'Reversed', className: 'bg-surface-overlay text-text-muted' },
+const STATUS_STYLES: Record<ProposalStatus, { label: string; bar: string; badge: string }> = {
+  pending:  { label: 'Pending',  bar: 'bg-yellow-400',  badge: 'bg-yellow-500/15 text-yellow-400' },
+  approved: { label: 'Approved', bar: 'bg-green-400',   badge: 'bg-green-500/15 text-green-400' },
+  rejected: { label: 'Rejected', bar: 'bg-red-400',     badge: 'bg-red-500/15 text-red-400' },
+  reversed: { label: 'Reversed', bar: 'bg-surface-overlay', badge: 'bg-surface-overlay text-text-muted' },
 }
+
+const RANK_STYLES: Record<number, { num: string; bg: string }> = {
+  1: { num: 'text-yellow-400 font-black', bg: 'bg-yellow-500/8 ring-1 ring-yellow-500/20' },
+  2: { num: 'text-slate-300 font-black',  bg: 'bg-slate-500/8 ring-1 ring-slate-400/20' },
+  3: { num: 'text-amber-600 font-black',  bg: 'bg-amber-700/8 ring-1 ring-amber-600/20' },
+}
+
+type FilterTab = 'all' | ProposalStatus
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function changeTypeLabel(type: string): string {
-  return type.charAt(0).toUpperCase() + type.slice(1)
+  return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
 export default function EditorProfileView(): JSX.Element {
@@ -35,6 +43,7 @@ export default function EditorProfileView(): JSX.Element {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [loadingProposals, setLoadingProposals] = useState(true)
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true)
+  const [filter, setFilter] = useState<FilterTab>('all')
 
   useEffect(() => {
     getMyProposals()
@@ -50,161 +59,222 @@ export default function EditorProfileView(): JSX.Element {
 
   const myEntry = leaderboard.find((e) => e.discord_username === account?.discord_username)
 
+  const filteredProposals = useMemo(() => {
+    if (filter === 'all') return proposals
+    return proposals.filter(p => p.status === filter)
+  }, [proposals, filter])
+
+  const TABS: { key: FilterTab; label: string }[] = [
+    { key: 'all',      label: 'All' },
+    { key: 'pending',  label: 'Pending' },
+    { key: 'approved', label: 'Approved' },
+    { key: 'rejected', label: 'Rejected' },
+  ]
+
+  const tabCount = (tab: FilterTab) => tab === 'all' ? proposals.length : proposals.filter(p => p.status === tab).length
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
-      {/* Header */}
-      <div className="px-6 pt-6 pb-5 border-b border-[var(--border)] shrink-0">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+
+      {/* ── Header ── */}
+      <div className="px-6 pt-5 pb-4 border-b border-[var(--border)] shrink-0">
         <button
           onClick={() => setActiveView('api-tracker')}
-          className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-xs mb-4 transition-colors"
+          className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-xs mb-3 transition-colors"
         >
-          <ChevronLeft size={14} />
-          Back
+          <ChevronLeft size={14} /> Back
         </button>
-        <div className="flex items-center gap-4">
+
+        <div className="flex items-center gap-3.5">
           {account?.discord_avatar ? (
-            <img src={account.discord_avatar} alt="" className="w-14 h-14 rounded-full object-cover shrink-0" />
+            <img src={account.discord_avatar} alt="" className="w-12 h-12 rounded-full object-cover shrink-0 ring-2 ring-[var(--border)]" />
           ) : (
-            <div className="w-14 h-14 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xl font-bold shrink-0">
+            <div className="w-12 h-12 rounded-full bg-accent/20 text-accent flex items-center justify-center text-lg font-bold shrink-0">
               {(account?.display_name || account?.discord_username || '?').charAt(0).toUpperCase()}
             </div>
           )}
-          <div>
-            <h1 className="text-text-primary text-xl font-bold">
-              {account?.display_name || account?.discord_username || 'My Profile'}
-            </h1>
-            <div className="flex items-center gap-3 mt-1 text-text-muted text-xs">
-              {myEntry && (
-                <span className="flex items-center gap-1">
-                  <Trophy size={11} className="text-accent" />
-                  #{myEntry.rank} · {myEntry.approved_count} approved
-                </span>
-              )}
-              {(account?.is_administrator) && (
-                <span className="px-1.5 py-0.5 rounded bg-accent/15 text-accent text-[10px] font-semibold uppercase tracking-wide">Admin</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-text-primary text-lg font-bold truncate">
+                {account?.display_name || account?.discord_username || 'My Profile'}
+              </h1>
+              {account?.is_administrator && (
+                <span className="px-1.5 py-0.5 rounded bg-accent/15 text-accent text-[10px] font-semibold uppercase tracking-wide shrink-0">Admin</span>
               )}
               {account?.is_editor && !account.is_administrator && (
-                <span className="px-1.5 py-0.5 rounded bg-surface-overlay text-text-secondary text-[10px] font-semibold uppercase tracking-wide">Editor</span>
+                <span className="px-1.5 py-0.5 rounded bg-surface-overlay text-text-secondary text-[10px] font-semibold uppercase tracking-wide shrink-0">Editor</span>
               )}
             </div>
+            {myEntry && (
+              <p className="text-text-muted text-xs mt-0.5 flex items-center gap-1.5">
+                <Trophy size={10} className="text-accent" />
+                Rank #{myEntry.rank} · {myEntry.approved_count} approved
+                {myEntry.badges.length > 0 && (
+                  <span className="ml-1">
+                    {myEntry.badges.slice(0, 5).map(b => (
+                      <span key={b.slug} title={b.name}>{b.icon}</span>
+                    ))}
+                  </span>
+                )}
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 px-6 py-5 space-y-8">
-        {/* My Proposals */}
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <FileEdit size={15} className="text-text-muted" />
-            <h2 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">My Proposals</h2>
-            {!loadingProposals && (
-              <span className="ml-auto text-text-muted text-xs">{proposals.length} total</span>
-            )}
-          </div>
+      {/* ── Body: side by side ── */}
+      <div className="flex-1 flex overflow-hidden">
 
-          {loadingProposals ? (
-            <div className="flex justify-center py-8">
-              <Loader2 size={20} className="animate-spin text-text-muted" />
+        {/* ── Left: My Proposals ── */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden border-r border-[var(--border)]">
+          {/* Section header */}
+          <div className="px-5 pt-4 pb-3 shrink-0">
+            <div className="flex items-center gap-2 mb-3">
+              <FileEdit size={13} className="text-text-muted" />
+              <h2 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">My Proposals</h2>
+              {!loadingProposals && (
+                <span className="ml-auto text-text-muted text-xs">{proposals.length} total</span>
+              )}
             </div>
-          ) : proposals.length === 0 ? (
-            <p className="text-text-muted text-sm text-center py-8 opacity-50">No proposals yet</p>
-          ) : (
-            <div className="space-y-1">
-              {proposals.map((p) => {
-                const status = STATUS_STYLES[p.status]
+
+            {/* Filter tabs */}
+            <div className="flex gap-1">
+              {TABS.map(({ key, label }) => {
+                const count = tabCount(key)
+                const active = filter === key
                 return (
-                  <div
-                    key={p.id}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-overlay transition-colors"
+                  <button
+                    key={key}
+                    onClick={() => setFilter(key)}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      active ? 'bg-accent/15 text-accent' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'
+                    }`}
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-text-primary text-sm truncate">{p.title || `Song #${p.song}`}</p>
-                      <p className="text-text-muted text-xs">{changeTypeLabel(p.change_type)} · {formatDate(p.created_at)}</p>
-                    </div>
-                    <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${status.className}`}>
-                      {status.label}
-                    </span>
-                  </div>
+                    {label}
+                    {count > 0 && (
+                      <span className={`text-[10px] tabular-nums ${active ? 'text-accent/70' : 'text-text-muted'}`}>
+                        {count}
+                      </span>
+                    )}
+                  </button>
                 )
               })}
             </div>
-          )}
-        </section>
+          </div>
 
-        {/* Leaderboard */}
-        <section>
-          <div className="flex items-center gap-2 mb-4">
-            <Trophy size={15} className="text-text-muted" />
+          {/* Proposals list */}
+          <div className="flex-1 overflow-y-auto min-h-0 px-3 pb-6">
+            {loadingProposals ? (
+              <div className="flex justify-center py-12">
+                <Loader2 size={18} className="animate-spin text-text-muted" />
+              </div>
+            ) : filteredProposals.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2 text-text-muted opacity-50">
+                <FileEdit size={28} />
+                <p className="text-sm">{filter === 'all' ? 'No proposals yet' : `No ${filter} proposals`}</p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {filteredProposals.map((p) => {
+                  const s = STATUS_STYLES[p.status]
+                  return (
+                    <div key={p.id} className="flex items-stretch gap-0 rounded-lg overflow-hidden hover:bg-surface-overlay transition-colors group">
+                      {/* Status bar */}
+                      <div className={`w-0.5 shrink-0 ${s.bar}`} />
+                      <div className="flex items-center gap-3 px-3 py-2.5 flex-1 min-w-0">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-text-primary text-sm font-medium truncate">{p.title || `Song #${p.song}`}</p>
+                          <p className="text-text-muted text-xs mt-0.5">{changeTypeLabel(p.change_type)} · {formatDate(p.created_at)}</p>
+                        </div>
+                        <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${s.badge}`}>
+                          {s.label}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Right: Leaderboard ── */}
+        <div className="w-64 flex flex-col min-h-0 overflow-hidden shrink-0">
+          <div className="px-4 pt-4 pb-3 shrink-0 flex items-center gap-2">
+            <Trophy size={13} className="text-text-muted" />
             <h2 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">Leaderboard</h2>
           </div>
 
-          {loadingLeaderboard ? (
-            <div className="flex justify-center py-8">
-              <Loader2 size={20} className="animate-spin text-text-muted" />
-            </div>
-          ) : leaderboard.length === 0 ? (
-            <p className="text-text-muted text-sm text-center py-8 opacity-50">No data</p>
-          ) : (
-            <div className="space-y-1">
-              {leaderboard.map((entry) => {
-                const isMe = entry.discord_username === account?.discord_username
-                return (
-                  <div
-                    key={entry.user_id}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                      isMe ? 'bg-accent/8 ring-1 ring-accent/20' : 'hover:bg-surface-overlay'
-                    }`}
-                  >
-                    {/* Rank */}
-                    <span
-                      className={`text-xs font-bold w-6 text-right shrink-0 tabular-nums ${
-                        entry.rank === 1 ? 'text-yellow-400' : entry.rank === 2 ? 'text-slate-300' : entry.rank === 3 ? 'text-amber-600' : 'text-text-muted'
+          <div className="flex-1 overflow-y-auto min-h-0 px-2 pb-6">
+            {loadingLeaderboard ? (
+              <div className="flex justify-center py-12">
+                <Loader2 size={18} className="animate-spin text-text-muted" />
+              </div>
+            ) : leaderboard.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-2 text-text-muted opacity-50">
+                <Trophy size={28} />
+                <p className="text-sm">No data</p>
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {leaderboard.map((entry) => {
+                  const isMe = entry.discord_username === account?.discord_username
+                  const rankStyle = RANK_STYLES[entry.rank]
+                  return (
+                    <div
+                      key={entry.user_id}
+                      className={`flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors ${
+                        isMe
+                          ? 'bg-accent/8 ring-1 ring-accent/20'
+                          : rankStyle
+                          ? rankStyle.bg
+                          : 'hover:bg-surface-overlay'
                       }`}
                     >
-                      {entry.rank}
-                    </span>
+                      {/* Rank */}
+                      <span className={`text-xs w-5 text-right shrink-0 tabular-nums ${rankStyle ? rankStyle.num : 'text-text-muted font-medium'}`}>
+                        {entry.rank}
+                      </span>
 
-                    {/* Avatar */}
-                    {entry.discord_avatar ? (
-                      <img src={entry.discord_avatar} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
-                    ) : (
-                      <div className="w-7 h-7 rounded-full bg-surface-raised flex items-center justify-center text-xs text-text-muted shrink-0">
-                        {(entry.discord_username || '?').charAt(0).toUpperCase()}
-                      </div>
-                    )}
+                      {/* Avatar */}
+                      {entry.discord_avatar ? (
+                        <img src={entry.discord_avatar} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-surface-raised flex items-center justify-center text-[10px] text-text-muted shrink-0">
+                          {(entry.discord_username || '?').charAt(0).toUpperCase()}
+                        </div>
+                      )}
 
-                    {/* Name */}
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm truncate ${isMe ? 'text-accent font-semibold' : 'text-text-primary'}`}>
-                        {entry.username || entry.discord_username}
-                        {isMe && <span className="ml-1.5 text-[10px] font-normal opacity-70">you</span>}
-                      </p>
-                    </div>
-
-                    {/* Badges */}
-                    {entry.badges.length > 0 && (
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        {entry.badges.slice(0, 4).map((b) => (
-                          <span key={b.slug} title={b.name} className="text-sm leading-none">
-                            {b.icon}
-                          </span>
-                        ))}
-                        {entry.badges.length > 4 && (
-                          <span className="text-text-muted text-[10px] ml-0.5">+{entry.badges.length - 4}</span>
+                      {/* Name */}
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs truncate leading-tight ${isMe ? 'text-accent font-semibold' : 'text-text-primary'}`}>
+                          {entry.username || entry.discord_username}
+                          {isMe && <span className="ml-1 opacity-60 font-normal">you</span>}
+                        </p>
+                        {entry.badges.length > 0 && (
+                          <p className="text-[11px] leading-tight mt-0.5">
+                            {entry.badges.slice(0, 4).map(b => (
+                              <span key={b.slug} title={b.name}>{b.icon}</span>
+                            ))}
+                            {entry.badges.length > 4 && (
+                              <span className="text-text-muted ml-0.5">+{entry.badges.length - 4}</span>
+                            )}
+                          </p>
                         )}
                       </div>
-                    )}
 
-                    {/* Approved count */}
-                    <span className="text-text-muted text-xs tabular-nums shrink-0 w-14 text-right">
-                      {entry.approved_count} <span className="opacity-60">approved</span>
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </section>
+                      {/* Count */}
+                      <span className={`text-xs tabular-nums shrink-0 font-semibold ${isMe ? 'text-accent' : rankStyle ? 'text-text-secondary' : 'text-text-muted'}`}>
+                        {entry.approved_count}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
     </div>
   )

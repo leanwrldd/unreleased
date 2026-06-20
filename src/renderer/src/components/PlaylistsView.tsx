@@ -497,10 +497,6 @@ export default function PlaylistsView(): JSX.Element {
                   </>
                 )}
               </div>
-              {/* Permanent pencil badge — always visible */}
-              <div className="absolute bottom-1.5 right-1.5 p-1 rounded-md bg-black/60 text-white pointer-events-none">
-                <Pencil size={11} />
-              </div>
               {/* Remove cover button */}
               {detail?.cover_image_url && (
                 <button
@@ -785,7 +781,7 @@ export default function PlaylistsView(): JSX.Element {
   // ── Playlist library ───────────────────────────────────────────────────────
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-y-auto" onClick={() => setLibMenu(null)}>
+    <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden" onClick={() => setLibMenu(null)}>
       <div className="px-5 pt-5 pb-8">
         <div className="flex items-center justify-between mb-6">
           <div>

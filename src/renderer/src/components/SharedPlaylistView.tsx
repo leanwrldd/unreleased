@@ -49,24 +49,44 @@ function parseTracks(data: unknown): Track[] {
   }
 
   const obj = data as AnyObject
-  const candidates = [obj.songs, obj.items, obj.tracks, obj.results, obj.data, obj.playlist_songs, obj.song_list]
-  for (const list of candidates) {
+  // Named candidate fields — try recursively to handle any nesting
+  const ARRAY_KEYS = ['songs', 'items', 'tracks', 'results', 'playlist_songs', 'song_list', 'files', 'entries']
+  for (const key of ARRAY_KEYS) {
+    const list = obj[key]
     if (!Array.isArray(list) || list.length === 0) continue
     const first = list[0]
-    // Full song objects
     if (isApiSongLite(first)) return (list as ApiSongLite[]).map(liteSongToTrack)
-    // Items with nested song
-    if (first.song && isApiSongLite(first.song)) return list.map((i: AnyObject) => liteSongToTrack(i.song as ApiSongLite))
-    // Objects with path
-    const tracks = list.map((s: AnyObject) => {
-      const path = (s.path ?? s.file_path ?? s.url ?? '') as string
-      return path ? pathToTrack(path) : null
-    }).filter(Boolean) as Track[]
-    if (tracks.length) return tracks
+    if (first && typeof first === 'object' && 'song' in first && isApiSongLite((first as AnyObject).song)) {
+      return list.map((i: AnyObject) => liteSongToTrack(i.song as ApiSongLite))
+    }
+    const byPath = (list as AnyObject[]).flatMap((s: AnyObject) => {
+      const p = (s.path ?? s.file_path ?? s.url ?? '') as string
+      return p ? [pathToTrack(p)] : []
+    })
+    if (byPath.length) return byPath
   }
 
-  // Flat paths array
-  if (Array.isArray(obj.paths)) return (obj.paths as string[]).filter(Boolean).map(pathToTrack)
+  // data field (object or array)
+  if (obj.data && typeof obj.data === 'object') {
+    const dataParsed = parseTracks(obj.data)
+    if (dataParsed.length) return dataParsed
+  }
+
+  // paths field (strings or song objects)
+  if (Array.isArray(obj.paths) && obj.paths.length > 0) {
+    if (typeof obj.paths[0] === 'string') return (obj.paths as string[]).filter(Boolean).map(pathToTrack)
+    const pathsParsed = parseTracks(obj.paths)
+    if (pathsParsed.length) return pathsParsed
+  }
+
+  // Deep scan: any other array field
+  for (const key of Object.keys(obj)) {
+    if ([...ARRAY_KEYS, 'data', 'paths'].includes(key)) continue
+    const val = obj[key]
+    if (!Array.isArray(val) || val.length === 0) continue
+    const deep = parseTracks(val)
+    if (deep.length) return deep
+  }
 
   return []
 }

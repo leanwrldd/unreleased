@@ -108,7 +108,7 @@ export function buildCoverArtUrl(path: string): string {
 
 export function buildImageUrl(imageUrl: string | null | undefined): string | undefined {
   if (!imageUrl) return undefined
-  if (imageUrl.startsWith('http')) return imageUrl
+  if (imageUrl.startsWith('http') || imageUrl.startsWith('data:')) return imageUrl
   return `https://juicewrldapi.com${imageUrl}`
 }
 
