@@ -7,12 +7,14 @@
  *  - Lazy loading (background page fetching, triggered by nextTrack)
  *  - Shuffle with random insertion so newly fetched tracks land at random
  *    positions in the upcoming list instead of piling up at the end
+ *  - Radio mode: when shuffle is active from the Tracker, uses /radio/random/
+ *    instead of a pre-built queue. Queue stays empty (only history is kept).
  */
 
 import type { StateCreator } from 'zustand'
 import type { Track } from '../types'
 import { apiFetch, songToTrack } from '../lib/juicewrldApi'
-import type { JWApiPaginatedResponse } from '../lib/juicewrldApi'
+import type { JWApiPaginatedResponse, JWApiSong } from '../lib/juicewrldApi'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,6 +29,14 @@ export interface QueueFilter {
   total: number
 }
 
+interface RadioResponse {
+  title: string
+  path: string
+  song: JWApiSong
+  size: number
+  hash: string
+}
+
 export interface QueueSlice {
   // Playback
   queue: Track[]
@@ -38,18 +48,36 @@ export interface QueueSlice {
   shuffle: boolean
   repeat: 'none' | 'all' | 'one'
 
-  // Lazy loading
+  // Lazy loading (non-radio mode)
   queueFilter: QueueFilter | null
   /** True while a background page fetch is in flight. */
   queueLoadingMore: boolean
 
-  // ── Actions ──────────────────────────────────────────────────────────────
   /**
-   * Start playing `track`.
-   * `context` is the ordered list the track came from (defaults to current queue).
+   * Radio mode: enabled when the user clicks a track from the Tracker with
+   * shuffle on. Uses /radio/random/ to fetch each next song — no pre-built
+   * queue. History of played tracks is kept in `queue` (capped at 30).
+   */
+  radioMode: boolean
+  /** Pre-fetched next radio track, null while the fetch is in flight. */
+  radioNext: Track | null
+  /** True when nextTrack() was called but radioNext wasn't ready yet. */
+  _radioWaiting: boolean
+
+  // ── Actions ──────────────────────────────────────────────────────────────
+
+  /**
+   * Start playing `track` with a known context list.
    * `filter` enables lazy loading beyond the initial context.
+   * Does NOT activate radio mode — use `startRadio` for that.
    */
   playTrack: (track: Track, context?: Track[], filter?: QueueFilter | null) => void
+
+  /**
+   * Start radio mode. The queue is seeded with `track` only;
+   * subsequent songs come from /radio/random/ one at a time.
+   */
+  startRadio: (track: Track) => void
 
   /** Advance to the next track. Returns the track, or null if playback stops. */
   nextTrack: () => Track | null
@@ -57,15 +85,7 @@ export interface QueueSlice {
   /** Go back one track (or restart if >3 s in). */
   prevTrack: () => Track | null
 
-  /**
-   * Toggle shuffle.
-   * Turning ON: immediately re-orders upcoming tracks with Fisher-Yates and,
-   * if a queueFilter is active, upgrades it to full-catalog so newly fetched
-   * tracks aren't stuck in the same era/category.
-   */
   toggleShuffle: () => void
-
-  /** Cycle repeat: none → all → one. */
   toggleRepeat: () => void
 
   setIsPlaying: (playing: boolean) => void
@@ -77,14 +97,11 @@ export interface QueueSlice {
   playNext: (track: Track) => void
   removeFromQueue: (absoluteIndex: number) => void
   clearQueue: () => void
-  /**
-   * Reorder within the upcoming section only.
-   * `fromIdx` / `toIdx` are relative to `queue[queueIndex + 1]`.
-   */
   reorderQueue: (fromIdx: number, toIdx: number) => void
 
-  // Internal (prefixed _ — not for external use)
+  // Internal
   _loadMore: () => void
+  _prefetchRadioTrack: () => void
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -111,6 +128,8 @@ function insertRandom<T>(base: T[], items: T[]): T[] {
   return result
 }
 
+const RADIO_HISTORY_LIMIT = 30
+
 // ─── Slice factory ────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -126,6 +145,9 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
   repeat: 'none',
   queueFilter: null,
   queueLoadingMore: false,
+  radioMode: false,
+  radioNext: null,
+  _radioWaiting: false,
 
   // ── Simple setters ─────────────────────────────────────────────────────────
   setIsPlaying: (isPlaying) => set({ isPlaying }),
@@ -143,17 +165,66 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       currentTrackFull: null,
       isPlaying: true,
       queueFilter: filter,
+      radioMode: false,
+      radioNext: null,
+      _radioWaiting: false,
       progress: 0,
       currentTime: 0,
     })
     if (filter?.hasMore) get()._loadMore()
   },
 
+  // ── startRadio ─────────────────────────────────────────────────────────────
+  startRadio: (track) => {
+    set({
+      queue: [track],
+      queueIndex: 0,
+      currentTrack: track,
+      currentTrackFull: null,
+      isPlaying: true,
+      queueFilter: null,
+      queueLoadingMore: false,
+      radioMode: true,
+      radioNext: null,
+      _radioWaiting: false,
+      progress: 0,
+      currentTime: 0,
+    })
+    get()._prefetchRadioTrack()
+  },
+
   // ── nextTrack ──────────────────────────────────────────────────────────────
   nextTrack: () => {
-    const { queue, queueIndex, shuffle, repeat } = get()
+    const { queue, queueIndex, shuffle, repeat, radioMode, radioNext } = get()
+
+    // ── Radio mode ──────────────────────────────────────────────────────────
+    if (radioMode) {
+      if (!radioNext) {
+        // Pre-fetch not ready yet — mark as waiting; _prefetchRadioTrack will
+        // auto-play when the fetch completes.
+        set({ isPlaying: false, _radioWaiting: true })
+        return null
+      }
+      // Advance to the pre-fetched track (roll history, cap at limit)
+      const newQueue = [...queue.slice(-(RADIO_HISTORY_LIMIT - 1)), radioNext]
+      set({
+        queue: newQueue,
+        queueIndex: newQueue.length - 1,
+        currentTrack: radioNext,
+        currentTrackFull: null,
+        isPlaying: true,
+        radioNext: null,
+        _radioWaiting: false,
+        progress: 0,
+        currentTime: 0,
+      })
+      get()._prefetchRadioTrack()
+      return radioNext
+    }
+
     if (queue.length === 0) return null
 
+    // ── Standard queue ──────────────────────────────────────────────────────
     let nextIdx: number
 
     if (repeat === 'one') {
@@ -161,10 +232,8 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
     } else if (shuffle) {
       const upcomingCount = queue.length - queueIndex - 1
       if (upcomingCount > 0) {
-        // Random pick from the not-yet-played upcoming section
         nextIdx = queueIndex + 1 + Math.floor(Math.random() * upcomingCount)
       } else if (repeat === 'all') {
-        // All tracks played — reshuffle everything and start over
         const reshuffled = fisherYates(queue)
         const first = reshuffled[0]
         set({ queue: reshuffled, queueIndex: 0, currentTrack: first, currentTrackFull: null, isPlaying: true, progress: 0, currentTime: 0 })
@@ -177,12 +246,8 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
     } else {
       nextIdx = queueIndex + 1
       if (nextIdx >= queue.length) {
-        if (repeat === 'all') {
-          nextIdx = 0
-        } else {
-          set({ isPlaying: false })
-          return null
-        }
+        if (repeat === 'all') nextIdx = 0
+        else { set({ isPlaying: false }); return null }
       }
     }
 
@@ -194,10 +259,15 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
 
   // ── prevTrack ──────────────────────────────────────────────────────────────
   prevTrack: () => {
-    const { queue, queueIndex, currentTime } = get()
+    const { queue, queueIndex, currentTime, radioMode } = get()
     if (queue.length === 0) return null
 
-    // If more than 3 s in — restart current track
+    // In radio mode, only allow restarting the current track
+    if (radioMode) {
+      set({ currentTime: 0, progress: 0 })
+      return get().currentTrack
+    }
+
     if (currentTime > 3) {
       set({ currentTime: 0, progress: 0 })
       return get().currentTrack
@@ -211,32 +281,28 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
 
   // ── toggleShuffle ──────────────────────────────────────────────────────────
   toggleShuffle: () => {
-    const { shuffle, queue, queueIndex, queueFilter } = get()
+    const { shuffle, queue, queueIndex, queueFilter, radioMode } = get()
     const newShuffle = !shuffle
 
-    if (newShuffle) {
-      // Re-order upcoming tracks immediately (played tracks stay put)
-      const played = queue.slice(0, queueIndex + 1)
-      const upcoming = fisherYates(queue.slice(queueIndex + 1))
-
-      // Upgrade an active filter to full catalog at a random page so the
-      // lazy loader fills the pool with songs from all eras/categories
-      const newFilter: QueueFilter | null = queueFilter
-        ? {
-            category: '',
-            era: '',
-            search: '',
-            page: Math.floor(Math.random() * 80) + 2,
-            hasMore: true,
-            total: 999999,
-          }
-        : null
-
-      set({ shuffle: true, queue: [...played, ...upcoming], queueFilter: newFilter })
-      if (newFilter) get()._loadMore()
-    } else {
-      set({ shuffle: false })
+    if (!newShuffle) {
+      // Turning OFF: exit radio mode if active, resume linear playback
+      set({ shuffle: false, radioMode: false, radioNext: null, _radioWaiting: false })
+      return
     }
+
+    if (radioMode) {
+      // Already in radio mode — no change needed for toggling ON again
+      return
+    }
+
+    // Turning ON (non-radio): shuffle the upcoming portion
+    const played = queue.slice(0, queueIndex + 1)
+    const upcoming = fisherYates(queue.slice(queueIndex + 1))
+    const newFilter: QueueFilter | null = queueFilter
+      ? { category: '', era: '', search: '', page: Math.floor(Math.random() * 80) + 2, hasMore: true, total: 999999 }
+      : null
+    set({ shuffle: true, queue: [...played, ...upcoming], queueFilter: newFilter })
+    if (newFilter) get()._loadMore()
   },
 
   // ── toggleRepeat ───────────────────────────────────────────────────────────
@@ -266,6 +332,9 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
     set((s: QueueSlice) => ({
       queue: s.currentTrack ? [s.currentTrack] : [],
       queueIndex: 0,
+      radioMode: false,
+      radioNext: null,
+      _radioWaiting: false,
     })),
 
   reorderQueue: (fromIdx, toIdx) =>
@@ -277,20 +346,16 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       return { queue: [...s.queue.slice(0, base), ...upcoming] }
     }),
 
-  // ── Lazy loading ───────────────────────────────────────────────────────────
+  // ── Lazy loading (non-radio) ───────────────────────────────────────────────
   _loadMore: () => {
-    const { queue, queueIndex, shuffle, queueFilter, queueLoadingMore } = get()
-    if (!queueFilter?.hasMore || queueLoadingMore) return
+    const { queue, queueIndex, shuffle, queueFilter, queueLoadingMore, radioMode } = get()
+    if (radioMode || !queueFilter?.hasMore || queueLoadingMore) return
 
-    // How many unplayed tracks remain?
     const upcomingCount = queue.length - queueIndex - 1
-    // Load when running low — lower threshold in linear mode (predictable),
-    // higher in shuffle (we want a large random pool)
     const threshold = shuffle ? 40 : 15
     if (upcomingCount >= threshold) return
 
     set({ queueLoadingMore: true })
-
     apiFetch<JWApiPaginatedResponse>('/songs/', {
       searchall: queueFilter.search || undefined,
       category: queueFilter.category || undefined,
@@ -305,7 +370,6 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
 
         let nextQueue: Track[]
         if (isShuffle) {
-          // Scatter new tracks throughout the upcoming section randomly
           const played = q.slice(0, qi + 1)
           const upcoming = insertRandom(q.slice(qi + 1), newTracks)
           nextQueue = [...played, ...upcoming]
@@ -320,5 +384,40 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
         })
       })
       .catch(() => set({ queueLoadingMore: false }))
+  },
+
+  // ── Radio pre-fetch ────────────────────────────────────────────────────────
+  _prefetchRadioTrack: () => {
+    apiFetch<RadioResponse>('/radio/random/')
+      .then((data) => {
+        if (!get().radioMode) return  // radio was turned off while fetching
+        const track = songToTrack(data.song)
+        const wasWaiting = get()._radioWaiting
+
+        set({ radioNext: track, _radioWaiting: false })
+
+        if (wasWaiting) {
+          // Player was waiting for this track — advance and play immediately
+          const { queue } = get()
+          const newQueue = [...queue.slice(-(RADIO_HISTORY_LIMIT - 1)), track]
+          set({
+            queue: newQueue,
+            queueIndex: newQueue.length - 1,
+            currentTrack: track,
+            currentTrackFull: null,
+            isPlaying: true,
+            radioNext: null,
+            progress: 0,
+            currentTime: 0,
+          })
+          get()._prefetchRadioTrack()
+        }
+      })
+      .catch(() => {
+        // Retry once on failure
+        if (get().radioMode) {
+          setTimeout(() => get()._prefetchRadioTrack(), 3000)
+        }
+      })
   },
 })

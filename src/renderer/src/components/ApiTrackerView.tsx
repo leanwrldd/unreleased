@@ -363,11 +363,12 @@ function SongActions({
 
 // ─── Song row (list mode) ─────────────────────────────────────────────────────
 function SongRow({
-  song, onPlay, onCategoryClick, onInfo, onContextMenu,
+  song, onPlay, onCategoryClick, onEraClick, onInfo, onContextMenu,
 }: {
   song: JWApiSong
   onPlay: (song: JWApiSong) => void
   onCategoryClick: (cat: Category) => void
+  onEraClick: (era: string) => void
   onInfo: (song: JWApiSong) => void
   onContextMenu: (song: JWApiSong, e: React.MouseEvent) => void
 }): JSX.Element {
@@ -410,10 +411,20 @@ function SongRow({
 
       {/* Desktop-only columns */}
       <span className="hidden md:block text-text-muted text-xs truncate w-32 shrink-0">{song.credited_artists || 'Juice WRLD'}</span>
-      <span className="hidden md:block text-text-muted text-xs truncate w-36 shrink-0">{song.era?.name ?? '—'}</span>
+      {song.era?.name ? (
+        <button
+          onClick={() => onEraClick(song.era!.name)}
+          className="hidden md:block text-text-muted text-xs truncate w-36 shrink-0 text-left hover:text-accent transition-colors"
+          title={`Filter by era: ${song.era.name}`}
+        >
+          {song.era.name}
+        </button>
+      ) : (
+        <span className="hidden md:block text-text-muted text-xs truncate w-36 shrink-0">—</span>
+      )}
       <button
         onClick={() => onCategoryClick(song.category as Category)}
-        className="hidden md:block text-xs px-1.5 py-0.5 rounded bg-surface-overlay text-text-muted shrink-0 w-24 text-center hover:bg-surface-raised hover:text-accent transition-colors"
+        className="hidden md:block text-xs px-1.5 py-0.5 rounded border border-[var(--border)] bg-surface text-text-muted shrink-0 w-24 text-center hover:border-accent/40 hover:text-accent transition-colors"
         title="Filter by category"
       >
         {CATEGORY_LABELS[song.category] ?? song.category}
@@ -450,11 +461,12 @@ function SongRow({
 
 // ─── Song card (grid mode) ────────────────────────────────────────────────────
 function SongCard({
-  song, onPlay, onCategoryClick, onInfo, onContextMenu,
+  song, onPlay, onCategoryClick, onEraClick, onInfo, onContextMenu,
 }: {
   song: JWApiSong
   onPlay: (song: JWApiSong) => void
   onCategoryClick: (cat: Category) => void
+  onEraClick: (era: string) => void
   onInfo: (song: JWApiSong) => void
   onContextMenu: (song: JWApiSong, e: React.MouseEvent) => void
 }): JSX.Element {
@@ -502,13 +514,17 @@ function SongCard({
         <p className="text-text-muted text-[10px] truncate">{song.credited_artists || 'Juice WRLD'}</p>
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           {song.era?.name && (
-            <span className="text-[9px] uppercase tracking-wide text-text-muted bg-surface-overlay px-1.5 py-0.5 rounded truncate max-w-full">
+            <button
+              onClick={(e) => { e.stopPropagation(); onEraClick(song.era!.name) }}
+              className="text-[9px] uppercase tracking-wide text-text-muted bg-surface px-1.5 py-0.5 rounded border border-[var(--border)] truncate max-w-full hover:text-accent hover:border-accent/40 transition-colors"
+              title={`Filter by era: ${song.era.name}`}
+            >
               {song.era.name}
-            </span>
+            </button>
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onCategoryClick(song.category as Category) }}
-            className="text-[9px] uppercase tracking-wide text-accent/80 bg-accent/10 px-1.5 py-0.5 rounded shrink-0 hover:bg-accent/20 transition-colors"
+            className="text-[9px] uppercase tracking-wide text-accent/80 bg-accent/10 border border-accent/20 px-1.5 py-0.5 rounded shrink-0 hover:bg-accent/20 transition-colors"
           >
             {CATEGORY_LABELS[song.category] ?? song.category}
           </button>
@@ -537,7 +553,7 @@ function SongCard({
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function ApiTrackerView(): JSX.Element {
   const {
-    playTrack, addToQueue, account,
+    playTrack, startRadio, addToQueue, account,
     apiTrackerCategory, setApiTrackerCategory,
     apiTrackerEra, setApiTrackerEra,
     setActiveView, setApiFilesPath,
@@ -606,6 +622,7 @@ export default function ApiTrackerView(): JSX.Element {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCategoryClick = useCallback((cat: Category) => { setCategory(cat); resetSongs() }, [resetSongs])
+  const handleEraClick = useCallback((eraName: string) => { setEra(eraName); resetSongs() }, [resetSongs])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstDebounce = useRef(true)
 
@@ -749,15 +766,8 @@ export default function ApiTrackerView(): JSX.Element {
     const playable = sortedSongs.filter((s) => !!s.path)
 
     if (shuffle) {
-      // Full-catalog shuffle: pre-shuffle visible songs with Fisher-Yates,
-      // then lazy-load from a random catalog page so the pool spans all
-      // eras and categories.
-      const others = fisherYates(playable.filter((s) => s.id !== song.id).map(songToTrack))
-      const startPage = Math.floor(Math.random() * 80) + 2
-      playTrack(track, [track, ...others], {
-        category: '', era: '', search: '',
-        page: startPage, hasMore: true, total: 999999,
-      })
+      // Radio mode: empty queue, stream one random song at a time via /radio/random/
+      startRadio(track)
     } else {
       // Linear: play the visible context, lazy-load if there are more pages.
       const context = playable.map(songToTrack)
@@ -767,7 +777,7 @@ export default function ApiTrackerView(): JSX.Element {
         page: page + 1, hasMore: true, total: count,
       } : null)
     }
-  }, [playTrack, sortedSongs, category, era, debouncedSearch, count, hasMore, orderField, page])
+  }, [playTrack, startRadio, sortedSongs, category, era, debouncedSearch, count, hasMore, orderField, page])
 
   const handleInfo = useCallback((song: JWApiSong) => { setSelectedSong(song) }, [])
   const handleQueue = useCallback((track: Track) => { addToQueue(track) }, [addToQueue])
@@ -818,10 +828,10 @@ export default function ApiTrackerView(): JSX.Element {
                   ? 'bg-accent/15 text-accent border border-accent/30'
                   : 'bg-surface-overlay text-text-muted hover:text-text-secondary border border-transparent'
               }`}
-              title="Toggle category sidebar"
+              title="Toggle search settings"
             >
               <PanelLeft size={13} />
-              <span className="hidden sm:inline">Categories</span>
+              <span className="hidden sm:inline">Search Settings</span>
             </button>
 
             <select
@@ -954,6 +964,7 @@ export default function ApiTrackerView(): JSX.Element {
                     song={song}
                     onPlay={handlePlay}
                     onCategoryClick={handleCategoryClick}
+                    onEraClick={handleEraClick}
                     onInfo={handleInfo}
                     onContextMenu={handleContextMenu}
                   />
@@ -967,6 +978,7 @@ export default function ApiTrackerView(): JSX.Element {
                     song={song}
                     onPlay={handlePlay}
                     onCategoryClick={handleCategoryClick}
+                    onEraClick={handleEraClick}
                     onInfo={handleInfo}
                     onContextMenu={handleContextMenu}
                   />

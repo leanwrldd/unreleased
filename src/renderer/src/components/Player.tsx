@@ -15,7 +15,9 @@ import {
   Heart,
   ChevronUp,
   Check,
-  Plus
+  MoreHorizontal,
+  ListPlus,
+  Radio,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { formatDuration } from '../lib/lyrics'
@@ -65,8 +67,11 @@ export default function Player(): JSX.Element {
     setActiveView,
   } = useStore()
 
+  const [showContextMenu, setShowContextMenu] = useState(false)
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false)
+  const contextMenuBtnRef = useRef<HTMLButtonElement>(null)
   const currentSongId = currentTrack ? trackIdToSongId(currentTrack.id) : null
+  const { radioMode } = useStore()
 
   // Two audio slots — ping-pong between them for crossfade
   const slotA = useRef<HTMLAudioElement>(null)
@@ -387,6 +392,18 @@ export default function Player(): JSX.Element {
 
   const handleNext = (): void => {
     cancelCF()
+    // When on repeat-one, skip = restart the same song
+    if (repeat === 'one') {
+      const audio = getActive()
+      if (audio) {
+        audio.currentTime = 0
+        audio.volume = volumeRef.current
+        if (isPlaying) audio.play().catch(console.error)
+      }
+      setCurrentTime(0)
+      setProgress(0)
+      return
+    }
     nextTrack()
   }
 
@@ -556,34 +573,68 @@ export default function Player(): JSX.Element {
             )}
           </button>
 
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-text-primary text-sm font-medium truncate">
               {currentTrack?.title || 'Not playing'}
             </p>
-            <p className="text-text-muted text-xs truncate">{currentTrack?.artist || ''}</p>
-          </div>
-
-          <button
-            className={`ml-2 shrink-0 transition-colors ${currentTrack && likedTrackIds.includes(currentTrack.id) ? 'text-accent' : 'text-text-muted hover:text-accent'}`}
-            onClick={() => currentTrack && toggleLike(currentTrack.id)}
-          >
-            <Heart size={16} fill={currentTrack && likedTrackIds.includes(currentTrack.id) ? 'currentColor' : 'none'} />
-          </button>
-
-          {currentSongId != null && (
-            <div className="relative shrink-0">
-              <button
-                className="ml-1 text-text-muted hover:text-accent transition-colors"
-                onClick={() => setShowAddToPlaylist((v) => !v)}
-                title="Add to playlist"
-              >
-                <Plus size={16} />
-              </button>
-              {showAddToPlaylist && (
-                <AddToPlaylistMenu songId={currentSongId} placement="top" onClose={() => setShowAddToPlaylist(false)} />
+            <div className="flex items-center gap-1.5">
+              <p className="text-text-muted text-xs truncate">{currentTrack?.artist || ''}</p>
+              {radioMode && (
+                <span className="flex items-center gap-0.5 text-accent text-[9px] font-semibold uppercase tracking-widest shrink-0">
+                  <Radio size={9} /> Radio
+                </span>
               )}
             </div>
-          )}
+          </div>
+
+          {/* Heart + 3-dot — aligned in a tight flex group */}
+          <div className="flex items-center gap-1 shrink-0 ml-1">
+            <button
+              className={`p-1 rounded transition-colors ${currentTrack && likedTrackIds.includes(currentTrack.id) ? 'text-accent' : 'text-text-muted hover:text-accent'}`}
+              onClick={() => currentTrack && toggleLike(currentTrack.id)}
+              title="Like"
+            >
+              <Heart size={15} fill={currentTrack && likedTrackIds.includes(currentTrack.id) ? 'currentColor' : 'none'} />
+            </button>
+
+            <div className="relative">
+              <button
+                ref={contextMenuBtnRef}
+                className="p-1 rounded text-text-muted hover:text-text-primary transition-colors"
+                onClick={() => setShowContextMenu((v) => !v)}
+                title="More options"
+                disabled={!currentTrack}
+              >
+                <MoreHorizontal size={15} />
+              </button>
+
+              {showContextMenu && currentTrack && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowContextMenu(false)} />
+                  <div className="absolute bottom-8 left-0 z-50 w-44 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 overflow-hidden">
+                    <div className="px-3 py-2 border-b border-[var(--border)] mb-1">
+                      <p className="text-text-primary text-xs font-semibold truncate">{currentTrack.title}</p>
+                      <p className="text-text-muted text-[10px] truncate">{currentTrack.artist}</p>
+                    </div>
+                    {currentSongId != null && (
+                      <button
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                        onClick={() => { setShowAddToPlaylist(true); setShowContextMenu(false) }}
+                      >
+                        <ListPlus size={14} /> Add to playlist
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {showAddToPlaylist && currentSongId != null && (
+                <div className="absolute bottom-8 left-0 z-50">
+                  <AddToPlaylistMenu songId={currentSongId} placement="top" onClose={() => setShowAddToPlaylist(false)} />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Center: controls + progress */}

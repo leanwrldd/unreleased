@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
-import { X, GripVertical, ListMusic, Trash2, History, ChevronDown } from 'lucide-react'
+import { X, GripVertical, ListMusic, Trash2, History, ChevronDown, Radio } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 import { formatDuration } from '../lib/lyrics'
@@ -12,6 +12,7 @@ const MAX_UPCOMING_SHOWN = 60
 export default function QueuePanel(): JSX.Element {
   const {
     queue, queueIndex, currentTrack, isPlaying, shuffle, queueFilter, queueLoadingMore,
+    radioMode, radioNext,
     setShowQueue, removeFromQueue, clearQueue, reorderQueue, playTrack,
   } = useStore()
 
@@ -149,8 +150,27 @@ export default function QueuePanel(): JSX.Element {
           {/* Divider */}
           {currentTrack && <div className="mx-4 border-t border-[var(--border)] opacity-40" />}
 
-          {/* ── Upcoming ── */}
-          {upcoming.length > 0 ? (
+          {/* ── Radio: show pre-fetched next track or loading indicator ── */}
+          {radioMode && (
+            <div className="px-4 pt-3 pb-4">
+              <p className="text-text-muted text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold flex items-center gap-1.5">
+                <Radio size={10} className="text-accent" />
+                <span className="text-accent">Radio</span>
+                <span className="opacity-60">· Up Next</span>
+              </p>
+              {radioNext ? (
+                <QueueRow track={radioNext} isActive={false} isPlaying={false} />
+              ) : (
+                <div className="flex items-center gap-2 px-1 py-2 text-text-muted text-xs opacity-50">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                  Finding next song…
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Upcoming (non-radio) ── */}
+          {!radioMode && upcoming.length > 0 ? (
             <div className="px-4 pt-3 pb-6">
               <p className="text-text-muted text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold flex items-center gap-1.5">
                 {upcomingLabel}
@@ -191,7 +211,7 @@ export default function QueuePanel(): JSX.Element {
                 </p>
               )}
             </div>
-          ) : currentTrack ? (
+          ) : !radioMode && currentTrack ? (
             <p className="text-text-muted text-xs text-center py-4 opacity-50">
               Nothing up next
             </p>
