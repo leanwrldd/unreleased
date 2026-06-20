@@ -1,19 +1,23 @@
 import { useRef, useState, useEffect } from 'react'
-import { X, GripVertical, ListMusic, Trash2, Shuffle } from 'lucide-react'
+import { X, GripVertical, ListMusic, Trash2, History, ChevronDown } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 import { formatDuration } from '../lib/lyrics'
 import { Track } from '../types'
 import { useResizablePanel } from '../hooks/useResizablePanel'
 
+const MAX_HISTORY_SHOWN = 10
+const MAX_UPCOMING_SHOWN = 60
+
 export default function QueuePanel(): JSX.Element {
   const {
-    queue, queueIndex, currentTrack, isPlaying, isRandomMode, queueFilter,
-    setShowQueue, removeFromQueue, clearQueue, reorderQueue, playTrack
+    queue, queueIndex, currentTrack, isPlaying, shuffle, queueFilter, queueLoadingMore,
+    setShowQueue, removeFromQueue, clearQueue, reorderQueue, playTrack,
   } = useStore()
 
   const [panelWidth, dragHandle] = useResizablePanel(300, 240, 480)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   useEffect(() => {
     const check = (): void => setIsMobile(window.innerWidth < 768)
@@ -21,9 +25,11 @@ export default function QueuePanel(): JSX.Element {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  const upcoming = queue.slice(queueIndex + 1)
-  const past = queue.slice(0, queueIndex)
+  // Derived sections
+  const history = queue.slice(0, queueIndex)           // played tracks, oldest first
+  const upcoming = queue.slice(queueIndex + 1)          // unplayed tracks
 
+  // Drag state (upcoming indices only)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
 
@@ -38,10 +44,12 @@ export default function QueuePanel(): JSX.Element {
   }
   const handleDrop = (idx: number): void => {
     if (dragIdx !== null && dragIdx !== idx) reorderQueue(dragIdx, idx)
-    setDragIdx(null)
-    setDragOverIdx(null)
+    setDragIdx(null); setDragOverIdx(null)
   }
   const handleDragEnd = (): void => { setDragIdx(null); setDragOverIdx(null) }
+
+  const upcomingLabel = shuffle ? 'Shuffle' : 'Up Next'
+  const hasMore = queueFilter?.hasMore
 
   return (
     <div
@@ -61,55 +69,110 @@ export default function QueuePanel(): JSX.Element {
       {/* Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0 border-b border-[var(--border)]">
           <div className="flex items-center gap-2">
-            <ListMusic size={16} className="text-text-muted" />
+            <ListMusic size={15} className="text-text-muted" />
             <h2 className="text-text-primary font-semibold text-sm uppercase tracking-widest">Queue</h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {upcoming.length > 0 && (
               <button
                 onClick={clearQueue}
                 className="text-text-muted hover:text-red-400 transition-colors text-xs flex items-center gap-1"
                 title="Clear upcoming"
               >
-                <Trash2 size={13} /> Clear
+                <Trash2 size={12} /> Clear
               </button>
             )}
             <button onClick={() => setShowQueue(false)} className="text-text-muted hover:text-text-primary transition-colors">
-              <X size={18} />
+              <X size={17} />
             </button>
           </div>
         </div>
 
-        {/* Scrollable list */}
+        {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
-          {/* Now Playing */}
-          {currentTrack && (
-            <div className="px-4 pb-3">
-              <p className="text-text-muted text-xs uppercase tracking-widest px-1 mb-2">Now Playing</p>
-              <QueueRow track={currentTrack} isActive isPlaying={isPlaying} onRemove={undefined} />
+
+          {/* ── History ── (collapsible, above now playing) */}
+          {history.length > 0 && (
+            <div className="px-4 pt-4 pb-2">
+              <button
+                onClick={() => setHistoryOpen((o) => !o)}
+                className="flex items-center gap-1.5 px-1 mb-2 text-text-muted hover:text-text-secondary transition-colors w-full text-left"
+              >
+                <History size={11} />
+                <span className="text-xs uppercase tracking-widest flex-1">
+                  History · {history.length}
+                </span>
+                <ChevronDown
+                  size={12}
+                  className={`transition-transform ${historyOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {historyOpen && (
+                <div className="opacity-50 space-y-0.5">
+                  {[...history].reverse().slice(0, MAX_HISTORY_SHOWN).map((track, i) => (
+                    <QueueRow
+                      key={`hist-${track.id}-${i}`}
+                      track={track}
+                      isActive={false}
+                      isPlaying={false}
+                      onPlay={() => playTrack(track)}
+                    />
+                  ))}
+                  {history.length > MAX_HISTORY_SHOWN && (
+                    <p className="text-text-muted text-[10px] text-center py-1 opacity-60">
+                      +{history.length - MAX_HISTORY_SHOWN} older
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Upcoming */}
+          {/* ── Now Playing ── */}
+          {currentTrack ? (
+            <div className="px-4 py-3">
+              <p className="text-text-muted text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold">
+                Now Playing
+              </p>
+              <QueueRow track={currentTrack} isActive isPlaying={isPlaying} />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-44 gap-2 text-center px-8">
+              <ListMusic className="text-text-muted w-8 h-8 opacity-20" />
+              <p className="text-text-muted text-sm">Queue is empty</p>
+              <p className="text-text-muted text-xs">Play a song to get started</p>
+            </div>
+          )}
+
+          {/* Divider */}
+          {currentTrack && <div className="mx-4 border-t border-[var(--border)] opacity-40" />}
+
+          {/* ── Upcoming ── */}
           {upcoming.length > 0 ? (
-            <div className="px-4 pb-6">
-              <div className="flex items-center gap-1.5 px-1 mb-2">
-                {isRandomMode && <Shuffle size={11} className="text-accent" />}
-                <p className="text-text-muted text-xs uppercase tracking-widest">
-                  {isRandomMode ? 'Random mode' : 'Next Up'} · {upcoming.length}{queueFilter?.hasMore ? '+' : ''}
-                </p>
-              </div>
-              {upcoming.slice(0, 50).map((track, i) => (
+            <div className="px-4 pt-3 pb-6">
+              <p className="text-text-muted text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold flex items-center gap-1.5">
+                {upcomingLabel}
+                <span className="opacity-60">
+                  · {upcoming.length}{hasMore ? '+' : ''}
+                </span>
+                {queueLoadingMore && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse ml-auto" />
+                )}
+              </p>
+
+              {upcoming.slice(0, MAX_UPCOMING_SHOWN).map((track, i) => (
                 <div
-                  key={`${track.id}-${queueIndex + 1 + i}`}
+                  key={`up-${track.id}-${queueIndex + 1 + i}`}
                   draggable
                   onDragStart={(e) => handleDragStart(e, i)}
                   onDragOver={(e) => handleDragOver(e, i)}
                   onDrop={() => handleDrop(i)}
                   onDragEnd={handleDragEnd}
-                  className={`transition-all ${dragOverIdx === i && dragIdx !== i ? 'translate-y-0.5 opacity-70' : ''} ${dragIdx === i ? 'opacity-30' : ''}`}
+                  className={`transition-transform ${
+                    dragOverIdx === i && dragIdx !== i ? 'translate-y-0.5 opacity-70' : ''
+                  } ${dragIdx === i ? 'opacity-30' : ''}`}
                 >
                   <QueueRow
                     track={track}
@@ -121,51 +184,29 @@ export default function QueuePanel(): JSX.Element {
                   />
                 </div>
               ))}
-              {upcoming.length > 50 && (
+
+              {upcoming.length > MAX_UPCOMING_SHOWN && (
                 <p className="text-text-muted text-xs text-center py-2 opacity-50">
-                  +{upcoming.length - 50}{queueFilter?.hasMore ? '+' : ''} more in queue
+                  +{upcoming.length - MAX_UPCOMING_SHOWN}{hasMore ? '+' : ''} more
                 </p>
               )}
             </div>
-          ) : (
-            !currentTrack && (
-              <div className="flex flex-col items-center justify-center h-40 gap-2 text-center px-8">
-                <ListMusic className="text-text-muted w-8 h-8 opacity-30" />
-                <p className="text-text-muted text-sm">Queue is empty</p>
-                <p className="text-text-muted text-xs">Right-click a track to add it</p>
-              </div>
-            )
-          )}
-
-          {upcoming.length === 0 && currentTrack && (
-            <div className="px-5 py-3 text-text-muted text-xs text-center opacity-60">
+          ) : currentTrack ? (
+            <p className="text-text-muted text-xs text-center py-4 opacity-50">
               Nothing up next
-            </div>
-          )}
-
-          {/* History */}
-          {past.length > 0 && (
-            <div className="px-4 pb-6 opacity-50">
-              <p className="text-text-muted text-xs uppercase tracking-widest px-1 mb-2">History</p>
-              {[...past].reverse().slice(0, 8).map((track, i) => (
-                <QueueRow
-                  key={`past-${track.id}-${i}`}
-                  track={track}
-                  isActive={false}
-                  isPlaying={false}
-                  onPlay={() => playTrack(track)}
-                  onRemove={undefined}
-                />
-              ))}
-            </div>
-          )}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>
   )
 }
 
-function QueueRow({ track, isActive, isPlaying, showDrag, onPlay, onRemove }: {
+// ─── Row component ────────────────────────────────────────────────────────────
+
+function QueueRow({
+  track, isActive, isPlaying, showDrag, onPlay, onRemove,
+}: {
   track: Track
   isActive: boolean
   isPlaying: boolean
@@ -177,38 +218,55 @@ function QueueRow({ track, isActive, isPlaying, showDrag, onPlay, onRemove }: {
     <div
       className={`flex items-center gap-2 px-1 py-1.5 rounded-lg group transition-colors ${
         isActive ? 'bg-surface-overlay' : 'hover:bg-surface-overlay'
-      } ${onPlay ? 'cursor-pointer' : ''}`}
+      } ${onPlay && !isActive ? 'cursor-pointer' : ''}`}
       onDoubleClick={onPlay}
     >
+      {/* Drag handle or spacer */}
       {showDrag ? (
         <div className="text-text-muted opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing shrink-0 transition-opacity">
-          <GripVertical size={14} />
+          <GripVertical size={13} />
         </div>
       ) : (
         <div className="w-3.5 shrink-0" />
       )}
 
+      {/* Art */}
       <div className="w-9 h-9 rounded shrink-0 overflow-hidden bg-surface-overlay">
         <AlbumArtThumbnail track={track} size={36} className="w-full h-full" shimmer={false} rootMargin="200px" />
       </div>
 
+      {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className={`text-xs font-medium truncate ${isActive ? 'text-accent' : 'text-text-primary'}`}>
+        <p className={`text-xs font-medium truncate leading-tight ${isActive ? 'text-accent' : 'text-text-primary'}`}>
           {track.title}
         </p>
-        <p className="text-xs text-text-muted truncate">{track.artist}</p>
+        <p className="text-[10px] text-text-muted truncate mt-0.5">{track.artist}</p>
       </div>
 
+      {/* Duration + remove */}
       <div className="flex items-center gap-1 shrink-0">
-        <span className="text-text-muted text-xs tabular-nums opacity-60">
-          {track.duration ? formatDuration(track.duration) : '--:--'}
-        </span>
+        {!isPlaying && (
+          <span className="text-text-muted text-[10px] tabular-nums opacity-50">
+            {track.duration ? formatDuration(track.duration) : ''}
+          </span>
+        )}
+        {isPlaying && (
+          <span className="flex gap-0.5 items-end h-3">
+            {[0.4, 0.7, 1, 0.6].map((h, i) => (
+              <span
+                key={i}
+                className="w-0.5 bg-accent rounded-full animate-pulse"
+                style={{ height: `${h * 100}%`, animationDelay: `${i * 0.15}s` }}
+              />
+            ))}
+          </span>
+        )}
         {onRemove && (
           <button
             onClick={(e) => { e.stopPropagation(); onRemove() }}
-            className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-400 transition-all ml-1"
+            className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-400 transition-all ml-1 p-0.5"
           >
-            <X size={12} />
+            <X size={11} />
           </button>
         )}
       </div>

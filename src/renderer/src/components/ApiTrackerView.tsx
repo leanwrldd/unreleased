@@ -11,6 +11,7 @@ import {
   apiFetch, songToTrack, parseDuration, CATEGORY_LABELS, buildStreamUrl,
   JWApiSong, JWApiPaginatedResponse, JWApiStats, JWApiEra,
 } from '../lib/juicewrldApi'
+import { fisherYates } from '../store/queueSlice'
 import { Track } from '../types'
 import * as userApi from '../lib/userApi'
 
@@ -540,7 +541,6 @@ export default function ApiTrackerView(): JSX.Element {
     apiTrackerCategory, setApiTrackerCategory,
     apiTrackerEra, setApiTrackerEra,
     setActiveView, setApiFilesPath,
-    setQueueMode,
   } = useStore()
 
   const canEdit = !!(account?.is_editor || account?.is_administrator)
@@ -746,42 +746,28 @@ export default function ApiTrackerView(): JSX.Element {
   const handlePlay = useCallback((song: JWApiSong) => {
     const track = songToTrack(song)
     const { shuffle } = useStore.getState()
-    const hasFilters = !!(category || era || debouncedSearch)
     const playable = sortedSongs.filter((s) => !!s.path)
 
     if (shuffle) {
-      // Shuffle: pre-shuffle the visible songs so the initial context is varied,
-      // then lazy-load from a random page of the full catalog so the 150-song
-      // pool the lazy loader builds is spread across all eras / categories.
-      const others = playable.filter((s) => s.id !== song.id).map(songToTrack)
-      const shuffledOthers = others.sort(() => Math.random() - 0.5)
-      const initial = [track, ...shuffledOthers]
-      playTrack(track, initial)
+      // Full-catalog shuffle: pre-shuffle visible songs with Fisher-Yates,
+      // then lazy-load from a random catalog page so the pool spans all
+      // eras and categories.
+      const others = fisherYates(playable.filter((s) => s.id !== song.id).map(songToTrack))
       const startPage = Math.floor(Math.random() * 80) + 2
-      setQueueMode(false, { category: '', era: '', search: '', page: startPage, hasMore: true, total: 999999 })
-    } else if (!hasFilters) {
-      // No filters, no shuffle → released + unreleased random mode
-      const context = playable
-        .filter((s) => s.category === 'released' || s.category === 'unreleased')
-        .map(songToTrack)
-      playTrack(track, context.length > 0 ? context : [track])
-      setQueueMode(true, null)
-    } else if (orderField) {
-      // Sort active + filter → all songs already loaded, queue them all at once
-      const context = playable.map(songToTrack)
-      playTrack(track, context.length > 0 ? context : [track])
-      setQueueMode(false, null)
+      playTrack(track, [track, ...others], {
+        category: '', era: '', search: '',
+        page: startPage, hasMore: true, total: 999999,
+      })
     } else {
-      // Filter active (no sort) → queue first 50, lazy-fetch rest from API with same filter
-      const initial = playable.slice(0, 50).map(songToTrack)
-      playTrack(track, initial.length > 0 ? initial : [track])
-      const needsMore = count > sortedSongs.length || (hasMore && sortedSongs.length >= 50)
-      setQueueMode(false, needsMore ? {
+      // Linear: play the visible context, lazy-load if there are more pages.
+      const context = playable.map(songToTrack)
+      const needsLazy = !orderField && hasMore
+      playTrack(track, context.length > 0 ? context : [track], needsLazy ? {
         category, era, search: debouncedSearch,
-        page: 2, hasMore: true, total: count,
+        page: page + 1, hasMore: true, total: count,
       } : null)
     }
-  }, [playTrack, sortedSongs, category, era, debouncedSearch, count, hasMore, orderField, setQueueMode])
+  }, [playTrack, sortedSongs, category, era, debouncedSearch, count, hasMore, orderField, page])
 
   const handleInfo = useCallback((song: JWApiSong) => { setSelectedSong(song) }, [])
   const handleQueue = useCallback((track: Track) => { addToQueue(track) }, [addToQueue])

@@ -1,7 +1,8 @@
 import { create } from 'zustand'
-import { Track, FullTrack, ViewType, SortField, SortDir, Cols } from '../types'
+import { ViewType, SortField, SortDir, Cols, FullTrack } from '../types'
 import * as userApi from '../lib/userApi'
 import type { AccountUser, PlaylistSummary } from '../lib/userApi'
+import { createQueueSlice, QueueSlice } from './queueSlice'
 
 type ColumnConfig = Cols
 
@@ -22,71 +23,81 @@ const ls = {
   },
 }
 
-interface StoreActions {
-  // Playback
-  setQueue: (tracks: Track[], startIndex?: number) => void
-  playTrack: (track: Track, context?: Track[]) => void
-  setCurrentTrackFull: (full: FullTrack | null) => void
-  setIsPlaying: (playing: boolean) => void
-  setVolume: (vol: number) => void
-  setProgress: (progress: number) => void
-  setCurrentTime: (time: number) => void
-  toggleShuffle: () => void
-  toggleRepeat: () => void
-  nextTrack: () => Track | null
-  prevTrack: () => Track | null
+// ─── Non-queue state ──────────────────────────────────────────────────────────
+
+interface AppState {
+  // Playback extras (not queue-managed)
+  currentTrackFull: FullTrack | null
+  volume: number
+  playbackSpeed: number
 
   // UI
+  activeView: ViewType
+  showNowPlaying: boolean
+  showSettings: boolean
+  showQueue: boolean
+  viewMode: 'list' | 'grid'
+  theme: 'dark' | 'light'
+  searchQuery: string
+
+  // Sort & columns
+  sortField: SortField
+  sortDir: SortDir
+  columns: ColumnConfig
+
+  // Settings
+  crossfadeEnabled: boolean
+  crossfadeDuration: number
+  sleepTimerEnd: number | null
+  audioOutput: string
+  accentColor: string
+
+  // Liked songs
+  likedTrackIds: string[]
+
+  // API tracker extras
+  apiTrackerCategory: string
+  apiTrackerEra: string
+  apiFilesPath: string
+
+  // Account
+  account: AccountUser | null
+  playlists: PlaylistSummary[]
+  showUserAuth: boolean
+
+  // Editor
+  pendingEditorSongId: number | null
+}
+
+interface AppActions {
+  setCurrentTrackFull: (full: FullTrack | null) => void
+  setVolume: (vol: number) => void
+  setPlaybackSpeed: (speed: number) => void
+
   setActiveView: (view: ViewType) => void
   setShowNowPlaying: (show: boolean) => void
   setShowSettings: (show: boolean) => void
+  setShowQueue: (show: boolean) => void
   setViewMode: (mode: 'list' | 'grid') => void
   setTheme: (theme: 'dark' | 'light') => void
   setSearchQuery: (q: string) => void
 
-  // Sort & columns
   setSort: (field: SortField, dir: SortDir) => void
   toggleColumn: (col: keyof ColumnConfig) => void
   setColumns: (columns: ColumnConfig) => void
 
-  // Queue management
-  setShowQueue: (show: boolean) => void
-  addToQueue: (track: Track) => void
-  playNext: (track: Track) => void
-  removeFromQueue: (index: number) => void
-  clearQueue: () => void
-  reorderQueue: (fromIdx: number, toIdx: number) => void
-
-  // Crossfade
   setCrossfade: (enabled: boolean, duration: number) => void
-
-  // Sleep timer
   setSleepTimer: (endTimestamp: number | null) => void
-
-  // Audio output
   setAudioOutput: (deviceId: string) => void
-
-  // Accent color
   setAccentColor: (color: string) => void
 
-  // Playback speed
-  setPlaybackSpeed: (speed: number) => void
-
-  // Liked songs
   setLikedTrackIds: (ids: string[]) => void
   toggleLike: (trackId: string) => void
 
-  // API extras
   setApiTrackerCategory: (cat: string) => void
   setApiTrackerEra: (era: string) => void
-  apiFilesPath: string
   setApiFilesPath: (path: string) => void
 
-  // Queue mode
-  setQueueMode: (randomMode: boolean, filter: AppStore['queueFilter']) => void
-  appendQueueItems: (tracks: Track[]) => void
-
-  // Public account (favorites + playlists)
   setShowUserAuth: (show: boolean) => void
   loadAccount: () => Promise<void>
   loginWithDiscord: () => Promise<void>
@@ -94,177 +105,36 @@ interface StoreActions {
   logoutAccount: () => Promise<void>
   refreshPlaylists: () => Promise<void>
 
-  // Editor
   setPendingEditorSongId: (id: number | null) => void
 }
 
-interface AppStore {
-  queue: Track[]
-  queueIndex: number
-  currentTrack: Track | null
-  currentTrackFull: FullTrack | null
-  isPlaying: boolean
-  volume: number
-  progress: number
-  currentTime: number
-  shuffle: boolean
-  repeat: 'none' | 'all' | 'one'
-  activeView: ViewType
-  showNowPlaying: boolean
-  showSettings: boolean
-  viewMode: 'list' | 'grid'
-  theme: 'dark' | 'light'
-  searchQuery: string
-  sortField: SortField
-  sortDir: SortDir
-  columns: ColumnConfig
-  showQueue: boolean
-  crossfadeEnabled: boolean
-  crossfadeDuration: number
-  sleepTimerEnd: number | null
-  audioOutput: string
-  accentColor: string
-  playbackSpeed: number
-  likedTrackIds: string[]
-  apiTrackerCategory: string
-  apiTrackerEra: string
-  isRandomMode: boolean
-  queueFilter: { category: string; era: string; search: string; page: number; hasMore: boolean; total: number } | null
-  account: AccountUser | null
-  playlists: PlaylistSummary[]
-  showUserAuth: boolean
-  pendingEditorSongId: number | null
-}
+export type AppStore = QueueSlice & AppState & AppActions
 
-export const useStore = create<AppStore & StoreActions>((set, get) => ({
-  // ─── Initial state ───────────────────────────────────────────────────────────
-  queue: [],
-  queueIndex: -1,
-  currentTrack: null,
+// ─── Store ────────────────────────────────────────────────────────────────────
+
+export const useStore = create<AppStore>((set, get, store) => ({
+  // ── Queue slice (all queue + playback logic) ───────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ...createQueueSlice(set, get, store as any),
+
+  // ── Playback extras ───────────────────────────────────────────────────────
   currentTrackFull: null,
-  isPlaying: false,
   volume: ls.get<number>('volume') ?? 0.8,
-  progress: 0,
-  currentTime: 0,
-  shuffle: false,
-  repeat: 'none',
+  playbackSpeed: ls.get<number>('playbackSpeed') ?? 1,
+
+  setCurrentTrackFull: (currentTrackFull) => set({ currentTrackFull }),
+  setVolume: (volume) => { set({ volume }); ls.set('volume', volume) },
+  setPlaybackSpeed: (speed) => { set({ playbackSpeed: speed }); ls.set('playbackSpeed', speed) },
+
+  // ── UI ────────────────────────────────────────────────────────────────────
   activeView: 'api-tracker',
   showNowPlaying: false,
   showSettings: false,
+  showQueue: false,
   viewMode: ls.get<'list' | 'grid'>('viewMode') ?? 'list',
   theme: ls.get<'dark' | 'light'>('theme') ?? 'dark',
   searchQuery: '',
-  sortField: ls.get<SortField>('sortField') ?? 'default',
-  sortDir: ls.get<SortDir>('sortDir') ?? 'asc',
-  columns: ls.get<ColumnConfig>('columns') ?? {
-    art: true,
-    artist: true,
-    album: true,
-    year: false,
-    genre: false,
-    duration: true,
-  },
-  showQueue: false,
-  crossfadeEnabled: ls.get<boolean>('crossfadeEnabled') ?? false,
-  crossfadeDuration: ls.get<number>('crossfadeDuration') ?? 5,
-  sleepTimerEnd: null,
-  audioOutput: ls.get<string>('audioOutput') ?? '',
-  accentColor: ls.get<string>('accentColor') ?? '#1db954',
-  playbackSpeed: ls.get<number>('playbackSpeed') ?? 1,
-  likedTrackIds: ls.get<string[]>('likedTrackIds') ?? [],
-  apiTrackerCategory: '',
-  apiTrackerEra: '',
-  apiFilesPath: '',
-  isRandomMode: false,
-  queueFilter: null,
-  account: null,
-  playlists: [],
-  showUserAuth: false,
-  pendingEditorSongId: null,
 
-  // ─── Playback ────────────────────────────────────────────────────────────────
-  setQueue: (tracks, startIndex = 0) =>
-    set({ queue: tracks, queueIndex: startIndex, currentTrack: tracks[startIndex] || null }),
-
-  playTrack: (track, context) => {
-    const s = get()
-    const tracks = context || s.queue
-    const idx = tracks.findIndex((t) => t.id === track.id)
-    set({
-      queue: tracks,
-      queueIndex: idx >= 0 ? idx : 0,
-      currentTrack: track,
-      isPlaying: true,
-      currentTrackFull: null,
-    })
-  },
-
-  setCurrentTrackFull: (full) => set({ currentTrackFull: full }),
-  setIsPlaying: (isPlaying) => set({ isPlaying }),
-  setVolume: (volume) => { set({ volume }); ls.set('volume', volume) },
-  setProgress: (progress) => set({ progress }),
-  setCurrentTime: (currentTime) => set({ currentTime }),
-
-  toggleShuffle: () => set((s) => {
-    const newShuffle = !s.shuffle
-    // When turning shuffle ON while a filtered queue is active, switch to the full
-    // catalog so the user isn't stuck shuffling within a single era or search.
-    if (newShuffle && s.queueFilter) {
-      const startPage = Math.floor(Math.random() * 80) + 1
-      return {
-        shuffle: newShuffle,
-        queueFilter: { category: '', era: '', search: '', page: startPage, hasMore: true, total: 999999 },
-      }
-    }
-    return { shuffle: newShuffle }
-  }),
-  toggleRepeat: () =>
-    set((s) => {
-      const order: Array<'none' | 'all' | 'one'> = ['none', 'all', 'one']
-      return { repeat: order[(order.indexOf(s.repeat) + 1) % 3] }
-    }),
-
-  nextTrack: () => {
-    const { queue, queueIndex, shuffle, repeat } = get()
-    if (queue.length === 0) return null
-    let nextIdx: number
-    if (shuffle) {
-      if (queue.length > 1) {
-        let r: number
-        do { r = Math.floor(Math.random() * queue.length) } while (r === queueIndex)
-        nextIdx = r
-      } else {
-        nextIdx = 0
-      }
-    } else if (repeat === 'one') {
-      nextIdx = queueIndex
-    } else {
-      nextIdx = (queueIndex + 1) % queue.length
-      if (nextIdx === 0 && repeat === 'none') {
-        set({ isPlaying: false })
-        return null
-      }
-    }
-    const track = queue[nextIdx]
-    const isSameTrack = nextIdx === queueIndex
-    set({ queueIndex: nextIdx, currentTrack: track, currentTrackFull: isSameTrack ? get().currentTrackFull : null, isPlaying: true })
-    return track
-  },
-
-  prevTrack: () => {
-    const { queue, queueIndex, currentTime } = get()
-    if (queue.length === 0) return null
-    if (currentTime > 3) {
-      set({ currentTime: 0, progress: 0 })
-      return get().currentTrack
-    }
-    const prevIdx = (queueIndex - 1 + queue.length) % queue.length
-    const track = queue[prevIdx]
-    set({ queueIndex: prevIdx, currentTrack: track, currentTrackFull: null, isPlaying: true })
-    return track
-  },
-
-  // ─── UI ──────────────────────────────────────────────────────────────────────
   setActiveView: (view) => {
     const paths: Partial<Record<ViewType, string>> = {
       'api-categories': '/categories',
@@ -276,18 +146,23 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
       'liked': '/liked',
       'playlists': '/playlists',
     }
-    const path = paths[view] ?? '/tracker'
-    window.history.pushState({ view }, '', path)
+    window.history.pushState({ view }, '', paths[view] ?? '/tracker')
     set({ activeView: view })
   },
   setShowNowPlaying: (showNowPlaying) => set({ showNowPlaying }),
   setShowSettings: (showSettings) => set({ showSettings }),
+  setShowQueue: (showQueue) => set({ showQueue }),
   setViewMode: (viewMode) => { set({ viewMode }); ls.set('viewMode', viewMode) },
   setTheme: (theme) => { set({ theme }); ls.set('theme', theme) },
   setSearchQuery: (searchQuery) => set({ searchQuery }),
-  setShowQueue: (showQueue) => set({ showQueue }),
 
-  // ─── Sort & columns ───────────────────────────────────────────────────────────
+  // ── Sort & columns ────────────────────────────────────────────────────────
+  sortField: ls.get<SortField>('sortField') ?? 'default',
+  sortDir: ls.get<SortDir>('sortDir') ?? 'asc',
+  columns: ls.get<ColumnConfig>('columns') ?? {
+    art: true, artist: true, album: true, year: false, genre: false, duration: true,
+  },
+
   setSort: (sortField, sortDir) => {
     set({ sortField, sortDir })
     ls.set('sortField', sortField)
@@ -299,46 +174,27 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   },
   setColumns: (columns) => set({ columns }),
 
-  // ─── Queue management ─────────────────────────────────────────────────────────
-  addToQueue: (track) => set((s) => ({ queue: [...s.queue, track] })),
-  playNext: (track) =>
-    set((s) => {
-      const after = s.queueIndex + 1
-      const next = [...s.queue.slice(0, after), track, ...s.queue.slice(after)]
-      return { queue: next }
-    }),
-  removeFromQueue: (index) =>
-    set((s) => {
-      const next = s.queue.filter((_, i) => i !== index)
-      const newIndex = index <= s.queueIndex ? Math.max(0, s.queueIndex - 1) : s.queueIndex
-      return { queue: next, queueIndex: newIndex }
-    }),
-  clearQueue: () =>
-    set((s) => {
-      const current = s.currentTrack ? [s.currentTrack] : []
-      return { queue: current, queueIndex: 0 }
-    }),
-  reorderQueue: (fromIdx, toIdx) =>
-    set((s) => {
-      const base = s.queueIndex + 1
-      const upcoming = [...s.queue.slice(base)]
-      const [moved] = upcoming.splice(fromIdx, 1)
-      upcoming.splice(toIdx, 0, moved)
-      return { queue: [...s.queue.slice(0, base), ...upcoming] }
-    }),
+  // ── Settings ──────────────────────────────────────────────────────────────
+  crossfadeEnabled: ls.get<boolean>('crossfadeEnabled') ?? false,
+  crossfadeDuration: ls.get<number>('crossfadeDuration') ?? 5,
+  sleepTimerEnd: null,
+  audioOutput: ls.get<string>('audioOutput') ?? '',
+  accentColor: ls.get<string>('accentColor') ?? '#1db954',
 
-  // ─── Settings ────────────────────────────────────────────────────────────────
   setCrossfade: (enabled, duration) => {
     set({ crossfadeEnabled: enabled, crossfadeDuration: duration })
     ls.set('crossfadeEnabled', enabled)
     ls.set('crossfadeDuration', duration)
   },
-  setSleepTimer: (endTimestamp) => set({ sleepTimerEnd: endTimestamp }),
+  setSleepTimer: (sleepTimerEnd) => set({ sleepTimerEnd }),
   setAudioOutput: (deviceId) => { set({ audioOutput: deviceId }); ls.set('audioOutput', deviceId) },
   setAccentColor: (color) => { set({ accentColor: color }); ls.set('accentColor', color) },
-  setPlaybackSpeed: (speed) => { set({ playbackSpeed: speed }); ls.set('playbackSpeed', speed) },
+
+  // ── Liked songs ───────────────────────────────────────────────────────────
+  likedTrackIds: ls.get<string[]>('likedTrackIds') ?? [],
 
   setLikedTrackIds: (ids) => set({ likedTrackIds: ids }),
+
   toggleLike: (trackId) => {
     const { likedTrackIds, account } = get()
     const wasLiked = likedTrackIds.includes(trackId)
@@ -364,15 +220,22 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
     }
   },
 
-  // ─── API extras ──────────────────────────────────────────────────────────────
+  // ── API tracker extras ────────────────────────────────────────────────────
+  apiTrackerCategory: '',
+  apiTrackerEra: '',
+  apiFilesPath: '',
+
   setApiTrackerCategory: (cat) => set({ apiTrackerCategory: cat }),
   setApiTrackerEra: (era) => set({ apiTrackerEra: era }),
   setApiFilesPath: (path) => set({ apiFilesPath: path }),
-  setQueueMode: (randomMode, filter) => set({ isRandomMode: randomMode, queueFilter: filter }),
-  appendQueueItems: (tracks) => set((s) => ({ queue: [...s.queue, ...tracks] })),
 
-  // ─── Public account ─────────────────────────────────────────────────────────────
+  // ── Account ───────────────────────────────────────────────────────────────
+  account: null,
+  playlists: [],
+  showUserAuth: false,
+
   setShowUserAuth: (showUserAuth) => set({ showUserAuth }),
+
   loadAccount: async () => {
     if (!userApi.getToken()) return
     try {
@@ -428,6 +291,7 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
     } catch {}
   },
 
-  // ─── Editor ───────────────────────────────────────────────────────────────────
+  // ── Editor ────────────────────────────────────────────────────────────────
+  pendingEditorSongId: null,
   setPendingEditorSongId: (pendingEditorSongId) => set({ pendingEditorSongId }),
 }))
