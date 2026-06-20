@@ -2,18 +2,11 @@ import { useEffect, useState } from 'react'
 import { Play, Loader2, Music2, Share2, Download } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { apiFetch, buildStreamUrl, buildCoverArtUrl } from '../lib/juicewrldApi'
+import { liteSongToTrack, ApiSongLite } from '../lib/userApi'
 import { Track } from '../types'
 
-type SharedPlaylistData =
-  | string[]
-  | {
-      share_id?: string
-      paths?: string[]
-      songs?: Array<{ path?: string; file_path?: string; url?: string; [key: string]: unknown }>
-      items?: Array<{ path?: string; song?: { path?: string; file_path?: string }; [key: string]: unknown }>
-      tracks?: Array<{ path?: string; [key: string]: unknown }>
-      results?: Array<{ path?: string; [key: string]: unknown }>
-    }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyObject = Record<string, any>
 
 function pathToTrack(path: string): Track {
   return {
@@ -33,6 +26,51 @@ function pathToTrack(path: string): Track {
   }
 }
 
+/** Returns true if an object looks like a full ApiSongLite (has id + name + path). */
+function isApiSongLite(obj: AnyObject): obj is ApiSongLite {
+  return typeof obj === 'object' && obj !== null && 'id' in obj && 'name' in obj && 'path' in obj
+}
+
+/** Convert whatever the API returns into a Track array. */
+function parseTracks(data: unknown): Track[] {
+  if (!data) return []
+
+  // Plain array
+  if (Array.isArray(data)) {
+    if (data.length === 0) return []
+    const first = data[0]
+    if (typeof first === 'string') return (data as string[]).filter(Boolean).map(pathToTrack)
+    if (isApiSongLite(first)) return (data as ApiSongLite[]).map(liteSongToTrack)
+    // Array of objects with path
+    return (data as AnyObject[]).map(s => {
+      const path = (s.path ?? s.file_path ?? s.url ?? '') as string
+      return path ? pathToTrack(path) : null
+    }).filter(Boolean) as Track[]
+  }
+
+  const obj = data as AnyObject
+  const candidates = [obj.songs, obj.items, obj.tracks, obj.results]
+  for (const list of candidates) {
+    if (!Array.isArray(list) || list.length === 0) continue
+    const first = list[0]
+    // Full song objects
+    if (isApiSongLite(first)) return (list as ApiSongLite[]).map(liteSongToTrack)
+    // Items with nested song
+    if (first.song && isApiSongLite(first.song)) return list.map((i: AnyObject) => liteSongToTrack(i.song as ApiSongLite))
+    // Objects with path
+    const tracks = list.map((s: AnyObject) => {
+      const path = (s.path ?? s.file_path ?? s.url ?? '') as string
+      return path ? pathToTrack(path) : null
+    }).filter(Boolean) as Track[]
+    if (tracks.length) return tracks
+  }
+
+  // Flat paths array
+  if (Array.isArray(obj.paths)) return (obj.paths as string[]).filter(Boolean).map(pathToTrack)
+
+  return []
+}
+
 export default function SharedPlaylistView(): JSX.Element {
   const { playTrack } = useStore()
   const shareId = window.location.pathname.split('/shared/')[1]?.split('/')[0] ?? ''
@@ -44,24 +82,11 @@ export default function SharedPlaylistView(): JSX.Element {
 
   useEffect(() => {
     if (!shareId) { setError(true); setLoading(false); return }
-    apiFetch<SharedPlaylistData>(`/playlists/shared/${shareId}/`)
+    apiFetch<unknown>(`/playlists/shared/${shareId}/`)
       .then(data => {
-        let paths: string[] = []
-        if (Array.isArray(data)) {
-          // Response is a plain array of paths or objects
-          paths = data.map(item => (typeof item === 'string' ? item : (item as Record<string, unknown>).path as string ?? '')).filter(Boolean)
-        } else if (data.paths) {
-          paths = data.paths
-        } else if (data.songs) {
-          paths = data.songs.map(s => s.path ?? s.file_path ?? s.url ?? '').filter(Boolean) as string[]
-        } else if (data.items) {
-          paths = data.items.map(i => i.path ?? i.song?.path ?? i.song?.file_path ?? '').filter(Boolean) as string[]
-        } else if (data.tracks) {
-          paths = data.tracks.map(t => t.path ?? '').filter(Boolean) as string[]
-        } else if (data.results) {
-          paths = data.results.map(r => r.path ?? '').filter(Boolean) as string[]
-        }
-        setTracks(paths.map(pathToTrack))
+        const parsed = parseTracks(data)
+        if (parsed.length === 0 && data != null) setError(true)
+        else setTracks(parsed)
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false))
@@ -120,9 +145,9 @@ export default function SharedPlaylistView(): JSX.Element {
           >
             <span className="text-text-muted text-xs w-6 text-right tabular-nums shrink-0">{i + 1}</span>
             <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-surface-overlay shrink-0 flex items-center justify-center">
-              {!imgErrors.has(t.id) && t.imageUrl ? (
+              {!imgErrors.has(t.id) && (t.imageUrl || t.hasAlbumArt) ? (
                 <img
-                  src={t.imageUrl}
+                  src={t.imageUrl ?? ''}
                   alt=""
                   className="w-full h-full object-cover"
                   onError={() => setImgErrors(prev => new Set([...prev, t.id]))}

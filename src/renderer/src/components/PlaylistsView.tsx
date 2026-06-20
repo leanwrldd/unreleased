@@ -3,7 +3,7 @@ import {
   ListMusic, Play, Loader2, Plus, Trash2, Pencil, ArrowLeft,
   X, Check, Heart, Shuffle, Music2, Clock, GripVertical,
   ListPlus, Download, Share2, Archive, Info, FolderInput, MoreHorizontal,
-  Search, ChevronUp, ChevronDown, Camera, ImageOff,
+  Search, ChevronUp, ChevronDown, ImageOff,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
@@ -492,7 +492,7 @@ export default function PlaylistsView(): JSX.Element {
                   <Loader2 size={24} className="text-white animate-spin" />
                 ) : (
                   <>
-                    <Camera size={24} className="text-white" />
+                    <Pencil size={24} className="text-white" />
                     <span className="text-white text-xs font-medium">Change cover</span>
                   </>
                 )}
@@ -553,13 +553,16 @@ export default function PlaylistsView(): JSX.Element {
                 </div>
               ) : (
                 <button
-                  className="text-left mb-3 group/desc block"
+                  className="text-left mb-3 group/desc flex items-start gap-1.5"
                   onClick={() => { setDescValue(detail?.description ?? ''); setEditingDesc(true) }}
                 >
                   {detail?.description ? (
-                    <p className="text-text-muted text-sm line-clamp-2 group-hover/desc:text-text-secondary transition-colors">{detail.description}</p>
+                    <>
+                      <p className="text-text-muted text-sm line-clamp-2 group-hover/desc:text-text-secondary transition-colors">{detail.description}</p>
+                      <Pencil size={11} className="text-text-muted opacity-0 group-hover/desc:opacity-60 transition-opacity shrink-0 mt-1" />
+                    </>
                   ) : (
-                    <p className="text-text-muted text-sm opacity-0 group-hover/desc:opacity-50 transition-opacity">+ Add description</p>
+                    <p className="text-text-muted text-sm opacity-40 hover:opacity-70 transition-opacity italic">+ Add description</p>
                   )}
                 </button>
               )}
