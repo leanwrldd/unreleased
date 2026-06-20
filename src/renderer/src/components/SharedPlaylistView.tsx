@@ -49,7 +49,7 @@ function parseTracks(data: unknown): Track[] {
   }
 
   const obj = data as AnyObject
-  const candidates = [obj.songs, obj.items, obj.tracks, obj.results]
+  const candidates = [obj.songs, obj.items, obj.tracks, obj.results, obj.data, obj.playlist_songs, obj.song_list]
   for (const list of candidates) {
     if (!Array.isArray(list) || list.length === 0) continue
     const first = list[0]
@@ -85,8 +85,7 @@ export default function SharedPlaylistView(): JSX.Element {
     apiFetch<unknown>(`/playlists/shared/${shareId}/`)
       .then(data => {
         const parsed = parseTracks(data)
-        if (parsed.length === 0 && data != null) setError(true)
-        else setTracks(parsed)
+        setTracks(parsed)
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false))

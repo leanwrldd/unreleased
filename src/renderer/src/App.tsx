@@ -3,6 +3,7 @@ import { useStore } from './store/useStore'
 import { ViewType } from './types'
 
 function getViewFromPath(pathname: string): ViewType {
+  if (pathname === '/' || pathname === '/tracker') return 'api-tracker'
   if (pathname.startsWith('/files')) return 'api-files'
   if (pathname === '/categories') return 'api-categories'
   if (pathname === '/editor') return 'editor'
@@ -11,7 +12,8 @@ function getViewFromPath(pathname: string): ViewType {
   if (pathname === '/liked') return 'liked'
   if (pathname === '/playlists') return 'playlists'
   if (pathname.startsWith('/shared/')) return 'shared-playlist'
-  return 'api-tracker'
+  if (pathname === '/auth/discord/callback') return 'api-tracker'
+  return 'not-found'
 }
 
 import Sidebar from './components/Sidebar'
@@ -26,6 +28,7 @@ import LikedSongsView from './components/LikedSongsView'
 import PlaylistsView from './components/PlaylistsView'
 import SharedPlaylistView from './components/SharedPlaylistView'
 import EditorProfileView from './components/EditorProfileView'
+import NotFoundView from './components/NotFoundView'
 import UserAuthModal from './components/UserAuthModal'
 import Player from './components/Player'
 import NowPlaying from './components/NowPlaying'
@@ -105,6 +108,7 @@ export default function App(): JSX.Element {
               : activeView === 'playlists' ? <PlaylistsView />
               : activeView === 'shared-playlist' ? <SharedPlaylistView />
               : activeView === 'editor-profile' ? <EditorProfileView />
+              : activeView === 'not-found' ? <NotFoundView />
               : <ApiTrackerView />}
           </ErrorBoundary>
           {showNowPlaying && <ErrorBoundary><NowPlaying /></ErrorBoundary>}

@@ -453,7 +453,7 @@ export default function PlaylistsView(): JSX.Element {
     }
 
     return (
-      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto" onClick={() => { setTrackMenu(null); setShowAddAllMenu(false) }}>
+      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden" onClick={() => { setTrackMenu(null); setShowAddAllMenu(false) }}>
         {/* Back */}
         <div className="px-6 pt-5 shrink-0">
           <button onClick={() => { setSelectedId(null); setRenaming(false) }} className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-sm transition-colors mb-4">
@@ -496,6 +496,10 @@ export default function PlaylistsView(): JSX.Element {
                     <span className="text-white text-xs font-medium">Change cover</span>
                   </>
                 )}
+              </div>
+              {/* Permanent pencil badge — always visible */}
+              <div className="absolute bottom-1.5 right-1.5 p-1 rounded-md bg-black/60 text-white pointer-events-none">
+                <Pencil size={11} />
               </div>
               {/* Remove cover button */}
               {detail?.cover_image_url && (

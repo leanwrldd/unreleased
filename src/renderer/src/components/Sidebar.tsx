@@ -74,9 +74,9 @@ export default function Sidebar(): JSX.Element {
         {account ? (
           <div className={`flex items-center py-2 rounded text-sm ${collapsed ? 'justify-center px-2' : 'gap-2 px-3'}`}>
             <button
-              onClick={() => (account.is_editor || account.is_administrator) ? setActiveView('editor-profile') : undefined}
+              onClick={() => setActiveView('editor-profile')}
               title={collapsed ? (account.display_name || account.discord_username) : undefined}
-              className={`flex items-center gap-2 min-w-0 flex-1 ${(account.is_editor || account.is_administrator) ? 'cursor-pointer hover:opacity-80 transition-opacity' : 'cursor-default'} ${collapsed ? 'justify-center' : ''}`}
+              className={`flex items-center gap-2 min-w-0 flex-1 cursor-pointer hover:opacity-80 transition-opacity ${collapsed ? 'justify-center' : ''}`}
             >
               {account.discord_avatar ? (
                 <img src={account.discord_avatar} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
