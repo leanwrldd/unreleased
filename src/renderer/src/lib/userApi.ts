@@ -212,16 +212,17 @@ export async function updatePlaylist(id: number, data: { name?: string; descript
 }
 
 export async function uploadPlaylistCover(id: number, file: File): Promise<PlaylistDetail> {
-  const token = getToken()
-  const form = new FormData()
-  form.append('cover_image', file)
-  const res = await fetch(`${LIBRARY_BASE}/playlists/${id}/`, {
-    method: 'PATCH',
-    headers: token ? { Authorization: `Token ${token}` } : {},
-    body: form,
+  // API expects JSON with base64 data URI — multipart/form-data is not supported
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
   })
-  if (!res.ok) throw new Error(await parseError(res))
-  return res.json() as Promise<PlaylistDetail>
+  return request(`${LIBRARY_BASE}/playlists/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ cover_image: base64 }),
+  })
 }
 
 export async function removePlaylistCover(id: number): Promise<PlaylistDetail> {

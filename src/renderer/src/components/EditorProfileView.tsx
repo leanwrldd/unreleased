@@ -109,13 +109,6 @@ export default function EditorProfileView(): JSX.Element {
               <p className="text-text-muted text-xs mt-0.5 flex items-center gap-1.5">
                 <Trophy size={10} className="text-accent" />
                 Rank #{myEntry.rank} · {myEntry.approved_count} approved
-                {myEntry.badges.length > 0 && (
-                  <span className="ml-1">
-                    {myEntry.badges.slice(0, 5).map(b => (
-                      <span key={b.slug} title={b.name}>{b.icon}</span>
-                    ))}
-                  </span>
-                )}
               </p>
             )}
           </div>
@@ -199,13 +192,13 @@ export default function EditorProfileView(): JSX.Element {
         </div>
 
         {/* ── Right: Leaderboard ── */}
-        <div className="w-64 flex flex-col min-h-0 overflow-hidden shrink-0">
-          <div className="px-4 pt-4 pb-3 shrink-0 flex items-center gap-2">
+        <div className="w-80 flex flex-col min-h-0 overflow-hidden shrink-0">
+          <div className="px-5 pt-4 pb-3 shrink-0 flex items-center gap-2">
             <Trophy size={13} className="text-text-muted" />
             <h2 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">Leaderboard</h2>
           </div>
 
-          <div className="flex-1 overflow-y-auto min-h-0 px-2 pb-6">
+          <div className="flex-1 overflow-y-auto min-h-0 px-3 pb-6">
             {loadingLeaderboard ? (
               <div className="flex justify-center py-12">
                 <Loader2 size={18} className="animate-spin text-text-muted" />
@@ -223,7 +216,7 @@ export default function EditorProfileView(): JSX.Element {
                   return (
                     <div
                       key={entry.user_id}
-                      className={`flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors ${
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
                         isMe
                           ? 'bg-accent/8 ring-1 ring-accent/20'
                           : rankStyle
@@ -238,32 +231,20 @@ export default function EditorProfileView(): JSX.Element {
 
                       {/* Avatar */}
                       {entry.discord_avatar ? (
-                        <img src={entry.discord_avatar} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+                        <img src={entry.discord_avatar} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
                       ) : (
-                        <div className="w-6 h-6 rounded-full bg-surface-raised flex items-center justify-center text-[10px] text-text-muted shrink-0">
+                        <div className="w-7 h-7 rounded-full bg-surface-raised flex items-center justify-center text-xs text-text-muted shrink-0">
                           {(entry.discord_username || '?').charAt(0).toUpperCase()}
                         </div>
                       )}
 
                       {/* Name */}
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-xs truncate leading-tight ${isMe ? 'text-accent font-semibold' : 'text-text-primary'}`}>
-                          {entry.username || entry.discord_username}
-                          {isMe && <span className="ml-1 opacity-60 font-normal">you</span>}
-                        </p>
-                        {entry.badges.length > 0 && (
-                          <p className="text-[11px] leading-tight mt-0.5">
-                            {entry.badges.slice(0, 4).map(b => (
-                              <span key={b.slug} title={b.name}>{b.icon}</span>
-                            ))}
-                            {entry.badges.length > 4 && (
-                              <span className="text-text-muted ml-0.5">+{entry.badges.length - 4}</span>
-                            )}
-                          </p>
-                        )}
-                      </div>
+                      <p className={`flex-1 min-w-0 text-sm truncate ${isMe ? 'text-accent font-semibold' : 'text-text-primary'}`}>
+                        {entry.username || entry.discord_username}
+                        {isMe && <span className="ml-1.5 text-xs opacity-60 font-normal">you</span>}
+                      </p>
 
-                      {/* Count */}
+                      {/* Approved count */}
                       <span className={`text-xs tabular-nums shrink-0 font-semibold ${isMe ? 'text-accent' : rankStyle ? 'text-text-secondary' : 'text-text-muted'}`}>
                         {entry.approved_count}
                       </span>
