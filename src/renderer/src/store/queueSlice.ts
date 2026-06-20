@@ -281,7 +281,7 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
 
   // ── toggleShuffle ──────────────────────────────────────────────────────────
   toggleShuffle: () => {
-    const { shuffle, queue, queueIndex, queueFilter, radioMode } = get()
+    const { shuffle, queue, queueIndex, queueFilter, radioMode, currentTrack } = get()
     const newShuffle = !shuffle
 
     if (!newShuffle) {
@@ -295,7 +295,15 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       return
     }
 
-    // Turning ON (non-radio): shuffle the upcoming portion
+    // Turning ON: if a tracker song is already playing, switch to radio mode
+    const isTrackerSong = currentTrack?.id?.startsWith('jw-') ?? false
+    if (isTrackerSong && currentTrack) {
+      set({ shuffle: true })
+      get().startRadio(currentTrack)
+      return
+    }
+
+    // Turning ON (non-tracker): shuffle the upcoming portion
     const played = queue.slice(0, queueIndex + 1)
     const upcoming = fisherYates(queue.slice(queueIndex + 1))
     const newFilter: QueueFilter | null = queueFilter

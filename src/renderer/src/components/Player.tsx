@@ -18,6 +18,8 @@ import {
   MoreHorizontal,
   ListPlus,
   Radio,
+  ListEnd,
+  Info,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { formatDuration } from '../lib/lyrics'
@@ -25,6 +27,7 @@ import { apiFetch, JWApiSong } from '../lib/juicewrldApi'
 import { trackIdToSongId } from '../lib/userApi'
 import { FullTrack } from '../types'
 import AddToPlaylistMenu from './AddToPlaylistMenu'
+import SongInfoModal from './SongInfoModal'
 
 let _seek: ((t: number) => void) | null = null
 export function seekAudio(t: number): void { _seek?.(t) }
@@ -65,13 +68,28 @@ export default function Player(): JSX.Element {
     likedTrackIds,
     toggleLike,
     setActiveView,
+    playNext,
   } = useStore()
 
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false)
+  const [showSongInfo, setShowSongInfo] = useState(false)
+  const [songInfoData, setSongInfoData] = useState<JWApiSong | null>(null)
   const contextMenuBtnRef = useRef<HTMLButtonElement>(null)
   const currentSongId = currentTrack ? trackIdToSongId(currentTrack.id) : null
   const { radioMode } = useStore()
+
+  const openSongInfo = (): void => {
+    setShowContextMenu(false)
+    if (!currentTrack) return
+    const match = currentTrack.id.match(/^jw-(\d+)$/)
+    if (!match) return
+    setSongInfoData(null)
+    setShowSongInfo(true)
+    apiFetch<JWApiSong>(`/songs/${match[1]}/`)
+      .then((song) => setSongInfoData(song))
+      .catch(() => setShowSongInfo(false))
+  }
 
   // Two audio slots — ping-pong between them for crossfade
   const slotA = useRef<HTMLAudioElement>(null)
@@ -556,7 +574,7 @@ export default function Player(): JSX.Element {
       {/* ── Desktop player ── */}
       <div className="hidden md:flex h-[90px] bg-surface border-t border-[var(--border)] items-center px-4 gap-4 shrink-0">
         {/* Track info */}
-        <div className="flex items-center gap-3 w-72 min-w-0">
+        <div className="flex items-center gap-3 w-64 min-w-0 shrink-0">
           <button
             className="w-14 h-14 rounded-md bg-surface-overlay shrink-0 overflow-hidden hover:ring-2 ring-accent transition-all"
             onClick={() => setShowNowPlaying(!showNowPlaying)}
@@ -586,54 +604,69 @@ export default function Player(): JSX.Element {
               )}
             </div>
           </div>
+        </div>
 
-          {/* Heart + 3-dot — aligned in a tight flex group */}
-          <div className="flex items-center gap-1 shrink-0 ml-1">
+        {/* Heart + 3-dot (standalone column) */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          <button
+            className={`p-1.5 rounded transition-colors ${currentTrack && likedTrackIds.includes(currentTrack.id) ? 'text-accent' : 'text-text-muted hover:text-accent'}`}
+            onClick={() => currentTrack && toggleLike(currentTrack.id)}
+            title="Like"
+            disabled={!currentTrack}
+          >
+            <Heart size={15} fill={currentTrack && likedTrackIds.includes(currentTrack.id) ? 'currentColor' : 'none'} />
+          </button>
+
+          <div className="relative">
             <button
-              className={`p-1 rounded transition-colors ${currentTrack && likedTrackIds.includes(currentTrack.id) ? 'text-accent' : 'text-text-muted hover:text-accent'}`}
-              onClick={() => currentTrack && toggleLike(currentTrack.id)}
-              title="Like"
+              ref={contextMenuBtnRef}
+              className="p-1.5 rounded text-text-muted hover:text-text-primary transition-colors"
+              onClick={() => setShowContextMenu((v) => !v)}
+              title="More options"
+              disabled={!currentTrack}
             >
-              <Heart size={15} fill={currentTrack && likedTrackIds.includes(currentTrack.id) ? 'currentColor' : 'none'} />
+              <MoreHorizontal size={15} />
             </button>
 
-            <div className="relative">
-              <button
-                ref={contextMenuBtnRef}
-                className="p-1 rounded text-text-muted hover:text-text-primary transition-colors"
-                onClick={() => setShowContextMenu((v) => !v)}
-                title="More options"
-                disabled={!currentTrack}
-              >
-                <MoreHorizontal size={15} />
-              </button>
-
-              {showContextMenu && currentTrack && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowContextMenu(false)} />
-                  <div className="absolute bottom-8 left-0 z-50 w-44 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 overflow-hidden">
-                    <div className="px-3 py-2 border-b border-[var(--border)] mb-1">
-                      <p className="text-text-primary text-xs font-semibold truncate">{currentTrack.title}</p>
-                      <p className="text-text-muted text-[10px] truncate">{currentTrack.artist}</p>
-                    </div>
-                    {currentSongId != null && (
-                      <button
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-                        onClick={() => { setShowAddToPlaylist(true); setShowContextMenu(false) }}
-                      >
-                        <ListPlus size={14} /> Add to playlist
-                      </button>
-                    )}
+            {showContextMenu && currentTrack && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowContextMenu(false)} />
+                <div className="absolute bottom-10 left-0 z-50 w-48 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 overflow-hidden">
+                  <div className="px-3 py-2 border-b border-[var(--border)] mb-1">
+                    <p className="text-text-primary text-xs font-semibold truncate">{currentTrack.title}</p>
+                    <p className="text-text-muted text-[10px] truncate">{currentTrack.artist}</p>
                   </div>
-                </>
-              )}
-
-              {showAddToPlaylist && currentSongId != null && (
-                <div className="absolute bottom-8 left-0 z-50">
-                  <AddToPlaylistMenu songId={currentSongId} placement="top" onClose={() => setShowAddToPlaylist(false)} />
+                  <button
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                    onClick={() => { playNext(currentTrack); setShowContextMenu(false) }}
+                  >
+                    <ListEnd size={14} /> Play Next
+                  </button>
+                  {currentSongId != null && (
+                    <button
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                      onClick={() => { setShowAddToPlaylist(true); setShowContextMenu(false) }}
+                    >
+                      <ListPlus size={14} /> Add to playlist
+                    </button>
+                  )}
+                  {currentSongId != null && (
+                    <button
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                      onClick={openSongInfo}
+                    >
+                      <Info size={14} /> Song info
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
+
+            {showAddToPlaylist && currentSongId != null && (
+              <div className="absolute bottom-10 left-0 z-50">
+                <AddToPlaylistMenu songId={currentSongId} placement="top" onClose={() => setShowAddToPlaylist(false)} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -744,6 +777,11 @@ export default function Player(): JSX.Element {
             </button>
           </div>
         </div>
+
+        {/* Song info modal */}
+        {showSongInfo && (
+          <SongInfoModal song={songInfoData} onClose={() => { setShowSongInfo(false); setSongInfoData(null) }} />
+        )}
 
         {/* Output device popover */}
         {showOutputPicker && createPortal(
