@@ -49,7 +49,13 @@ export default function Sidebar(): JSX.Element {
         {items.map(({ icon, label, view }) => (
           <button
             key={view}
-            onClick={() => setActiveView(view)}
+            onClick={() => {
+              if (activeView === view && view === 'playlists') {
+                window.dispatchEvent(new CustomEvent('playlists:back'))
+              } else {
+                setActiveView(view)
+              }
+            }}
             title={collapsed ? label : undefined}
             className={`flex items-center w-full py-2 rounded text-sm font-medium transition-colors ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'} ${
               activeView === view

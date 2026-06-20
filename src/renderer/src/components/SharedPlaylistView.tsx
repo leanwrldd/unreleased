@@ -4,11 +4,16 @@ import { useStore } from '../store/useStore'
 import { apiFetch, buildStreamUrl, buildCoverArtUrl, JWAPI_BASE } from '../lib/juicewrldApi'
 import { Track } from '../types'
 
-interface SharedPlaylistData {
-  share_id?: string
-  paths?: string[]
-  items?: Array<{ path: string; [key: string]: unknown }>
-}
+type SharedPlaylistData =
+  | string[]
+  | {
+      share_id?: string
+      paths?: string[]
+      songs?: Array<{ path?: string; file_path?: string; url?: string; [key: string]: unknown }>
+      items?: Array<{ path?: string; song?: { path?: string; file_path?: string }; [key: string]: unknown }>
+      tracks?: Array<{ path?: string; [key: string]: unknown }>
+      results?: Array<{ path?: string; [key: string]: unknown }>
+    }
 
 function pathToTrack(path: string): Track {
   return {
@@ -41,7 +46,21 @@ export default function SharedPlaylistView(): JSX.Element {
     if (!shareId) { setError(true); setLoading(false); return }
     apiFetch<SharedPlaylistData>(`/playlists/shared/${shareId}/`)
       .then(data => {
-        const paths: string[] = data.paths ?? data.items?.map(i => i.path as string) ?? []
+        let paths: string[] = []
+        if (Array.isArray(data)) {
+          // Response is a plain array of paths or objects
+          paths = data.map(item => (typeof item === 'string' ? item : (item as Record<string, unknown>).path as string ?? '')).filter(Boolean)
+        } else if (data.paths) {
+          paths = data.paths
+        } else if (data.songs) {
+          paths = data.songs.map(s => s.path ?? s.file_path ?? s.url ?? '').filter(Boolean) as string[]
+        } else if (data.items) {
+          paths = data.items.map(i => i.path ?? i.song?.path ?? i.song?.file_path ?? '').filter(Boolean) as string[]
+        } else if (data.tracks) {
+          paths = data.tracks.map(t => t.path ?? '').filter(Boolean) as string[]
+        } else if (data.results) {
+          paths = data.results.map(r => r.path ?? '').filter(Boolean) as string[]
+        }
         setTracks(paths.map(pathToTrack))
       })
       .catch(() => setError(true))

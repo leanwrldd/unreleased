@@ -20,7 +20,13 @@ export default function BottomNav(): JSX.Element {
         return (
           <button
             key={view}
-            onClick={() => setActiveView(view)}
+            onClick={() => {
+              if (activeView === view && view === 'playlists') {
+                window.dispatchEvent(new CustomEvent('playlists:back'))
+              } else {
+                setActiveView(view)
+              }
+            }}
             className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-1 transition-colors relative overflow-hidden ${active ? 'text-accent' : 'text-text-muted'}`}
           >
             {active && (
