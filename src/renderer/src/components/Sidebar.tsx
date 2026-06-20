@@ -73,20 +73,26 @@ export default function Sidebar(): JSX.Element {
       <div className={`pb-4 space-y-1 ${collapsed ? 'px-2' : 'px-3'}`}>
         {account ? (
           <div className={`flex items-center py-2 rounded text-sm ${collapsed ? 'justify-center px-2' : 'gap-2 px-3'}`}>
-            {account.discord_avatar ? (
-              <img src={account.discord_avatar} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
-            ) : (
-              <div className="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-semibold shrink-0">
-                {(account.display_name || account.discord_username || '?').charAt(0).toUpperCase()}
-              </div>
-            )}
-            {!collapsed && (
-              <>
+            <button
+              onClick={() => (account.is_editor || account.is_administrator) ? setActiveView('editor-profile') : undefined}
+              title={collapsed ? (account.display_name || account.discord_username) : undefined}
+              className={`flex items-center gap-2 min-w-0 flex-1 ${(account.is_editor || account.is_administrator) ? 'cursor-pointer hover:opacity-80 transition-opacity' : 'cursor-default'} ${collapsed ? 'justify-center' : ''}`}
+            >
+              {account.discord_avatar ? (
+                <img src={account.discord_avatar} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-semibold shrink-0">
+                  {(account.display_name || account.discord_username || '?').charAt(0).toUpperCase()}
+                </div>
+              )}
+              {!collapsed && (
                 <span className="flex-1 min-w-0 truncate text-text-secondary">{account.display_name || account.discord_username}</span>
-                <button onClick={() => logoutAccount()} title="Log out" className="text-text-muted hover:text-text-primary transition-colors shrink-0">
-                  <LogOut size={16} />
-                </button>
-              </>
+              )}
+            </button>
+            {!collapsed && (
+              <button onClick={() => logoutAccount()} title="Log out" className="text-text-muted hover:text-text-primary transition-colors shrink-0">
+                <LogOut size={16} />
+              </button>
             )}
           </div>
         ) : (

@@ -25,6 +25,7 @@ import AdminPage from './components/AdminPage'
 import LikedSongsView from './components/LikedSongsView'
 import PlaylistsView from './components/PlaylistsView'
 import SharedPlaylistView from './components/SharedPlaylistView'
+import EditorProfileView from './components/EditorProfileView'
 import UserAuthModal from './components/UserAuthModal'
 import Player from './components/Player'
 import NowPlaying from './components/NowPlaying'
@@ -103,6 +104,7 @@ export default function App(): JSX.Element {
               : activeView === 'liked' ? <LikedSongsView />
               : activeView === 'playlists' ? <PlaylistsView />
               : activeView === 'shared-playlist' ? <SharedPlaylistView />
+              : activeView === 'editor-profile' ? <EditorProfileView />
               : <ApiTrackerView />}
           </ErrorBoundary>
           {showNowPlaying && <ErrorBoundary><NowPlaying /></ErrorBoundary>}
