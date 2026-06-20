@@ -6,6 +6,124 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.5.9] — 2026-06-20
+
+- **Fix** Playlists: description edit trigger was invisible (opacity-0 button); now shows at 40% opacity and brightens on hover
+- **Improve** Playlists: pencil icon appears on cover hover to indicate the image is editable (replaced Camera icon)
+- **Fix** Shared playlists: rewrote track parser with `isApiSongLite` type guard — handles plain path arrays, full `ApiSongLite` arrays, `items[].song` pattern, and path-keyed objects; shared pages no longer show empty
+
+---
+
+## [1.5.8] — 2026-06-20
+
+- **New** Playlists: upload a custom cover image — click the cover art to open a file picker; uploaded via multipart/form-data PATCH
+- **New** Playlists: add and edit a description — click the area below the title to add one, click again to edit, Enter saves, Escape cancels
+- **New** Playlists: remove cover image (resets to auto-generated mosaic)
+
+---
+
+## [1.5.7] — 2026-06-20
+
+- **New** Queue: radio mode view — when radio is active, the upcoming section shows only the pre-fetched next track with a pulsing "Finding next song…" indicator instead of a reorderable list
+- **New** Player: 3-dot context menu now includes "Play Next" (queues song immediately after current) and "Song info" (fetches and shows full song detail modal)
+- **Improve** Player: heart ♥ and 3-dot ··· buttons are now inline with the song title — they follow the natural text width instead of sitting at a fixed position
+- **Improve** Queue: toggling shuffle on while a tracker song (`jw-*`) is already playing now starts radio mode instead of shuffling the queue
+- **Fix** Player: repeat-one restarts the current audio element directly — no longer calls `nextTrack()`, so song info stays correct
+- **Fix** Tracker: category badge shown on row hover; clicking an era in the sidebar sets the era filter correctly
+- **Rename** Settings: "Categories" filter label renamed to "Search Settings"
+
+---
+
+## [1.5.4] — 2026-06-20
+
+- **New** Playlists: right-click any track for a context menu — Play, Add to Queue, Song Info, Add to Playlist, Remove, Download
+- **New** Playlists: drag tracks to reorder (replaces up/down arrow buttons)
+- **New** Playlists: zip and download all API tracks in a playlist at once
+- **New** Playlists: share a playlist via a public link (copy link button in hero)
+- **New** Playlists: right-click a playlist card in the library to add all its songs to another playlist
+- **New** Playlists: add all songs from the open playlist to another playlist (folder icon in hero)
+- **New** Shared playlist view — opening a share link shows a read-only playlist anyone can play
+
+---
+
+## [1.5.3] — 2026-06-19
+
+- **New** Playlist page: full Spotify-style hero — large 2×2 cover mosaic, gradient background, bold name, song count + total duration, Play and Shuffle buttons
+- **New** Player: next song preloads into the inactive audio slot while the current track plays — no gap on track change (linear/repeat modes)
+- **Improve** Playlist library grid: refined card design with hover effects and better placeholder art
+
+---
+
+## [1.5.2] — 2026-06-19
+
+- **Fix** Tracker: songs show on initial load (debounce was clearing songs 400 ms after mount)
+- **Fix** Tracker: infinite scroll accumulates songs correctly as you scroll
+- **Fix** Tracker: category sidebar is scrollable so all eras are reachable
+- **Fix** Tracker: sorting loads the full library client-side — first click asc, second desc, third clears sort
+- **Fix** Queue: shuffle/random mode excludes unsurfaced tracks by default
+- **Fix** Tracker: duration column right-aligned with tabular-nums; `--:--` for unknown durations
+- **Fix** Tracker: "Add to queue" removed from song row (context menu only)
+- **New** Queue: playing with no filters shows a "Random mode" label in the queue panel
+- **New** Queue: playing with filters lazy-loads the queue — starts with 50 songs, auto-fetches more as tracks end
+- **New** Lyrics: editor-only hint hidden for regular users
+
+---
+
+## [1.5.0] — 2026-06-19
+
+- **New** Tracker: infinite/endless scroll — songs load automatically as you scroll; no page buttons
+- **New** Context menu — right-click any song (or tap ···) to: Song info, Add to queue, Add to playlist, Show in Files, Download, Edit (editors/admins only)
+- **New** Sidebar: collapsible to icon-only strip — click the chevron at the bottom to collapse/expand; state persists
+- **Fix** Search now finds producer names — uses `searchall` API param
+- **Fix** Sorting works correctly — column header clicks sort the full dataset via the API
+- **Remove** GitHub and Discord links removed from sidebar (still in Settings)
+
+---
+
+## [1.4.0] — 2026-06-18
+
+- **Remove** Radio tab and toggle button removed (re-implemented as radio mode in v1.5.7)
+- **Fix** Repeat-one: track info, title, artist, and cover art no longer disappear when a song replays
+- **Fix** Files / Compilation: artist and cover art show reliably; broken cover falls back to music note icon
+- **Fix** Tracker: track names no longer disappear when the Now Playing panel opens
+
+---
+
+## [1.3.9] — 2026-06-18
+
+- **New** Radio mode: 📻 toggle button in the player bar — when on, a fresh random queue loads when the current queue ends
+- **New** Tracker: click any column header to sort (Title, Artist, Era, Category, Time); click again to reverse
+- **Fix** Tracker: removed era dropdown and "By album" toggle — era filter lives in the category sidebar
+- **Fix** Player bar and Now Playing: track info and cover art show correctly for Files and Compilation tracks
+- **Fix** Now Playing: title and artist always visible when artwork is collapsed, even for tracks without cover art
+- **Fix** Queue panel: unknown-duration songs show `--:--` instead of `0:00`
+- **Fix** Favicon: resized and auto-cropped — no longer tiny in browser tabs
+- **Improve** App name wordmark: slightly heavier font weight
+- **Improve** Audio output picker: re-enumerates devices with permission prompt on playback start
+
+---
+
+## [1.3.8] — 2026-06-18
+
+- **New** Site favicon — browser tabs now show the unreleased logo
+- **New** Tracker: collapsible category sidebar (desktop) with song counts and era list
+- **New** All song lists have consistent action buttons — Info, Add to Queue, Download across Tracker, Compilation, Radio, and Files
+- **Fix** Radio: builds a full ~14-song random queue upfront; no longer stops after 2 songs
+- **Fix** Now Playing: cover art and info show correctly when playing from Compilation or Files
+- **Fix** Settings: "Become an Editor" hidden for users who are already editors/admins
+- **Improve** Nav: removed Categories (now inside Tracker) and Contribute (pencil icon in Now Playing)
+
+---
+
+## [1.3.7] — 2026-06-17
+
+- **Fix** Contribute: date fields strip API-prepended words like "Recorded"
+- **Improve** Contribute: Category is now a dropdown
+- **New** Contribute: Additional information pre-filled from API into Context/Story field
+- **New** Contribute: Lyrics and Synced Lyrics fields added
+
+---
+
 ## [1.2.9] — 2026-06-17
 
 - **Fix** Compilation: album covers now load correctly (lazy per-folder fetch)
