@@ -8,7 +8,7 @@ A browser-based music player for Juice WRLD unreleased songs, powered by the [Ju
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
 [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/qq7DMNkBJ4)
 
-**Live:** [unreleased-juicewrldapi.vercel.app](https://unreleased-juicewrldapi.vercel.app)
+**Live:** [player.juicewrldpapi.com](https://player.juicewrldpapi.com)
 
 ---
 
