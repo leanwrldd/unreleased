@@ -163,6 +163,9 @@ export default function PlaylistsView(): JSX.Element {
   // Playlist membership cache: playlistId → Set<songId>
   const membershipCache = useRef<Map<number, Set<number>>>(new Map())
 
+  // Race-condition guard: each loadDetail call gets a generation ID; stale responses are discarded
+  const loadGen = useRef(0)
+
   // ── Derived data — ALL hooks at top level, no conditionals ────────────────
 
   const summary = useMemo(() => playlists.find(p => p.id === selectedId), [playlists, selectedId])
@@ -218,10 +221,17 @@ export default function PlaylistsView(): JSX.Element {
   useEffect(() => { if (account) refreshPlaylists() }, [account, refreshPlaylists])
 
   const loadDetail = useCallback(async (id: number) => {
+    const gen = ++loadGen.current
     setLoadingDetail(true)
-    try { setDetail(await userApi.getPlaylist(id)) }
-    catch { setDetail(null) }
-    finally { setLoadingDetail(false) }
+    try {
+      const result = await userApi.getPlaylist(id)
+      if (gen !== loadGen.current) return   // stale — a newer load is in flight
+      setDetail(result)
+    } catch {
+      if (gen === loadGen.current) setDetail(null)
+    } finally {
+      if (gen === loadGen.current) setLoadingDetail(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -229,8 +239,12 @@ export default function PlaylistsView(): JSX.Element {
     else setDetail(null)
   }, [selectedId, loadDetail])
 
-  // Reset sort/search when switching playlists
-  useEffect(() => { setSort({ field: 'default', dir: 'asc' }); setSearch('') }, [selectedId])
+  // Reset sort/search/infoSong when switching playlists
+  useEffect(() => {
+    setSort({ field: 'default', dir: 'asc' })
+    setSearch('')
+    setInfoSong(null)
+  }, [selectedId])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Play, Loader2, Music2, Share2, Download } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { apiFetch, buildStreamUrl, buildCoverArtUrl, JWAPI_BASE } from '../lib/juicewrldApi'
+import { apiFetch, buildStreamUrl, buildCoverArtUrl } from '../lib/juicewrldApi'
 import { Track } from '../types'
 
 type SharedPlaylistData =
