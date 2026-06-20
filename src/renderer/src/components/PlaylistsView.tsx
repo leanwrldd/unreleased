@@ -3,7 +3,7 @@ import {
   ListMusic, Play, Loader2, Plus, Trash2, Pencil, ArrowLeft,
   X, Check, Heart, Shuffle, Music2, Clock, GripVertical,
   ListPlus, Download, Share2, Archive, Info, FolderInput, MoreHorizontal,
-  Search, ChevronUp, ChevronDown,
+  Search, ChevronUp, ChevronDown, Camera, ImageOff,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
@@ -160,6 +160,14 @@ export default function PlaylistsView(): JSX.Element {
   // Song info modal
   const [infoSong, setInfoSong] = useState<JWApiSong | null>(null)
 
+  // Cover upload
+  const coverInputRef = useRef<HTMLInputElement>(null)
+  const [coverUploading, setCoverUploading] = useState(false)
+
+  // Description editing
+  const [editingDesc, setEditingDesc] = useState(false)
+  const [descValue, setDescValue] = useState('')
+
   // Playlist membership cache: playlistId → Set<songId>
   const membershipCache = useRef<Map<number, Set<number>>>(new Map())
 
@@ -239,11 +247,13 @@ export default function PlaylistsView(): JSX.Element {
     else setDetail(null)
   }, [selectedId, loadDetail])
 
-  // Reset sort/search/infoSong when switching playlists
+  // Reset sort/search/infoSong/editing when switching playlists
   useEffect(() => {
     setSort({ field: 'default', dir: 'asc' })
     setSearch('')
     setInfoSong(null)
+    setEditingDesc(false)
+    setDescValue('')
   }, [selectedId])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -306,6 +316,36 @@ export default function PlaylistsView(): JSX.Element {
   const openSongInfo = useCallback(async (songId: number) => {
     try { setInfoSong(await apiFetch<JWApiSong>(`/songs/${songId}/`)) } catch {}
   }, [])
+
+  const handleCoverUpload = useCallback(async (file: File) => {
+    if (!selectedId || coverUploading) return
+    setCoverUploading(true)
+    try {
+      const updated = await userApi.uploadPlaylistCover(selectedId, file)
+      setDetail(updated)
+      await refreshPlaylists()
+    } catch {}
+    setCoverUploading(false)
+  }, [selectedId, coverUploading, refreshPlaylists])
+
+  const handleRemoveCover = useCallback(async () => {
+    if (!selectedId) return
+    try {
+      const updated = await userApi.removePlaylistCover(selectedId)
+      setDetail(updated)
+      await refreshPlaylists()
+    } catch {}
+  }, [selectedId, refreshPlaylists])
+
+  const saveDescription = useCallback(async () => {
+    if (!selectedId) return
+    setEditingDesc(false)
+    try {
+      const updated = await userApi.updatePlaylist(selectedId, { description: descValue })
+      setDetail(updated)
+      await refreshPlaylists()
+    } catch {}
+  }, [selectedId, descValue, refreshPlaylists])
 
   const isMember = (playlistId: number, songId: number): boolean | null => {
     const cache = membershipCache.current.get(playlistId)
@@ -423,17 +463,52 @@ export default function PlaylistsView(): JSX.Element {
 
         {/* ── Hero (shown immediately using summary data) ── */}
         <div className="relative px-6 pb-6 shrink-0">
-          {tracks[0]?.imageUrl && (
-            <div className="absolute inset-0 opacity-20 blur-3xl scale-110 pointer-events-none" style={{ background: `url(${tracks[0].imageUrl}) center/cover`, zIndex: 0 }} />
+          {(detail?.cover_image_url ? buildImageUrl(detail.cover_image_url) : tracks[0]?.imageUrl) && (
+            <div className="absolute inset-0 opacity-20 blur-3xl scale-110 pointer-events-none" style={{ background: `url(${detail?.cover_image_url ? buildImageUrl(detail.cover_image_url) : tracks[0]?.imageUrl}) center/cover`, zIndex: 0 }} />
           )}
+
+          {/* Hidden file input */}
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleCoverUpload(f); e.target.value = '' }}
+          />
+
           <div className="relative z-10 flex gap-6 items-end">
-            <div className="shrink-0 rounded-xl shadow-2xl overflow-hidden" style={{ width: 180, height: 180 }}>
+            {/* Cover image — clickable to upload */}
+            <div className="shrink-0 group/cover relative rounded-xl shadow-2xl overflow-hidden cursor-pointer" style={{ width: 180, height: 180 }} onClick={() => coverInputRef.current?.click()}>
               {loadingDetail && tracks.length === 0 ? (
                 <div className="w-full h-full bg-surface-overlay animate-pulse" />
+              ) : detail?.cover_image_url ? (
+                <img src={buildImageUrl(detail.cover_image_url)} alt="" className="w-full h-full object-cover" />
               ) : (
                 <PlaylistMosaic tracks={tracks} className="w-full h-full" />
               )}
+              {/* Upload overlay */}
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/cover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                {coverUploading ? (
+                  <Loader2 size={24} className="text-white animate-spin" />
+                ) : (
+                  <>
+                    <Camera size={24} className="text-white" />
+                    <span className="text-white text-xs font-medium">Change cover</span>
+                  </>
+                )}
+              </div>
+              {/* Remove cover button */}
+              {detail?.cover_image_url && (
+                <button
+                  className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/60 text-white opacity-0 group-hover/cover:opacity-100 transition-opacity hover:bg-red-500/80"
+                  onClick={e => { e.stopPropagation(); handleRemoveCover() }}
+                  title="Remove cover"
+                >
+                  <ImageOff size={12} />
+                </button>
+              )}
             </div>
+
             <div className="min-w-0 flex-1 pb-1">
               <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-2">Playlist</p>
               {renaming ? (
@@ -447,7 +522,7 @@ export default function PlaylistsView(): JSX.Element {
                   {detail?.name ?? summary?.name ?? <span className="bg-surface-overlay rounded animate-pulse text-transparent select-none">Loading…</span>}
                 </h1>
               )}
-              <div className="flex items-center gap-1.5 text-text-muted text-sm mb-4">
+              <div className="flex items-center gap-1.5 text-text-muted text-sm mb-2">
                 <span className="font-medium text-text-secondary">{account.discord_username}</span>
                 {!loadingDetail && (
                   <>
@@ -458,6 +533,37 @@ export default function PlaylistsView(): JSX.Element {
                 )}
                 {loadingDetail && <span className="ml-1 text-xs opacity-50">Loading…</span>}
               </div>
+
+              {/* Description */}
+              {editingDesc ? (
+                <div className="flex items-start gap-2 mb-3">
+                  <textarea
+                    value={descValue}
+                    onChange={e => setDescValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveDescription() } if (e.key === 'Escape') setEditingDesc(false) }}
+                    autoFocus
+                    rows={2}
+                    placeholder="Add a description…"
+                    className="flex-1 bg-surface-overlay border border-[var(--border)] rounded-lg px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent/50 resize-none"
+                  />
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <button onClick={saveDescription} className="p-1.5 rounded-lg bg-accent/15 text-accent"><Check size={14} /></button>
+                    <button onClick={() => setEditingDesc(false)} className="p-1.5 rounded-lg text-text-muted hover:text-text-primary"><X size={14} /></button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  className="text-left mb-3 group/desc block"
+                  onClick={() => { setDescValue(detail?.description ?? ''); setEditingDesc(true) }}
+                >
+                  {detail?.description ? (
+                    <p className="text-text-muted text-sm line-clamp-2 group-hover/desc:text-text-secondary transition-colors">{detail.description}</p>
+                  ) : (
+                    <p className="text-text-muted text-sm opacity-0 group-hover/desc:opacity-50 transition-opacity">+ Add description</p>
+                  )}
+                </button>
+              )}
+
               {/* Action row */}
               <div className="flex items-center gap-2 flex-wrap">
                 {tracks.length > 0 && (

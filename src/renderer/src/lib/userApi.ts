@@ -38,6 +38,7 @@ export interface FavoriteEntry {
 export interface PlaylistSummary {
   id: number
   name: string
+  description: string | null
   track_count: number
   cover_image_url: string | null
   created_at: string
@@ -54,6 +55,8 @@ export interface PlaylistItemEntry {
 export interface PlaylistDetail {
   id: number
   name: string
+  description: string | null
+  cover_image_url: string | null
   items: PlaylistItemEntry[]
   created_at: string
   updated_at: string
@@ -198,6 +201,33 @@ export async function renamePlaylist(id: number, name: string): Promise<Playlist
   return request(`${LIBRARY_BASE}/playlists/${id}/`, {
     method: 'PATCH',
     body: JSON.stringify({ name }),
+  })
+}
+
+export async function updatePlaylist(id: number, data: { name?: string; description?: string }): Promise<PlaylistDetail> {
+  return request(`${LIBRARY_BASE}/playlists/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function uploadPlaylistCover(id: number, file: File): Promise<PlaylistDetail> {
+  const token = getToken()
+  const form = new FormData()
+  form.append('cover_image', file)
+  const res = await fetch(`${LIBRARY_BASE}/playlists/${id}/`, {
+    method: 'PATCH',
+    headers: token ? { Authorization: `Token ${token}` } : {},
+    body: form,
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json() as Promise<PlaylistDetail>
+}
+
+export async function removePlaylistCover(id: number): Promise<PlaylistDetail> {
+  return request(`${LIBRARY_BASE}/playlists/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ cover_image: null }),
   })
 }
 
