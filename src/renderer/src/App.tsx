@@ -47,13 +47,19 @@ export default function App(): JSX.Element {
   const { showNowPlaying, showQueue, showSettings, activeView, theme, accentColor, loadAccount, completeDiscordLogin, showUserAuth, setShowUserAuth } = useStore()
   const queueIndex = useStore((s) => s.queueIndex)
   const queueLength = useStore((s) => s.queue.length)
+  const shuffle = useStore((s) => s.shuffle)
 
-  // Auto-fetch next queue page when running low (lazy queue for filtered playback)
+  // Auto-fetch next queue page.
+  // Linear mode:  load when fewer than 15 songs remain ahead of the current position.
+  // Shuffle mode: load until the pool has 150+ songs so random picks have real variety.
   useEffect(() => {
-    const { queueFilter, queue, queueIndex: qi } = useStore.getState()
+    const { queueFilter, queue, queueIndex: qi, shuffle: isShuffle } = useStore.getState()
     if (!queueFilter || !queueFilter.hasMore) return
-    const remaining = queue.length - (qi + 1)
-    if (remaining > 15) return
+
+    const shouldLoad = isShuffle
+      ? queue.length < 150
+      : queue.length - (qi + 1) < 15
+    if (!shouldLoad) return
 
     let cancelled = false
     apiFetch<JWApiPaginatedResponse>('/songs/', {
@@ -73,7 +79,7 @@ export default function App(): JSX.Element {
       }))
     }).catch(() => {})
     return () => { cancelled = true }
-  }, [queueIndex, queueLength])
+  }, [queueIndex, queueLength, shuffle])
 
   // Sync view from URL on mount + handle back/forward
   useEffect(() => {

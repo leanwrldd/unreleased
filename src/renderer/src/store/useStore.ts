@@ -205,7 +205,19 @@ export const useStore = create<AppStore & StoreActions>((set, get) => ({
   setProgress: (progress) => set({ progress }),
   setCurrentTime: (currentTime) => set({ currentTime }),
 
-  toggleShuffle: () => set((s) => ({ shuffle: !s.shuffle })),
+  toggleShuffle: () => set((s) => {
+    const newShuffle = !s.shuffle
+    // When turning shuffle ON while a filtered queue is active, switch to the full
+    // catalog so the user isn't stuck shuffling within a single era or search.
+    if (newShuffle && s.queueFilter) {
+      const startPage = Math.floor(Math.random() * 80) + 1
+      return {
+        shuffle: newShuffle,
+        queueFilter: { category: '', era: '', search: '', page: startPage, hasMore: true, total: 999999 },
+      }
+    }
+    return { shuffle: newShuffle }
+  }),
   toggleRepeat: () =>
     set((s) => {
       const order: Array<'none' | 'all' | 'one'> = ['none', 'all', 'one']

@@ -750,11 +750,15 @@ export default function ApiTrackerView(): JSX.Element {
     const playable = sortedSongs.filter((s) => !!s.path)
 
     if (shuffle) {
-      // Shuffle mode: always ignore active filters and lazy-load from the full
-      // unfiltered catalog so tracks are truly random across all eras/categories
-      const initial = playable.map(songToTrack)
-      playTrack(track, initial.length > 0 ? initial : [track])
-      setQueueMode(false, { category: '', era: '', search: '', page: 2, hasMore: true, total: 999999 })
+      // Shuffle: pre-shuffle the visible songs so the initial context is varied,
+      // then lazy-load from a random page of the full catalog so the 150-song
+      // pool the lazy loader builds is spread across all eras / categories.
+      const others = playable.filter((s) => s.id !== song.id).map(songToTrack)
+      const shuffledOthers = others.sort(() => Math.random() - 0.5)
+      const initial = [track, ...shuffledOthers]
+      playTrack(track, initial)
+      const startPage = Math.floor(Math.random() * 80) + 2
+      setQueueMode(false, { category: '', era: '', search: '', page: startPage, hasMore: true, total: 999999 })
     } else if (!hasFilters) {
       // No filters, no shuffle → released + unreleased random mode
       const context = playable
