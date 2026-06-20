@@ -745,23 +745,30 @@ export default function ApiTrackerView(): JSX.Element {
 
   const handlePlay = useCallback((song: JWApiSong) => {
     const track = songToTrack(song)
+    const { shuffle } = useStore.getState()
     const hasFilters = !!(category || era || debouncedSearch)
     const playable = sortedSongs.filter((s) => !!s.path)
 
-    if (!hasFilters) {
-      // No filters → Random mode: shuffle through released + unreleased only
+    if (shuffle) {
+      // Shuffle mode: always ignore active filters and lazy-load from the full
+      // unfiltered catalog so tracks are truly random across all eras/categories
+      const initial = playable.map(songToTrack)
+      playTrack(track, initial.length > 0 ? initial : [track])
+      setQueueMode(false, { category: '', era: '', search: '', page: 2, hasMore: true, total: 999999 })
+    } else if (!hasFilters) {
+      // No filters, no shuffle → released + unreleased random mode
       const context = playable
         .filter((s) => s.category === 'released' || s.category === 'unreleased')
         .map(songToTrack)
       playTrack(track, context.length > 0 ? context : [track])
       setQueueMode(true, null)
     } else if (orderField) {
-      // Sort mode + filter → all songs already loaded, queue them all at once
+      // Sort active + filter → all songs already loaded, queue them all at once
       const context = playable.map(songToTrack)
       playTrack(track, context.length > 0 ? context : [track])
       setQueueMode(false, null)
     } else {
-      // Scroll mode + filter → queue first 50, lazy-fetch rest from API
+      // Filter active (no sort) → queue first 50, lazy-fetch rest from API with same filter
       const initial = playable.slice(0, 50).map(songToTrack)
       playTrack(track, initial.length > 0 ? initial : [track])
       const needsMore = count > sortedSongs.length || (hasMore && sortedSongs.length >= 50)
