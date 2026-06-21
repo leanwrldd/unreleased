@@ -295,23 +295,20 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       return
     }
 
-    // Turning ON: only switch to radio if it's a lone tracker song (no playlist queue loaded)
-    // Playlist tracks also have jw- IDs, so we check queue.length === 1 to distinguish
-    const isTrackerSong = currentTrack?.id?.startsWith('jw-') ?? false
-    if (isTrackerSong && currentTrack && queue.length <= 1) {
+    // Turning ON: if there's a tracker queueFilter OR it's a lone tracker song → radio mode
+    // queueFilter is set when playing from the tracker with lazy loading (infinite scroll context)
+    const isTrackerSong = currentTrack?.id?.startsWith('jw-') && !currentTrack?.id?.startsWith('jw-file-')
+    const isTrackerContext = !!queueFilter || (isTrackerSong && queue.length <= 1)
+    if (isTrackerContext && currentTrack) {
       set({ shuffle: true })
       get().startRadio(currentTrack)
       return
     }
 
-    // Turning ON (non-tracker): shuffle the upcoming portion
+    // Turning ON (playlist/non-tracker): shuffle the upcoming portion
     const played = queue.slice(0, queueIndex + 1)
     const upcoming = fisherYates(queue.slice(queueIndex + 1))
-    const newFilter: QueueFilter | null = queueFilter
-      ? { category: '', era: '', search: '', page: Math.floor(Math.random() * 80) + 2, hasMore: true, total: 999999 }
-      : null
-    set({ shuffle: true, queue: [...played, ...upcoming], queueFilter: newFilter })
-    if (newFilter) get()._loadMore()
+    set({ shuffle: true, queue: [...played, ...upcoming] })
   },
 
   // ── toggleRepeat ───────────────────────────────────────────────────────────
