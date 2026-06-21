@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Loader2, Trophy, FileEdit, ChevronLeft, Pencil, Trash2 } from 'lucide-react'
+import { Loader2, Trophy, FileEdit, ChevronLeft, Pencil, Trash2, RefreshCw } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { getMyProposals, getLeaderboard, withdrawProposal, SongEditProposal, ProposalStatus } from '../lib/userApi'
 
@@ -45,6 +45,8 @@ export default function EditorProfileView(): JSX.Element {
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true)
   const [filter, setFilter] = useState<FilterTab>('all')
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
 
   const handleDelete = async (id: number): Promise<void> => {
     setDeletingId(id)
@@ -63,16 +65,16 @@ export default function EditorProfileView(): JSX.Element {
   }
 
   useEffect(() => {
-    getMyProposals()
-      .then(setProposals)
-      .catch(() => {})
-      .finally(() => setLoadingProposals(false))
-
-    getLeaderboard()
-      .then((data) => setLeaderboard(data as LeaderboardEntry[]))
-      .catch(() => {})
-      .finally(() => setLoadingLeaderboard(false))
-  }, [])
+    setRefreshing(true)
+    Promise.all([
+      getMyProposals().then(setProposals).catch(() => {}),
+      getLeaderboard().then((data) => setLeaderboard(data as LeaderboardEntry[])).catch(() => {}),
+    ]).finally(() => {
+      setLoadingProposals(false)
+      setLoadingLeaderboard(false)
+      setRefreshing(false)
+    })
+  }, [refreshKey])
 
   const myEntry = leaderboard.find((e) => e.discord_username === account?.discord_username)
 
@@ -95,12 +97,22 @@ export default function EditorProfileView(): JSX.Element {
 
       {/* ── Header ── */}
       <div className="px-6 pt-5 pb-4 border-b border-[var(--border)] shrink-0">
-        <button
-          onClick={() => setActiveView('api-tracker')}
-          className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-xs mb-3 transition-colors"
-        >
-          <ChevronLeft size={14} /> Back
-        </button>
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={() => setActiveView('api-tracker')}
+            className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-xs transition-colors"
+          >
+            <ChevronLeft size={14} /> Back
+          </button>
+          <button
+            onClick={() => setRefreshKey(k => k + 1)}
+            disabled={refreshing}
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-[var(--surface-raised)] transition-colors disabled:opacity-40"
+            title="Refresh"
+          >
+            <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+          </button>
+        </div>
 
         <div className="flex items-center gap-3.5">
           {account?.discord_avatar ? (
