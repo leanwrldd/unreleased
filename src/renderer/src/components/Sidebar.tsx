@@ -79,14 +79,14 @@ export default function Sidebar(): JSX.Element {
               className={`flex items-center gap-3 min-w-0 flex-1 cursor-pointer hover:opacity-80 transition-opacity ${collapsed ? 'justify-center' : ''}`}
             >
               {account.discord_avatar ? (
-                <img src={account.discord_avatar} alt="" className="w-[18px] h-[18px] rounded-full object-cover shrink-0" />
+                <img src={account.discord_avatar} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
               ) : (
-                <div className="w-[18px] h-[18px] rounded-full bg-accent/20 text-accent flex items-center justify-center text-[9px] font-semibold shrink-0">
+                <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center text-[10px] font-semibold shrink-0">
                   {(account.display_name || account.discord_username || '?').charAt(0).toUpperCase()}
                 </div>
               )}
               {!collapsed && (
-                <span className="flex-1 min-w-0 truncate text-text-secondary text-sm font-medium">{account.display_name || account.discord_username}</span>
+                <span className="min-w-0 truncate text-text-secondary text-sm font-medium">{account.display_name || account.discord_username}</span>
               )}
             </button>
             {!collapsed && (

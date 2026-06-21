@@ -163,6 +163,7 @@ export default function PlaylistsView(): JSX.Element {
   // Cover upload
   const coverInputRef = useRef<HTMLInputElement>(null)
   const [coverUploading, setCoverUploading] = useState(false)
+  const [coverImgError, setCoverImgError] = useState(false)
 
   // Description editing
   const [editingDesc, setEditingDesc] = useState(false)
@@ -262,6 +263,7 @@ export default function PlaylistsView(): JSX.Element {
     setInfoSong(null)
     setEditingDesc(false)
     setDescValue('')
+    setCoverImgError(false)
   }, [selectedId])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -339,12 +341,14 @@ export default function PlaylistsView(): JSX.Element {
 
   const handleRemoveCover = useCallback(async () => {
     if (!selectedId) return
+    // Optimistically clear cover so UI updates immediately
+    setDetail(prev => prev ? { ...prev, cover_image: null, cover_image_url: null } : null)
     try {
-      const updated = await userApi.removePlaylistCover(selectedId)
-      setDetail(updated)
+      await userApi.removePlaylistCover(selectedId)
+      await loadDetail(selectedId)
       await refreshPlaylists()
-    } catch {}
-  }, [selectedId, refreshPlaylists])
+    } catch { await loadDetail(selectedId) }
+  }, [selectedId, loadDetail, refreshPlaylists])
 
   const saveDescription = useCallback(async () => {
     if (!selectedId) return
@@ -481,8 +485,13 @@ export default function PlaylistsView(): JSX.Element {
             <div className={`shrink-0 group/cover relative rounded-xl shadow-2xl overflow-hidden ${isSharedView ? "cursor-default" : "cursor-pointer"}`} style={{ width: 180, height: 180 }} onClick={() => !isSharedView && coverInputRef.current?.click()}>
               {loadingDetail && tracks.length === 0 ? (
                 <div className="w-full h-full bg-surface-overlay animate-pulse" />
-              ) : playlistCoverUrl(detail ?? {}) ? (
-                <img src={playlistCoverUrl(detail ?? {})} alt="" className="w-full h-full object-cover" />
+              ) : playlistCoverUrl(detail ?? {}) && !coverImgError ? (
+                <img
+                  src={playlistCoverUrl(detail ?? {})}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  onError={() => setCoverImgError(true)}
+                />
               ) : (
                 <PlaylistMosaic tracks={tracks} className="w-full h-full" />
               )}
@@ -498,7 +507,7 @@ export default function PlaylistsView(): JSX.Element {
                 )}
               </div>
               {/* Remove cover button (owner only) */}
-              {!isSharedView && (detail?.cover_image_url || detail?.cover_image) && (
+              {!isSharedView && (detail?.cover_image_url || detail?.cover_image) && !coverImgError && (
                 <button
                   className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/60 text-white opacity-0 group-hover/cover:opacity-100 transition-opacity hover:bg-red-500/80"
                   onClick={e => { e.stopPropagation(); handleRemoveCover() }}

@@ -227,10 +227,10 @@ export async function uploadPlaylistCover(id: number, file: File): Promise<Playl
   })
 }
 
-export async function removePlaylistCover(id: number): Promise<PlaylistDetail> {
-  return request(`${LIBRARY_BASE}/playlists/${id}/`, {
+export async function removePlaylistCover(id: number): Promise<void> {
+  await request(`${LIBRARY_BASE}/playlists/${id}/`, {
     method: 'PATCH',
-    body: JSON.stringify({ cover_image: null }),
+    body: JSON.stringify({ cover_image: '', cover_image_url: '' }),
   })
 }
 
