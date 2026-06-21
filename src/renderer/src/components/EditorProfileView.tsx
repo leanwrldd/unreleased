@@ -20,10 +20,10 @@ const STATUS_STYLES: Record<ProposalStatus, { label: string; bar: string; badge:
   reversed: { label: 'Reversed', bar: 'bg-surface-overlay', badge: 'bg-surface-overlay text-text-muted' },
 }
 
-const RANK_STYLES: Record<number, { num: string; bg: string }> = {
-  1: { num: 'text-yellow-400 font-black', bg: 'bg-yellow-500/8 ring-1 ring-yellow-500/20' },
-  2: { num: 'text-slate-300 font-black',  bg: 'bg-slate-500/8 ring-1 ring-slate-400/20' },
-  3: { num: 'text-amber-600 font-black',  bg: 'bg-amber-700/8 ring-1 ring-amber-600/20' },
+const RANK_STYLES: Record<number, { num: string; badge: string }> = {
+  1: { num: 'text-yellow-400 font-black', badge: 'bg-yellow-500/15 ring-1 ring-yellow-500/30' },
+  2: { num: 'text-slate-300 font-black',  badge: 'bg-slate-500/15 ring-1 ring-slate-400/30' },
+  3: { num: 'text-amber-600 font-black',  badge: 'bg-amber-700/15 ring-1 ring-amber-600/30' },
 }
 
 type FilterTab = 'all' | ProposalStatus
@@ -217,16 +217,16 @@ export default function EditorProfileView(): JSX.Element {
                     <div
                       key={entry.user_id}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                        isMe
-                          ? 'bg-accent/8 ring-1 ring-accent/20'
-                          : rankStyle
-                          ? rankStyle.bg
-                          : 'hover:bg-surface-overlay'
+                        isMe ? 'bg-accent/8 ring-1 ring-accent/20' : 'hover:bg-surface-overlay'
                       }`}
                     >
                       {/* Rank */}
-                      <span className={`text-xs w-5 text-right shrink-0 tabular-nums ${rankStyle ? rankStyle.num : 'text-text-muted font-medium'}`}>
-                        {entry.rank}
+                      <span className={`w-5 shrink-0 flex items-center justify-center`}>
+                        <span className={`text-xs tabular-nums rounded-md px-1 py-0.5 ${
+                          rankStyle ? `${rankStyle.num} ${rankStyle.badge}` : 'text-text-muted font-medium'
+                        }`}>
+                          {entry.rank}
+                        </span>
                       </span>
 
                       {/* Avatar */}
