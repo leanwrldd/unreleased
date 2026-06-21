@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Heart, Play, Loader2, ListMusic, MoreHorizontal, PlayCircle, ListPlus } from 'lucide-react'
+import { Heart, Play, Loader2, MoreHorizontal, PlayCircle, ListPlus, Info } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
 import { Track } from '../types'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
+import { apiFetch, JWApiSong } from '../lib/juicewrldApi'
+import SongInfoModal from './SongInfoModal'
 
 function formatDuration(seconds: number): string {
   if (!seconds) return ''
@@ -18,6 +20,7 @@ export default function LikedSongsView(): JSX.Element {
   const [loading, setLoading] = useState(true)
   type CtxMenu = { track: Track; songId: number; x: number; y: number; showPlaylists: boolean }
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
+  const [infoSong, setInfoSong] = useState<JWApiSong | null>(null)
 
   const load = useCallback(async () => {
     if (!account) { setLoading(false); return }
@@ -129,11 +132,6 @@ export default function LikedSongsView(): JSX.Element {
           </div>
         )}
 
-        {visible.length > 0 && (
-          <div className="mt-6 flex items-center gap-2 text-text-muted text-xs">
-            <ListMusic size={12} /> Synced to your account
-          </div>
-        )}
       </div>
     </div>
 
@@ -150,6 +148,10 @@ export default function LikedSongsView(): JSX.Element {
         <button onClick={() => { addToQueue(ctxMenu.track); setCtxMenu(null) }}
           className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
           <PlayCircle size={14} className="text-text-muted" /> Play next
+        </button>
+        <button onClick={async () => { const id = ctxMenu.songId; setCtxMenu(null); try { setInfoSong(await apiFetch<JWApiSong>(`/songs/${id}/`)) } catch {} }}
+          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
+          <Info size={14} className="text-text-muted" /> Song info
         </button>
         <div className="border-t border-[var(--border)] my-1" />
         <button
@@ -178,6 +180,7 @@ export default function LikedSongsView(): JSX.Element {
         </button>
       </div>
     )}
+    <SongInfoModal song={infoSong} onClose={() => setInfoSong(null)} />
     </>
   )
 }
