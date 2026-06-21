@@ -188,10 +188,13 @@ export async function getPlaylists(): Promise<PlaylistSummary[]> {
   return request(`${LIBRARY_BASE}/playlists/`, { method: 'GET' })
 }
 
-export async function createPlaylist(name: string): Promise<PlaylistDetail> {
+export async function createPlaylist(
+  name: string,
+  opts?: { description?: string | null; song_ids?: number[]; cover_image?: string | null }
+): Promise<PlaylistDetail> {
   return request(`${LIBRARY_BASE}/playlists/`, {
     method: 'POST',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, ...opts }),
   })
 }
 

@@ -432,13 +432,17 @@ export default function PlaylistsView(): JSX.Element {
     if (!detail) return
     setImportState('loading')
     try {
-      // 1. Create new playlist with same name
-      const newPl = await userApi.createPlaylist(detail.name)
-      // 2. Copy description if present
-      if (detail.description) {
-        await userApi.updatePlaylist(newPl.id, { description: detail.description })
-      }
-      // 3. Copy cover
+      const allowedIds = detail.items
+        .filter(item => !['recording_session', 'unsurfaced'].includes(item.song.category))
+        .map(item => item.song.id)
+
+      // Request 1: create playlist with name + description + song_ids in one shot
+      const newPl = await userApi.createPlaylist(detail.name, {
+        description: detail.description,
+        song_ids: allowedIds,
+      })
+
+      // Request 2 (optional): cover — use existing base64 directly, or fetch from URL
       const b64 = coverData?.cover_image
       const url = coverData?.cover_image_url
       if (b64) {
@@ -451,8 +455,7 @@ export default function PlaylistsView(): JSX.Element {
           await userApi.uploadPlaylistCover(newPl.id, file)
         } catch { /* skip cover on CORS/network failure */ }
       }
-      // 4. Add all tracks in parallel
-      await Promise.all(detail.items.filter(item => !['recording_session', 'unsurfaced'].includes(item.song.category)).map(item => userApi.addToPlaylist(newPl.id, item.song.id).catch(() => {})))
+
       await refreshPlaylists()
       setImportState('done')
       setTimeout(() => setImportState('idle'), 2500)
