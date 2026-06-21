@@ -617,7 +617,7 @@ export default function PlaylistsView(): JSX.Element {
                   className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${shareCopied ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
                   {shareCopied ? <Check size={16} /> : <Share2 size={16} />}
                 </button>
-                {!isSharedView && otherPlaylists.length > 0 && tracks.length > 0 && detail && (
+                {account && otherPlaylists.length > 0 && tracks.length > 0 && detail && (
                   <div className="relative" ref={addAllMenuRef} onClick={e => e.stopPropagation()}>
                     <button onClick={() => setShowAddAllMenu(v => !v)} title="Add all to playlist" disabled={addingAll}
                       className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${addingAll ? 'text-accent' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
@@ -711,7 +711,7 @@ export default function PlaylistsView(): JSX.Element {
                   onDragOver={e => { if (!dragEnabled) return; e.preventDefault(); setDropIdx(displayIdx) }}
                   onDragEnd={() => { setDragIdx(null); setDropIdx(null) }}
                   onDrop={() => dragEnabled && handleDrop(displayIdx)}
-                  onContextMenu={e => { if (isSharedView) return; e.preventDefault(); e.stopPropagation(); setTrackMenu({ track, songId, i: originalIdx, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                  onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setTrackMenu({ track, songId, i: originalIdx, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
                   className={`group grid items-center gap-3 px-4 py-2 rounded-lg transition-colors cursor-default select-none ${
                     isDragging ? 'opacity-40 bg-surface-raised' : isDropTarget ? 'border-t-2 border-accent bg-surface-overlay' : 'hover:bg-surface-raised'
                   }`}
@@ -733,16 +733,14 @@ export default function PlaylistsView(): JSX.Element {
                     {track.duration ? formatDuration(track.duration) : '--:--'}
                   </span>
                   <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={e => { e.stopPropagation(); setTrackMenu({ track, songId, i: originalIdx, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                      className="p-1.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-surface-overlay transition-colors hidden md:flex" title="More options">
+                      <MoreHorizontal size={13} />
+                    </button>
                     {!isSharedView && (
-                      <>
-                        <button onClick={e => { e.stopPropagation(); setTrackMenu({ track, songId, i: originalIdx, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
-                          className="p-1.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-surface-overlay transition-colors hidden md:flex" title="More options">
-                          <MoreHorizontal size={13} />
-                        </button>
-                        <button onClick={() => removeTrack(songId)} className="p-1.5 text-text-muted hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors" title="Remove">
-                          <X size={13} />
-                        </button>
-                      </>
+                      <button onClick={() => removeTrack(songId)} className="p-1.5 text-text-muted hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors" title="Remove">
+                        <X size={13} />
+                      </button>
                     )}
                   </div>
                 </div>
@@ -803,7 +801,7 @@ export default function PlaylistsView(): JSX.Element {
               a.href = buildStreamUrl(trackMenu.track.path); a.download = `${trackMenu.track.title}.mp3`; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.click()
               setTrackMenu(null)
             }} />
-            <MenuItem icon={Trash2} label="Remove from playlist" destructive onClick={() => { removeTrack(trackMenu.songId); setTrackMenu(null) }} />
+            {!isSharedView && <MenuItem icon={Trash2} label="Remove from playlist" destructive onClick={() => { removeTrack(trackMenu.songId); setTrackMenu(null) }} />}
           </div>
         )}
 
