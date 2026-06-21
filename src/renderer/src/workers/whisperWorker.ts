@@ -13,7 +13,7 @@ interface WordChunk {
 }
 
 self.onmessage = async (e: MessageEvent) => {
-  const { type, audio, language } = e.data
+  const { type, audio } = e.data
 
   if (type === 'load') {
     try {
@@ -48,7 +48,7 @@ self.onmessage = async (e: MessageEvent) => {
           return_timestamps: 'word',
           chunk_length_s: 30,
           stride_length_s: 5,
-          language: language ?? 'english',
+          language: 'english',
           task: 'transcribe',
         }
       )

@@ -67,7 +67,7 @@ function Avatar({ src, name, size = 8 }: { src?: string; name: string; size?: nu
 }
 
 function Empty({ label }: { label: string }): JSX.Element {
-  return <div className="flex items-center justify-center h-full text-text-muted/30 text-sm">{label}</div>
+  return <div className="flex items-center justify-center h-full text-text-muted text-sm">{label}</div>
 }
 
 // ── Diff ──────────────────────────────────────────────────────────────────────
@@ -94,10 +94,10 @@ function FieldDiff({ fieldKey, before, after }: { fieldKey: string; before: unkn
   return (
     <div className="rounded-lg overflow-hidden border border-[var(--border)] text-[11px]">
       {/* Field header */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-surface-raised/60 border-b border-[var(--border)]">
-        <span className="font-mono text-[10px] text-text-muted/60 tracking-tight">{fieldKey.replace(/_/g, ' ')}</span>
+      <div className="flex items-center justify-between px-3 py-1.5 bg-surface-raised border-b border-[var(--border)]">
+        <span className="font-mono text-[10px] text-text-muted tracking-tight">{fieldKey.replace(/_/g, ' ')}</span>
         <div className="flex items-center gap-2">
-          {unchanged && <span className="text-[9px] italic text-text-muted/30">unchanged</span>}
+          {unchanged && <span className="text-[9px] italic text-text-muted">unchanged</span>}
           {isLong && (
             <button onClick={() => setExp(e => !e)} className="text-[10px] text-accent/70 hover:text-accent">
               {exp ? 'collapse' : 'expand'}
@@ -120,7 +120,7 @@ function FieldDiff({ fieldKey, before, after }: { fieldKey: string; before: unkn
                 <pre key={i} className="font-mono text-red-500 whitespace-pre-wrap break-words leading-relaxed">{line || ' '}</pre>
               ))}
               {'clipped' in b && b.clipped && (
-                <p className="text-[9px] text-red-500/50 italic mt-1">+{(b as { total?: number }).total! - MAX} more lines</p>
+                <p className="text-[9px] text-red-400 italic mt-1">+{(b as { total?: number }).total! - MAX} more lines</p>
               )}
             </div>
           </div>
@@ -136,7 +136,7 @@ function FieldDiff({ fieldKey, before, after }: { fieldKey: string; before: unkn
                 <pre key={i} className="font-mono text-emerald-600 whitespace-pre-wrap break-words leading-relaxed">{line || ' '}</pre>
               ))}
               {'clipped' in a && a.clipped && (
-                <p className="text-[9px] text-emerald-600/50 italic mt-1">+{(a as { total?: number }).total! - MAX} more lines</p>
+                <p className="text-[9px] text-emerald-500 italic mt-1">+{(a as { total?: number }).total! - MAX} more lines</p>
               )}
             </div>
           </div>
@@ -161,7 +161,7 @@ function FieldDiff({ fieldKey, before, after }: { fieldKey: string; before: unkn
       {/* Unchanged */}
       {unchanged && (
         <div className="px-3 py-2">
-          <pre className="font-mono text-text-muted/50 whitespace-pre-wrap break-words leading-relaxed">
+          <pre className="font-mono text-text-muted whitespace-pre-wrap break-words leading-relaxed">
             {exp ? afterStr : afterStr.slice(0, 120) + (afterStr.length > 120 ? '…' : '')}
           </pre>
         </div>
@@ -172,11 +172,11 @@ function FieldDiff({ fieldKey, before, after }: { fieldKey: string; before: unkn
 
 function ProposalDiff({ proposal }: { proposal: SongEditProposal }): JSX.Element {
   const entries = Object.entries(proposal.proposed_data || {})
-  if (!entries.length) return <p className="text-text-muted/30 text-xs italic p-4">No field data.</p>
+  if (!entries.length) return <p className="text-text-muted text-xs italic p-4">No field data.</p>
   const snap = proposal.original_snapshot || {}
   return (
     <div className="space-y-2 p-4">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted/40 mb-3">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-3">
         Changes · {entries.length} field{entries.length !== 1 ? 's' : ''}
       </p>
       {entries.map(([k, v]) => <FieldDiff key={k} fieldKey={k} before={snap[k]} after={v} />)}
@@ -223,7 +223,7 @@ export default function AdminPage(): JSX.Element {
 
   if (!isAdmin) return (
     <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
-      <Shield size={28} className="text-text-muted/30" />
+      <Shield size={28} className="text-text-muted" />
       <p className="text-text-primary font-semibold text-sm">Admin only</p>
       <button onClick={() => setActiveView('api-tracker')} className="text-xs text-accent hover:underline">Go back</button>
     </div>
@@ -260,7 +260,7 @@ export default function AdminPage(): JSX.Element {
         <div className="flex-1 mb-3">
           <span className="text-text-primary font-bold text-sm">Admin</span>
           {account?.discord_username && (
-            <span className="text-text-muted/40 text-xs ml-2">{account.discord_username}</span>
+            <span className="text-text-muted text-xs ml-2">{account.discord_username}</span>
           )}
         </div>
         <button onClick={() => setRefreshKey(k => k + 1)} disabled={loading}
@@ -297,7 +297,7 @@ export default function AdminPage(): JSX.Element {
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <Loader2 size={20} className="animate-spin text-text-muted/30" />
+          <Loader2 size={20} className="animate-spin text-text-muted" />
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">
@@ -357,13 +357,13 @@ function ProposalsTab({ proposals, status, setStatus, onChanged }: {
       {/* Left: list */}
       <div className="w-80 shrink-0 border-r border-[var(--border)] flex flex-col overflow-hidden">
         {/* Filter bar */}
-        <div className="shrink-0 flex gap-1 flex-wrap px-3 py-2.5 border-b border-[var(--border)] bg-surface-raised/20">
+        <div className="shrink-0 flex gap-1 flex-wrap px-3 py-2.5 border-b border-[var(--border)] bg-surface-raised">
           {FILTERS.map(f => (
             <button key={f.id || 'all'} onClick={() => setStatus(f.id)}
               className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${
                 status === f.id
                   ? 'bg-accent text-[var(--bg)]'
-                  : 'text-text-muted/60 hover:text-text-muted bg-surface-overlay/50'
+                  : 'text-text-muted hover:text-text-muted bg-surface-overlay'
               }`}>{f.label}
             </button>
           ))}
@@ -378,15 +378,15 @@ function ProposalsTab({ proposals, status, setStatus, onChanged }: {
             return (
               <button key={item.id} onClick={() => setSelected(item)}
                 className={`w-full text-left px-3 py-3 border-b border-[var(--border)] border-l-2 ${ss.border} transition-colors ${
-                  isActive ? 'bg-accent/8' : 'hover:bg-surface-raised/40'
+                  isActive ? 'bg-accent/10' : 'hover:bg-surface-raised'
                 }`}>
                 <div className="flex items-center gap-1.5 mb-1">
                   <StatusChip status={item.status} />
-                  <span className="text-[9px] text-text-muted/40 bg-surface-raised px-1.5 py-0.5 rounded font-medium">
+                  <span className="text-[9px] text-text-muted bg-surface-raised px-1.5 py-0.5 rounded font-medium">
                     {item.change_type}
                   </span>
                   {item.song_public_id != null && (
-                    <span className="text-[9px] text-text-muted/30 ml-auto flex items-center gap-0.5">
+                    <span className="text-[9px] text-text-muted ml-auto flex items-center gap-0.5">
                       <Hash size={8} />{item.song_public_id}
                     </span>
                   )}
@@ -410,20 +410,20 @@ function ProposalsTab({ proposals, status, setStatus, onChanged }: {
         ) : (
           <>
             {/* Detail header */}
-            <div className="shrink-0 px-6 py-4 border-b border-[var(--border)] bg-surface-raised/10">
+            <div className="shrink-0 px-6 py-4 border-b border-[var(--border)] bg-surface-raised">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1.5">
                     <StatusChip status={p.status} />
-                    <span className="text-[10px] text-text-muted/50 bg-surface-raised px-2 py-0.5 rounded font-medium">{p.change_type}</span>
+                    <span className="text-[10px] text-text-muted bg-surface-raised px-2 py-0.5 rounded font-medium">{p.change_type}</span>
                     {p.song_public_id != null && (
-                      <span className="flex items-center gap-0.5 text-[10px] text-text-muted/40">
+                      <span className="flex items-center gap-0.5 text-[10px] text-text-muted">
                         <Hash size={9} />{p.song_public_id}
                       </span>
                     )}
                   </div>
                   <h2 className="text-text-primary font-bold text-base leading-snug">{p.title || `Proposal #${p.id}`}</h2>
-                  <div className="flex items-center gap-4 mt-1.5 text-[11px] text-text-muted/60 flex-wrap">
+                  <div className="flex items-center gap-4 mt-1.5 text-[11px] text-text-muted flex-wrap">
                     <span>by <span className="text-text-muted font-medium">{p.editor_username}</span></span>
                     <span className="flex items-center gap-1"><Calendar size={10} />{shortDate(p.created_at)}</span>
                     {p.reviewer_username && <span>reviewed by <span className="text-text-muted">{p.reviewer_username}</span></span>}
@@ -450,7 +450,7 @@ function ProposalsTab({ proposals, status, setStatus, onChanged }: {
                 )}
                 {p.status === 'approved' && (
                   <button onClick={() => doReverse(p.id)} disabled={actionId === p.id}
-                    className="px-3 py-1.5 rounded-lg text-xs text-text-muted/50 hover:text-amber-400 hover:bg-amber-500/10 transition-colors flex items-center gap-1.5 disabled:opacity-40">
+                    className="px-3 py-1.5 rounded-lg text-xs text-text-muted hover:text-amber-400 hover:bg-amber-500/10 transition-colors flex items-center gap-1.5 disabled:opacity-40">
                     {actionId === p.id ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Reverse
                   </button>
                 )}
@@ -460,14 +460,14 @@ function ProposalsTab({ proposals, status, setStatus, onChanged }: {
               {(p.editor_notes || p.review_notes) && (
                 <div className="flex flex-wrap gap-2 mt-3">
                   {p.editor_notes && (
-                    <div className="flex items-start gap-1.5 px-3 py-2 bg-surface-overlay rounded-lg text-xs text-text-muted/70 italic border border-[var(--border)] max-w-sm">
-                      <MessageSquare size={11} className="text-text-muted/30 shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-1.5 px-3 py-2 bg-surface-overlay rounded-lg text-xs text-text-muted italic border border-[var(--border)] max-w-sm">
+                      <MessageSquare size={11} className="text-text-muted shrink-0 mt-0.5" />
                       {p.editor_notes}
                     </div>
                   )}
                   {p.review_notes && (
-                    <div className="flex items-start gap-1.5 px-3 py-2 bg-surface-overlay rounded-lg text-xs text-text-muted/70 italic border border-[var(--border)] max-w-sm">
-                      <Check size={11} className="text-text-muted/30 shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-1.5 px-3 py-2 bg-surface-overlay rounded-lg text-xs text-text-muted italic border border-[var(--border)] max-w-sm">
+                      <Check size={11} className="text-text-muted shrink-0 mt-0.5" />
                       {p.review_notes}
                     </div>
                   )}
@@ -524,19 +524,19 @@ function ApplicationsTab({ applications, onChanged }: { applications: EditorAppl
       <div className="w-72 shrink-0 border-r border-[var(--border)] flex flex-col overflow-hidden">
         {pending.length > 0 && (
           <div className="shrink-0 px-3 pt-3 pb-1">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted/40">Pending · {pending.length}</p>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Pending · {pending.length}</p>
           </div>
         )}
         <div className="flex-1 overflow-y-auto">
           {applications.length === 0 && <Empty label="No applications" />}
           {pending.map(item => (
             <button key={item.id} onClick={() => setSelected(item)}
-              className={`w-full text-left px-3 py-3 border-b border-[var(--border)] border-l-2 border-l-amber-500/60 transition-colors text-text-primary ${selected?.id === item.id ? 'bg-accent/8' : 'hover:bg-surface-raised/40'}`}>
+              className={`w-full text-left px-3 py-3 border-b border-[var(--border)] border-l-2 border-l-amber-500/60 transition-colors text-text-primary ${selected?.id === item.id ? 'bg-accent/10' : 'hover:bg-surface-raised'}`}>
               <div className="flex items-center gap-2.5">
                 <Avatar src={item.discord_avatar} name={item.display_name || item.username} size={8} />
                 <div className="min-w-0 flex-1">
                   <p className="text-text-primary text-xs font-semibold truncate">{item.display_name || item.username}</p>
-                  <p className="text-text-muted/50 text-[10px] truncate">{item.discord_username} · {relativeTime(item.created_at)}</p>
+                  <p className="text-text-muted text-[10px] truncate">{item.discord_username} · {relativeTime(item.created_at)}</p>
                 </div>
               </div>
             </button>
@@ -544,17 +544,17 @@ function ApplicationsTab({ applications, onChanged }: { applications: EditorAppl
 
           {reviewed.length > 0 && (
             <div className="px-3 pt-3 pb-1">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted/30">Reviewed</p>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Reviewed</p>
             </div>
           )}
           {reviewed.map(item => (
             <button key={item.id} onClick={() => setSelected(item)}
-              className={`w-full text-left px-3 py-3 border-b border-[var(--border)] border-l-2 ${STATUS_STYLE[item.status]?.border ?? 'border-l-transparent'} transition-colors text-text-primary opacity-60 ${selected?.id === item.id ? 'bg-accent/8 opacity-100' : 'hover:bg-surface-raised/40'}`}>
+              className={`w-full text-left px-3 py-3 border-b border-[var(--border)] border-l-2 ${STATUS_STYLE[item.status]?.border ?? 'border-l-transparent'} transition-colors text-text-primary opacity-60 ${selected?.id === item.id ? 'bg-accent/10 opacity-100' : 'hover:bg-surface-raised'}`}>
               <div className="flex items-center gap-2.5">
                 <Avatar src={item.discord_avatar} name={item.display_name || item.username} size={7} />
                 <div className="min-w-0 flex-1">
                   <p className="text-text-primary text-xs font-medium truncate">{item.display_name || item.username}</p>
-                  <p className="text-text-muted/40 text-[10px]">{item.status} · {shortDate(item.reviewed_at)}</p>
+                  <p className="text-text-muted text-[10px]">{item.status} · {shortDate(item.reviewed_at)}</p>
                 </div>
               </div>
             </button>
@@ -574,7 +574,7 @@ function ApplicationsTab({ applications, onChanged }: { applications: EditorAppl
                   <h2 className="text-text-primary text-lg font-bold">{a.display_name || a.username}</h2>
                   <StatusChip status={a.status} />
                 </div>
-                <div className="flex items-center gap-4 text-xs text-text-muted/60 flex-wrap">
+                <div className="flex items-center gap-4 text-xs text-text-muted flex-wrap">
                   {a.discord_username && <span>{a.discord_username}</span>}
                   {a.contact && <span>{a.contact}</span>}
                   <span className="flex items-center gap-1"><Calendar size={10} />{shortDate(a.created_at)}</span>
@@ -612,7 +612,7 @@ function ApplicationsTab({ applications, onChanged }: { applications: EditorAppl
             {/* Review notes */}
             {a.status === 'pending' && (
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted/40">Review note</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-text-muted">Review note</label>
                 <textarea
                   value={notes[a.id] || ''}
                   onChange={e => setNotes(n => ({ ...n, [a.id]: e.target.value }))}
@@ -632,8 +632,8 @@ function ApplicationsTab({ applications, onChanged }: { applications: EditorAppl
 function AppSection({ label, value }: { label: string; value: string }): JSX.Element {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted/40 mb-1.5">{label}</p>
-      <p className="text-text-primary/80 text-sm leading-relaxed whitespace-pre-wrap">{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-1.5">{label}</p>
+      <p className="text-text-primary text-sm leading-relaxed whitespace-pre-wrap">{value}</p>
     </div>
   )
 }
@@ -673,12 +673,12 @@ function UsersTab({ users, onChanged, currentUserId }: { users: AdminUser[]; onC
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="shrink-0 flex items-center gap-3 px-6 py-3 border-b border-[var(--border)] bg-surface-raised/10">
+      <div className="shrink-0 flex items-center gap-3 px-6 py-3 border-b border-[var(--border)] bg-surface-raised">
         <div className="flex gap-1">
           {FILTERS.map(f => (
             <button key={f.id} onClick={() => setFilter(f.id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                filter === f.id ? 'bg-accent text-[var(--bg)] font-semibold' : 'text-text-muted/60 hover:text-text-muted hover:bg-surface-overlay'
+                filter === f.id ? 'bg-accent text-[var(--bg)] font-semibold' : 'text-text-muted hover:text-text-muted hover:bg-surface-overlay'
               }`}>
               {f.label}
               <span className={`text-[9px] px-1 rounded ${filter === f.id ? 'bg-white/20' : 'bg-surface-raised'}`}>{f.count}</span>
@@ -690,9 +690,9 @@ function UsersTab({ users, onChanged, currentUserId }: { users: AdminUser[]; onC
       </div>
 
       {/* Table header */}
-      <div className="shrink-0 grid grid-cols-[auto_1fr_120px_100px_80px_160px] items-center gap-3 px-6 py-2 border-b border-[var(--border)] bg-surface-raised/5">
+      <div className="shrink-0 grid grid-cols-[auto_1fr_120px_100px_80px_160px] items-center gap-3 px-6 py-2 border-b border-[var(--border)] bg-surface-raised">
         {['', 'User', 'Role', 'Approved', 'Props', 'Actions'].map(h => (
-          <p key={h} className="text-[9px] font-bold uppercase tracking-widest text-text-muted/30">{h}</p>
+          <p key={h} className="text-[9px] font-bold uppercase tracking-widest text-text-muted">{h}</p>
         ))}
       </div>
 
@@ -700,15 +700,15 @@ function UsersTab({ users, onChanged, currentUserId }: { users: AdminUser[]; onC
       <div className="flex-1 overflow-y-auto">
         {visible.length === 0 && <Empty label="No users" />}
         {visible.map(u => (
-          <div key={u.user_id} className="grid grid-cols-[auto_1fr_120px_100px_80px_160px] items-center gap-3 px-6 py-3 border-b border-[var(--border)] hover:bg-surface-raised/20 transition-colors">
+          <div key={u.user_id} className="grid grid-cols-[auto_1fr_120px_100px_80px_160px] items-center gap-3 px-6 py-3 border-b border-[var(--border)] hover:bg-surface-raised transition-colors">
             <Avatar src={u.discord_avatar} name={u.discord_username || u.username} size={8} />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-text-primary text-sm font-medium truncate">{u.discord_username || u.username}</p>
                 {!u.is_active && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded text-red-400 bg-red-500/15">disabled</span>}
-                {u.user_id === currentUserId && <span className="text-[9px] text-text-muted/30 italic">you</span>}
+                {u.user_id === currentUserId && <span className="text-[9px] text-text-muted italic">you</span>}
               </div>
-              <p className="text-text-muted/40 text-[10px]">joined {shortDate(u.date_joined)}</p>
+              <p className="text-text-muted text-[10px]">joined {shortDate(u.date_joined)}</p>
             </div>
             <div>
               <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border ${ROLE[u.role] ?? 'text-text-muted bg-surface-raised'}`}>
@@ -716,14 +716,14 @@ function UsersTab({ users, onChanged, currentUserId }: { users: AdminUser[]; onC
               </span>
             </div>
             <p className="text-text-primary text-sm font-semibold">{u.approved_count}</p>
-            <p className="text-text-muted/60 text-sm">{u.proposal_count}</p>
+            <p className="text-text-muted text-sm">{u.proposal_count}</p>
             <div className="flex items-center gap-1">
               {actionId === u.user_id ? (
-                <Loader2 size={13} className="animate-spin text-text-muted/40" />
+                <Loader2 size={13} className="animate-spin text-text-muted" />
               ) : u.user_id !== currentUserId && u.role !== 'administrator' ? (
                 <>
                   {u.role === 'editor' && (
-                    <label className="flex items-center gap-1 text-[10px] text-text-muted/40 cursor-pointer mr-2 hover:text-text-muted/70">
+                    <label className="flex items-center gap-1 text-[10px] text-text-muted cursor-pointer mr-2 hover:text-text-muted">
                       <input type="checkbox" checked={u.auto_approve_proposals}
                         onChange={e => doUpdate(u.user_id, { auto_approve_proposals: e.target.checked })}
                         className="w-3 h-3 accent-[var(--accent)]" />
@@ -732,17 +732,17 @@ function UsersTab({ users, onChanged, currentUserId }: { users: AdminUser[]; onC
                   )}
                   {u.role === 'editor' ? (
                     <button onClick={() => doUpdate(u.user_id, { role: 'applicant' })}
-                      className="px-2 py-1 rounded text-[10px] text-text-muted/50 hover:text-red-400 hover:bg-red-500/10 transition-colors font-medium">Demote</button>
+                      className="px-2 py-1 rounded text-[10px] text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors font-medium">Demote</button>
                   ) : (
                     <button onClick={() => doUpdate(u.user_id, { role: 'editor' })}
                       className="px-2 py-1 rounded text-[10px] text-emerald-400 hover:bg-emerald-500/10 transition-colors font-medium">Promote</button>
                   )}
                   <button onClick={() => doUpdate(u.user_id, { is_active: !u.is_active })}
-                    className="px-2 py-1 rounded text-[10px] text-text-muted/50 hover:text-text-muted hover:bg-surface-raised transition-colors font-medium">
+                    className="px-2 py-1 rounded text-[10px] text-text-muted hover:text-text-muted hover:bg-surface-raised transition-colors font-medium">
                     {u.is_active ? 'Disable' : 'Enable'}
                   </button>
                 </>
-              ) : <span className="text-text-muted/20 text-[10px]">—</span>}
+              ) : <span className="text-text-muted text-[10px]">—</span>}
             </div>
           </div>
         ))}
@@ -770,7 +770,7 @@ function StatsTab({ applications, proposals, users }: {
     { label: 'Pending proposals', value: proposals.filter(p => p.status === 'pending').length,     color: 'text-amber-400',     icon: <Clock size={16} /> },
     { label: 'Pending apps',      value: applications.filter(a => a.status === 'pending').length,  color: 'text-amber-400',     icon: <Clock size={16} /> },
     { label: 'Approval rate',     value: `${approvalPct}%`,                                        color: 'text-purple-400',    icon: <Activity size={16} /> },
-    { label: 'Applicants',        value: users.filter(u => u.role === 'applicant').length,          color: 'text-text-muted/60', icon: <Users size={16} /> },
+    { label: 'Applicants',        value: users.filter(u => u.role === 'applicant').length,          color: 'text-text-muted', icon: <Users size={16} /> },
   ]
 
   return (
@@ -780,28 +780,28 @@ function StatsTab({ applications, proposals, users }: {
           <div key={m.label} className="bg-surface-overlay border border-[var(--border)] rounded-xl p-4">
             <div className={`mb-2 ${m.color}`}>{m.icon}</div>
             <p className={`text-3xl font-black leading-none ${m.color}`}>{m.value}</p>
-            <p className="text-text-muted/50 text-[11px] mt-2">{m.label}</p>
+            <p className="text-text-muted text-[11px] mt-2">{m.label}</p>
           </div>
         ))}
       </div>
 
       {topEditors.length > 0 && (
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted/40 mb-3">Top editors by approvals</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-3">Top editors by approvals</p>
           <div className="grid grid-cols-2 gap-2">
             {topEditors.map((u, i) => (
               <div key={u.user_id} className="flex items-center gap-3 px-4 py-3 bg-surface-overlay border border-[var(--border)] rounded-xl">
-                <span className={`text-sm font-black w-6 text-center shrink-0 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-slate-400' : i === 2 ? 'text-amber-700' : 'text-text-muted/20'}`}>
+                <span className={`text-sm font-black w-6 text-center shrink-0 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-slate-400' : i === 2 ? 'text-amber-700' : 'text-text-muted'}`}>
                   {i + 1}
                 </span>
                 <Avatar src={u.discord_avatar} name={u.discord_username || u.username} size={8} />
                 <div className="flex-1 min-w-0">
                   <p className="text-text-primary text-xs font-semibold truncate">{u.discord_username || u.username}</p>
-                  <p className="text-text-muted/40 text-[10px]">{u.proposal_count} total</p>
+                  <p className="text-text-muted text-[10px]">{u.proposal_count} total</p>
                 </div>
                 <div className="text-right">
                   <p className="text-text-primary text-sm font-bold">{u.approved_count}</p>
-                  <p className="text-text-muted/30 text-[9px]">approved</p>
+                  <p className="text-text-muted text-[9px]">approved</p>
                 </div>
               </div>
             ))}
@@ -823,7 +823,7 @@ function SecurityTab(): JSX.Element {
         </div>
         <div>
           <p className="text-text-primary font-semibold">Two-factor authentication enabled</p>
-          <p className="text-text-muted/60 text-sm mt-1">Your account is protected with 2FA.</p>
+          <p className="text-text-muted text-sm mt-1">Your account is protected with 2FA.</p>
         </div>
       </div>
     </div>
@@ -850,14 +850,14 @@ function OtpSetupPanel({ onEnabled }: { onEnabled: () => Promise<void> }): JSX.E
     finally { setConfirming(false) }
   }
 
-  if (loading) return <div className="flex items-center justify-center h-32"><Loader2 size={20} className="animate-spin text-text-muted/30" /></div>
+  if (loading) return <div className="flex items-center justify-center h-32"><Loader2 size={20} className="animate-spin text-text-muted" /></div>
   if (!setup) return <p className="text-red-400 text-sm">Could not load OTP setup.</p>
 
   return (
     <div className="space-y-5">
       <div>
         <h2 className="text-text-primary text-base font-bold flex items-center gap-2"><KeyRound size={16} /> Enable 2FA</h2>
-        <p className="text-text-muted/60 text-sm mt-1.5 leading-relaxed">Admins must enable two-factor authentication. Scan the QR code with your authenticator app.</p>
+        <p className="text-text-muted text-sm mt-1.5 leading-relaxed">Admins must enable two-factor authentication. Scan the QR code with your authenticator app.</p>
       </div>
       {setup.qr_code && (
         <div className="bg-white p-4 rounded-2xl flex items-center justify-center w-fit mx-auto">
@@ -866,12 +866,12 @@ function OtpSetupPanel({ onEnabled }: { onEnabled: () => Promise<void> }): JSX.E
       )}
       {setup.otp_secret && (
         <div>
-          <p className="text-text-muted/50 text-[10px] mb-1.5">Manual entry:</p>
+          <p className="text-text-muted text-[10px] mb-1.5">Manual entry:</p>
           <code className="block bg-surface-overlay border border-[var(--border)] rounded-xl px-3 py-2.5 text-text-primary text-xs font-mono break-all">{setup.otp_secret}</code>
         </div>
       )}
       <div>
-        <label className="block text-xs font-semibold text-text-muted/60 mb-1.5">Verification code</label>
+        <label className="block text-xs font-semibold text-text-muted mb-1.5">Verification code</label>
         <input type="text" inputMode="numeric" value={code}
           onChange={e => { setCode(e.target.value); setError(null) }}
           onKeyDown={e => e.key === 'Enter' && confirm()} placeholder="123456"
