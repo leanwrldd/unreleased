@@ -3,7 +3,7 @@ import {
   ListMusic, Play, Loader2, Plus, Trash2, Pencil, ArrowLeft,
   X, Check, Heart, Shuffle, Music2, Clock, GripVertical,
   ListPlus, Download, Share2, Archive, Info, FolderInput, MoreHorizontal,
-  Search, ChevronUp, ChevronDown, ImageOff, Globe, Lock,
+  Search, ChevronUp, ChevronDown, ImageOff, Globe, Lock, Link, ListEnd,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
@@ -75,7 +75,7 @@ type SortField = 'default' | 'title' | 'artist' | 'duration'
 interface SortState { field: SortField; dir: 'asc' | 'desc' }
 
 interface TrackMenuState { track: Track; songId: number; i: number; x: number; y: number; showPlaylists: boolean }
-interface LibMenuState   { playlist: PlaylistSummary; x: number; y: number; showPlaylists: boolean }
+interface LibMenuState   { playlist: PlaylistSummary; x: number; y: number; showPlaylists: boolean; renaming?: boolean; renameVal?: string }
 
 // ── Tracklist skeleton ────────────────────────────────────────────────────────
 
@@ -1003,34 +1003,129 @@ export default function PlaylistsView(): JSX.Element {
       {/* Library card context menu */}
       {libMenu && (
         <div
-          className="fixed z-50 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[200px]"
-          style={{ left: Math.min(libMenu.x, window.innerWidth - 220), top: Math.min(libMenu.y, window.innerHeight - 220) }}
+          className="fixed z-50 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[210px]"
+          style={{ left: Math.min(libMenu.x, window.innerWidth - 230), top: Math.min(libMenu.y, window.innerHeight - 320) }}
           onClick={e => e.stopPropagation()}
         >
-          <MenuItem icon={Play} label="Open" onClick={() => { setSelectedId(libMenu.playlist.id); setLibMenu(null) }} />
-          <div className="border-t border-[var(--border)] my-1" />
-          <button
-            className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-sm text-text-primary transition-colors hover:bg-surface-overlay"
-            onClick={e => { e.stopPropagation(); setLibMenu(prev => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null) }}
-          >
-            <span className="flex items-center gap-2.5"><FolderInput size={14} className="text-text-muted" />Add all to playlist</span>
-            <span className="text-text-muted text-xs">›</span>
-          </button>
-          {libMenu.showPlaylists && (
-            <div className="border-t border-[var(--border)] max-h-48 overflow-y-auto">
-              {playlists.filter(p => p.id !== libMenu.playlist.id).length === 0 ? (
-                <p className="px-3.5 py-2 text-xs text-text-muted">No other playlists</p>
-              ) : playlists.filter(p => p.id !== libMenu.playlist.id).map(p => (
-                <button key={p.id} onClick={async () => {
-                  setLibMenu(null)
-                  const srcDetail = await userApi.getPlaylist(libMenu.playlist.id)
-                  await Promise.all(srcDetail.items.map(item => userApi.addToPlaylist(p.id, item.song.id).catch(() => {})))
+          {/* Inline rename input */}
+          {libMenu.renaming ? (
+            <div className="px-3 py-2 flex gap-2" onClick={e => e.stopPropagation()}>
+              <input
+                autoFocus
+                value={libMenu.renameVal ?? libMenu.playlist.name}
+                onChange={e => setLibMenu(prev => prev ? { ...prev, renameVal: e.target.value } : null)}
+                onKeyDown={async e => {
+                  if (e.key === 'Enter') {
+                    const val = libMenu.renameVal?.trim() || libMenu.playlist.name
+                    await userApi.renamePlaylist(libMenu.playlist.id, val)
+                    await refreshPlaylists()
+                    setLibMenu(null)
+                  } else if (e.key === 'Escape') {
+                    setLibMenu(prev => prev ? { ...prev, renaming: false } : null)
+                  }
+                }}
+                className="flex-1 bg-surface-overlay rounded-lg px-2.5 py-1.5 text-sm text-text-primary focus:outline-none border border-[var(--border)]"
+              />
+              <button
+                onClick={async () => {
+                  const val = libMenu.renameVal?.trim() || libMenu.playlist.name
+                  await userApi.renamePlaylist(libMenu.playlist.id, val)
                   await refreshPlaylists()
-                }} className="w-full text-left px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors truncate">
-                  {p.name}
-                </button>
-              ))}
+                  setLibMenu(null)
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-accent text-white text-xs font-medium"
+              >Save</button>
             </div>
+          ) : (
+            <>
+              <MenuItem icon={Play} label="Open" onClick={() => { setSelectedId(libMenu.playlist.id); setLibMenu(null) }} />
+              <MenuItem
+                icon={Shuffle}
+                label="Play all"
+                onClick={async () => {
+                  const d = await userApi.getPlaylist(libMenu.playlist.id)
+                  const tracks = d.items.map(i => userApi.liteSongToTrack(i.song))
+                  if (tracks.length) { playTrack(tracks[0], tracks) }
+                  setLibMenu(null)
+                }}
+              />
+              <MenuItem
+                icon={ListEnd}
+                label="Add all to queue"
+                onClick={async () => {
+                  const d = await userApi.getPlaylist(libMenu.playlist.id)
+                  d.items.forEach(i => addToQueue(userApi.liteSongToTrack(i.song)))
+                  setLibMenu(null)
+                }}
+              />
+              <div className="border-t border-[var(--border)] my-1" />
+              <MenuItem
+                icon={Link}
+                label="Copy share link"
+                onClick={async () => {
+                  try {
+                    if (!libMenu.playlist.is_public) {
+                      await userApi.updatePlaylist(libMenu.playlist.id, { is_public: true })
+                      await refreshPlaylists()
+                    }
+                    await navigator.clipboard.writeText(
+                      `${window.location.origin}/playlists?id=${libMenu.playlist.id}&view=shared`
+                    )
+                  } catch {}
+                  setLibMenu(null)
+                }}
+              />
+              <MenuItem
+                icon={libMenu.playlist.is_public ? Globe : Lock}
+                label={libMenu.playlist.is_public ? 'Make private' : 'Make public'}
+                onClick={async () => {
+                  await userApi.updatePlaylist(libMenu.playlist.id, { is_public: !libMenu.playlist.is_public })
+                  await refreshPlaylists()
+                  setLibMenu(null)
+                }}
+              />
+              <div className="border-t border-[var(--border)] my-1" />
+              <MenuItem
+                icon={Pencil}
+                label="Rename"
+                onClick={() => setLibMenu(prev => prev ? { ...prev, renaming: true, renameVal: prev.playlist.name } : null)}
+              />
+              <button
+                className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-sm text-text-primary transition-colors hover:bg-surface-overlay"
+                onClick={e => { e.stopPropagation(); setLibMenu(prev => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null) }}
+              >
+                <span className="flex items-center gap-2.5"><FolderInput size={14} className="text-text-muted" />Add all to playlist</span>
+                <span className="text-text-muted text-xs">›</span>
+              </button>
+              {libMenu.showPlaylists && (
+                <div className="border-t border-[var(--border)] max-h-40 overflow-y-auto">
+                  {playlists.filter(p => p.id !== libMenu.playlist.id).length === 0 ? (
+                    <p className="px-3.5 py-2 text-xs text-text-muted">No other playlists</p>
+                  ) : playlists.filter(p => p.id !== libMenu.playlist.id).map(p => (
+                    <button key={p.id} onClick={async () => {
+                      setLibMenu(null)
+                      const srcDetail = await userApi.getPlaylist(libMenu.playlist.id)
+                      await Promise.all(srcDetail.items.map(item => userApi.addToPlaylist(p.id, item.song.id).catch(() => {})))
+                      await refreshPlaylists()
+                    }} className="w-full text-left px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors truncate">
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="border-t border-[var(--border)] my-1" />
+              <MenuItem
+                icon={Trash2}
+                label="Delete playlist"
+                destructive
+                onClick={async () => {
+                  await userApi.deletePlaylist(libMenu.playlist.id)
+                  if (selectedId === libMenu.playlist.id) setSelectedId(null)
+                  await refreshPlaylists()
+                  setLibMenu(null)
+                }}
+              />
+            </>
           )}
         </div>
       )}
