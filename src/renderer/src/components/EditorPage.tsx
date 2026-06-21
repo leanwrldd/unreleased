@@ -298,6 +298,7 @@ export default function EditorPage(): JSX.Element {
       if ('release_date' in d)           setRelDate(String(d.release_date ?? ''))
       if ('leak_type' in d)              setLeak(String(d.leak_type ?? ''))
       if ('lyrics' in d)                 setLyrics(String(d.lyrics ?? ''))
+      if ('synced_lyrics' in d)           setSynced(String(d.synced_lyrics ?? ''))
       if ('additional_information' in d) setAddInfo(String(d.additional_information ?? ''))
       if ('notes' in d)                  setNotes(String(d.notes ?? ''))
       setEdNotes(editorNotes)

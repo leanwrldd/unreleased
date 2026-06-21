@@ -37,7 +37,7 @@ function renderValue(v: unknown): string {
   return JSON.stringify(v, null, 2)
 }
 
-const LONG_KEYS = new Set(['lyrics', 'synced_lyrics', 'description', 'notes'])
+const LONG_KEYS = new Set(['lyrics', 'synced_lyrics', 'description', 'notes', 'additional_information'])
 const LONG_THRESHOLD = 200
 
 const STATUS_STYLE: Record<string, { bg: string; text: string; dot: string; border: string }> = {
@@ -77,8 +77,9 @@ function FieldDiff({ fieldKey, before, after }: { fieldKey: string; before: unkn
   const afterStr  = renderValue(after)
   const unchanged = beforeStr === afterStr
   const isLong    = LONG_KEYS.has(fieldKey) || beforeStr.length > LONG_THRESHOLD || afterStr.length > LONG_THRESHOLD
-  const [exp, setExp] = useState(!isLong)
-  const MAX = 8
+  // synced_lyrics is LRC — default expanded so content is visible immediately
+  const [exp, setExp] = useState(!isLong || fieldKey === 'synced_lyrics')
+  const MAX = fieldKey === 'synced_lyrics' ? 60 : 8
 
   const sliceLong = (s: string) => {
     const lines = s.split('\n')
