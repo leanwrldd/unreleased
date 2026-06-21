@@ -285,6 +285,25 @@ export default function EditorPage(): JSX.Element {
     }
   }
 
+
+  const handleLyricsPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>): void => {
+    const pasted = e.clipboardData.getData('text')
+    if (!pasted || !/\[.*?\]/.test(pasted)) return  // nothing to strip
+    e.preventDefault()
+    const cleaned = pasted
+      .replace(/\[.*?\]/g, '')     // remove [Chorus], [Verse 1: Artist], etc.
+      .replace(/\n{3,}/g, '\n\n') // collapse runs of 3+ blank lines
+      .trim()
+    const el = e.currentTarget
+    const start = el.selectionStart ?? lyrics.length
+    const end   = el.selectionEnd   ?? lyrics.length
+    const next  = lyrics.substring(0, start) + cleaned + lyrics.substring(end)
+    setLyrics(next)
+    requestAnimationFrame(() => {
+      el.selectionStart = el.selectionEnd = start + cleaned.length
+    })
+  }
+
   /* ── Guards ──────────────────────────────────────────────────────────────── */
   if (!account) return (
     <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6 text-center">
@@ -475,6 +494,7 @@ export default function EditorPage(): JSX.Element {
                 {lyricsTab === 'lyrics' ? (
                   <textarea
                     rows={15} value={lyrics} onChange={e => setLyrics(e.target.value)}
+                    onPaste={handleLyricsPaste}
                     placeholder="Full lyrics…"
                     className={`w-full bg-surface-overlay rounded-xl px-3.5 py-3 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted placeholder:opacity-25 border transition-colors leading-relaxed ${
                       lyrics !== String(base.lyrics || '') ? 'border-accent/30' : 'border-[var(--border)]'
