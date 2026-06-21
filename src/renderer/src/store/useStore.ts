@@ -67,6 +67,7 @@ interface AppState {
 
   // Editor
   pendingEditorSongId: number | null
+  pendingEditProposal: { id: number; songId: number; proposedData: Record<string, unknown>; editorNotes: string } | null
 }
 
 interface AppActions {
@@ -106,6 +107,7 @@ interface AppActions {
   refreshPlaylists: () => Promise<void>
 
   setPendingEditorSongId: (id: number | null) => void
+  setPendingEditProposal: (p: { id: number; songId: number; proposedData: Record<string, unknown>; editorNotes: string } | null) => void
 }
 
 export type AppStore = QueueSlice & AppState & AppActions
@@ -299,5 +301,7 @@ export const useStore = create<AppStore>((set, get, store) => ({
 
   // ── Editor ────────────────────────────────────────────────────────────────
   pendingEditorSongId: null,
+  pendingEditProposal: null,
   setPendingEditorSongId: (pendingEditorSongId) => set({ pendingEditorSongId }),
+  setPendingEditProposal: (pendingEditProposal) => set({ pendingEditProposal }),
 }))

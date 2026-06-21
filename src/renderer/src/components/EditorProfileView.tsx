@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Loader2, Trophy, FileEdit, ChevronLeft } from 'lucide-react'
+import { Loader2, Trophy, FileEdit, ChevronLeft, Pencil, Trash2 } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { getMyProposals, getLeaderboard, SongEditProposal, ProposalStatus } from '../lib/userApi'
+import { getMyProposals, getLeaderboard, withdrawProposal, SongEditProposal, ProposalStatus } from '../lib/userApi'
 
 type LeaderboardEntry = {
   rank: number
@@ -37,13 +37,30 @@ function changeTypeLabel(type: string): string {
 }
 
 export default function EditorProfileView(): JSX.Element {
-  const { account, setActiveView } = useStore()
+  const { account, setActiveView, setPendingEditorSongId, setPendingEditProposal } = useStore()
 
   const [proposals, setProposals] = useState<SongEditProposal[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [loadingProposals, setLoadingProposals] = useState(true)
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true)
   const [filter, setFilter] = useState<FilterTab>('all')
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+
+  const handleDelete = async (id: number): Promise<void> => {
+    setDeletingId(id)
+    try {
+      await withdrawProposal(id)
+      setProposals(prev => prev.filter(p => p.id !== id))
+    } catch (e) { console.error('withdraw failed:', e) }
+    finally { setDeletingId(null) }
+  }
+
+  const handleEdit = (p: SongEditProposal): void => {
+    if (!p.song) return
+    setPendingEditProposal({ id: p.id, songId: p.song, proposedData: p.proposed_data, editorNotes: p.editor_notes || '' })
+    setPendingEditorSongId(p.song)
+    setActiveView('editor')
+  }
 
   useEffect(() => {
     getMyProposals()
@@ -182,6 +199,28 @@ export default function EditorProfileView(): JSX.Element {
                         <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${s.badge}`}>
                           {s.label}
                         </span>
+                        {p.status === 'pending' && (
+                          <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleEdit(p)}
+                              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-raised transition-all"
+                              title="Edit proposal"
+                            >
+                              <Pencil size={12} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(p.id)}
+                              disabled={deletingId === p.id}
+                              className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-40"
+                              title="Withdraw proposal"
+                            >
+                              {deletingId === p.id
+                                ? <Loader2 size={12} className="animate-spin" />
+                                : <Trash2 size={12} />
+                              }
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )

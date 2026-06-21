@@ -1,22 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Loader2, Check, AlertCircle, LogIn, Clock, X, ChevronDown,
-  ChevronUp, Award, Music2, FileText, Pencil, Trash2,
+  ChevronUp, Award, Music2, FileText, Pencil,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { apiFetch, JWApiSong, JWApiEra, buildImageUrl, CATEGORY_LABELS } from '../lib/juicewrldApi'
 import * as userApi from '../lib/userApi'
-import type { EditorApplication, SongEditProposal } from '../lib/userApi'
+import type { EditorApplication } from '../lib/userApi'
 
 type SubmitState = 'idle' | 'submitting' | 'submitted' | 'error'
 type LyricsTab = 'lyrics' | 'synced'
-type PageTab   = 'edit' | 'proposals'
-
-const STATUS_BADGE: Record<string, string> = {
-  pending:  'bg-yellow-500/15 text-yellow-400',
-  approved: 'bg-emerald-500/15 text-emerald-400',
-  rejected: 'bg-red-500/15 text-red-400',
-}
 
 const CATEGORIES = [
   { value: 'released',          label: 'Released' },
@@ -143,6 +136,7 @@ export default function EditorPage(): JSX.Element {
   const {
     account, currentTrack,
     pendingEditorSongId, setPendingEditorSongId,
+    pendingEditProposal, setPendingEditProposal,
     setShowUserAuth, logoutAccount,
   } = useStore()
   const isEditor = !!account?.is_editor
@@ -176,9 +170,6 @@ export default function EditorPage(): JSX.Element {
   const [submitState,  setSubmitState]  = useState<SubmitState>('idle')
   const [submitError,  setSubmitError]  = useState<string | null>(null)
   const [showMore,     setShowMore]     = useState(false)
-  const [activeTab,    setActiveTab]    = useState<PageTab>('edit')
-  const [myProposals,  setMyProposals]  = useState<SongEditProposal[]>([])
-  const [propsLoading, setPropsLoading] = useState(false)
   const [editingPropId, setEditingPropId] = useState<number | null>(null)
 
 
@@ -255,6 +246,30 @@ export default function EditorPage(): JSX.Element {
   }, [isEditor, song, currentTrack, pendingEditorSongId, loadSong])
 
   useEffect(() => {
+    if (!pendingEditProposal || !isEditor) return
+    const { id, songId, proposedData: d, editorNotes } = pendingEditProposal
+    setPendingEditProposal(null)
+    setEditingPropId(id)
+    loadSong(songId).then(() => {
+      if ('name' in d)                   setName(String(d.name ?? ''))
+      if ('credited_artists' in d)        setArtists(String(d.credited_artists ?? ''))
+      if ('album' in d)                   setAlbum(String(d.album ?? ''))
+      if ('category' in d)               setCat(String(d.category ?? ''))
+      if ('era_id' in d)                 setEraId(d.era_id != null ? String(d.era_id) : '')
+      if ('producers' in d)              setProd(String(d.producers ?? ''))
+      if ('engineers' in d)              setEng(String(d.engineers ?? ''))
+      if ('recording_locations' in d)    setLoc(String(d.recording_locations ?? ''))
+      if ('record_dates' in d)           setRecDate(String(d.record_dates ?? ''))
+      if ('release_date' in d)           setRelDate(String(d.release_date ?? ''))
+      if ('leak_type' in d)              setLeak(String(d.leak_type ?? ''))
+      if ('lyrics' in d)                 setLyrics(String(d.lyrics ?? ''))
+      if ('additional_information' in d) setAddInfo(String(d.additional_information ?? ''))
+      if ('notes' in d)                  setNotes(String(d.notes ?? ''))
+      setEdNotes(editorNotes)
+    })
+  }, [pendingEditProposal, isEditor, setPendingEditProposal, loadSong])
+
+  useEffect(() => {
     if (!account || isEditor) { setApplication(null); return }
     setAppLoading(true)
     userApi.getMyApplication()
@@ -276,43 +291,6 @@ export default function EditorPage(): JSX.Element {
   const changedCount = Object.keys(patch).length
   const base         = baseline(song)
 
-  const loadProposals = async (): Promise<void> => {
-    setPropsLoading(true)
-    try { setMyProposals(await userApi.getMyProposals()) }
-    catch {} finally { setPropsLoading(false) }
-  }
-
-  const handleEditProposal = useCallback(async (p: SongEditProposal): Promise<void> => {
-    if (!p.song) return
-    setEditingPropId(p.id)
-    setActiveTab('edit')
-    await loadSong(p.song)
-    const d = p.proposed_data
-    if ('name' in d)                   setName(String(d.name ?? ''))
-    if ('credited_artists' in d)        setArtists(String(d.credited_artists ?? ''))
-    if ('album' in d)                   setAlbum(String(d.album ?? ''))
-    if ('category' in d)               setCat(String(d.category ?? ''))
-    if ('era_id' in d)                 setEraId(d.era_id != null ? String(d.era_id) : '')
-    if ('producers' in d)              setProd(String(d.producers ?? ''))
-    if ('engineers' in d)              setEng(String(d.engineers ?? ''))
-    if ('recording_locations' in d)    setLoc(String(d.recording_locations ?? ''))
-    if ('record_dates' in d)           setRecDate(String(d.record_dates ?? ''))
-    if ('release_date' in d)           setRelDate(String(d.release_date ?? ''))
-    if ('leak_type' in d)              setLeak(String(d.leak_type ?? ''))
-    if ('lyrics' in d)                 setLyrics(String(d.lyrics ?? ''))
-    if ('additional_information' in d) setAddInfo(String(d.additional_information ?? ''))
-    if ('notes' in d)                  setNotes(String(d.notes ?? ''))
-    setEdNotes(p.editor_notes || '')
-  }, [loadSong])
-
-  const handleDeleteProposal = async (id: number): Promise<void> => {
-    try {
-      await userApi.withdrawProposal(id)
-      setMyProposals(prev => prev.filter(p => p.id !== id))
-      if (editingPropId === id) setEditingPropId(null)
-    } catch (e) { console.error('withdraw failed:', e) }
-  }
-
   const cancelEditProposal = (): void => {
     setEditingPropId(null)
     if (song) populate(song)
@@ -326,9 +304,6 @@ export default function EditorPage(): JSX.Element {
       if (editingPropId != null) {
         await userApi.updateProposal(editingPropId, { proposed_data: patch, editor_notes: edNotes })
         setEditingPropId(null)
-        setMyProposals(prev => prev.map(p =>
-          p.id === editingPropId ? { ...p, proposed_data: patch, editor_notes: edNotes } : p
-        ))
       } else {
         await userApi.createProposal({
           song: song.id, change_type: 'update',
@@ -406,61 +381,7 @@ export default function EditorPage(): JSX.Element {
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto min-h-0">
 
-        {/* ── Proposals view ── */}
-        {activeTab === 'proposals' && (
-          propsLoading ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 size={16} className="animate-spin text-text-muted" />
-            </div>
-          ) : myProposals.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 h-40 text-center px-6">
-              <FileText size={18} className="text-text-muted opacity-40" />
-              <p className="text-sm text-text-muted opacity-65">No proposals yet</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-[var(--border)]">
-              {myProposals.map(p => (
-                <div key={p.id} className="px-4 py-3 flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-primary truncate">{p.title}</p>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${STATUS_BADGE[p.status] || 'bg-surface-overlay text-text-muted'}`}>
-                        {p.status}
-                      </span>
-                      <span className="text-[11px] text-text-muted opacity-65">
-                        {new Date(p.created_at).toLocaleDateString()}
-                      </span>
-                      {p.edit_count > 0 && (
-                        <span className="text-[11px] text-text-muted opacity-50">edited {p.edit_count}×</span>
-                      )}
-                      {p.review_notes && (
-                        <span className="text-[11px] text-text-muted opacity-65 truncate max-w-[140px]" title={p.review_notes}>
-                          "{p.review_notes}"
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {p.status === 'pending' && (
-                    <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
-                      <button onClick={() => handleEditProposal(p)}
-                        className="p-1.5 rounded-lg text-text-muted opacity-65 hover:opacity-100 hover:bg-surface-overlay transition-all"
-                        title="Edit proposal">
-                        <Pencil size={13} />
-                      </button>
-                      <button onClick={() => handleDeleteProposal(p.id)}
-                        className="p-1.5 rounded-lg text-text-muted opacity-65 hover:text-red-400 hover:opacity-100 hover:bg-red-500/10 transition-all"
-                        title="Withdraw proposal">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )
-        )}
-
-        {activeTab === 'edit' && (loading ? (
+        {loading ? (
           <div className="flex items-center justify-center h-40">
             <Loader2 size={18} className="animate-spin text-text-muted" />
           </div>
@@ -638,7 +559,7 @@ export default function EditorPage(): JSX.Element {
               </div>
             </div>
           </>
-        ))}
+        )}
 
       </div>
 
