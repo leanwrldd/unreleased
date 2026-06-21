@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Loader2, Check, AlertCircle, LogIn, Clock, X, ChevronDown,
-  ChevronUp, Award, Music2, FileText, Pencil,
+  ChevronUp, Award, Music2, FileText, Pencil, Plus,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { apiFetch, JWApiSong, JWApiEra, buildImageUrl, CATEGORY_LABELS } from '../lib/juicewrldApi'
@@ -168,7 +168,7 @@ function extractGeniusLyrics(html: string): string {
 export default function EditorPage(): JSX.Element {
   const {
     account, currentTrack,
-    pendingEditorSongId, setPendingEditorSongId,
+    pendingEditorSongId, setPendingEditorSongId, setActiveView,
     pendingEditProposal, setPendingEditProposal,
     setShowUserAuth, logoutAccount,
   } = useStore()
@@ -588,6 +588,15 @@ export default function EditorPage(): JSX.Element {
                     </button>
                   )
                 })}
+                {lyricsTab === 'synced' && (
+                  <button
+                    onClick={() => setActiveView('synced-lyrics')}
+                    title="Make new synced lyrics"
+                    className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-text-muted hover:text-text-primary hover:bg-surface-overlay transition-all"
+                  >
+                    <Plus size={13} /> New
+                  </button>
+                )}
               </div>
 
               <div className="px-4">

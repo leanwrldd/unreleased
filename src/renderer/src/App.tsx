@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useStore } from './store/useStore'
 import { setToken, getToken } from './lib/userApi'
 import { ViewType } from './types'
+import SyncedLyricsPage from './components/SyncedLyricsPage'
 
 function getViewFromPath(pathname: string): ViewType {
   if (pathname === '/' || pathname === '/tracker') return 'api-tracker'
@@ -12,6 +13,7 @@ function getViewFromPath(pathname: string): ViewType {
   if (pathname === '/admin') return 'admin'
   if (pathname === '/liked') return 'liked'
   if (pathname === '/playlists') return 'playlists'
+  if (pathname === '/syncedlyrics') return 'synced-lyrics'
   if (pathname.startsWith('/shared/')) return 'shared-playlist'
   if (pathname === '/auth/discord/callback') return 'api-tracker'
   return 'not-found'
@@ -115,6 +117,7 @@ export default function App(): JSX.Element {
               : activeView === 'playlists' ? <PlaylistsView />
               : activeView === 'shared-playlist' ? <SharedPlaylistView />
               : activeView === 'editor-profile' ? <EditorProfileView />
+              : activeView === 'synced-lyrics' ? <SyncedLyricsPage />
               : activeView === 'not-found' ? <NotFoundView />
               : <ApiTrackerView />}
           </ErrorBoundary>
