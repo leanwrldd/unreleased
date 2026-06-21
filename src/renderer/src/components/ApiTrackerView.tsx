@@ -994,7 +994,17 @@ export default function ApiTrackerView(): JSX.Element {
         </div>
       </div>
 
-      <SongInfoModal song={selectedSong} onClose={() => setSelectedSong(null)} />
+      {selectedSong && (
+        <SongInfoModal
+          song={selectedSong}
+          onClose={() => setSelectedSong(null)}
+          onEdit={canEdit ? (songId) => {
+            setSelectedSong(null)
+            setPendingEditorSongId(songId)
+            setActiveView('editor')
+          } : undefined}
+        />
+      )}
 
       {contextMenu && (
         <SongContextMenu

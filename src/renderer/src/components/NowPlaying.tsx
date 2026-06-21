@@ -170,7 +170,17 @@ export default function NowPlaying(): JSX.Element {
       </div>
 
       {/* Song info modal */}
-      <SongInfoModal song={infoSong} onClose={() => setInfoSong(null)} />
+      {infoSong && (
+        <SongInfoModal
+          song={infoSong}
+          onClose={() => setInfoSong(null)}
+          onEdit={canEdit ? (songId) => {
+            setInfoSong(null)
+            setPendingEditorSongId(songId)
+            setActiveView('editor')
+          } : undefined}
+        />
+      )}
     </div>
   )
 }

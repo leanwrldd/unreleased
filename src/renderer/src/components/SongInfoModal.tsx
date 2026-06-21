@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { X, Music2 } from 'lucide-react'
+import { X, Music2, Pencil } from 'lucide-react'
 import { JWApiSong, CATEGORY_LABELS, buildImageUrl, parseDuration } from '../lib/juicewrldApi'
 
 function formatDur(secs: number): string {
@@ -37,9 +37,10 @@ function GroupLabel({ children }: { children: string }): JSX.Element {
 interface Props {
   song: JWApiSong | null
   onClose: () => void
+  onEdit?: (songId: number) => void
 }
 
-export default function SongInfoModal({ song, onClose }: Props): JSX.Element | null {
+export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Element | null {
   const overlayRef = useRef<HTMLDivElement>(null)
 
   if (!song) return null
@@ -90,6 +91,15 @@ export default function SongInfoModal({ song, onClose }: Props): JSX.Element | n
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-surface" />
+          {onEdit && (
+            <button
+              onClick={() => { onEdit(song.id); onClose() }}
+              className="absolute top-3 right-12 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-black/40 text-white/70 hover:text-white transition-colors"
+              title="Edit song info"
+            >
+              <Pencil size={13} />
+            </button>
+          )}
           <button
             onClick={onClose}
             className="absolute top-3 right-3 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-black/40 text-white/70 hover:text-white transition-colors"
