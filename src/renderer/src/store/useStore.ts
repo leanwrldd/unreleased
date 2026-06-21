@@ -36,6 +36,7 @@ interface AppState {
   showNowPlaying: boolean
   showSettings: boolean
   showQueue: boolean
+  radioFmActive: boolean
   viewMode: 'list' | 'grid'
   theme: 'dark' | 'light'
   searchQuery: string
@@ -77,6 +78,7 @@ interface AppActions {
 
   setActiveView: (view: ViewType) => void
   setShowNowPlaying: (show: boolean) => void
+  setRadioFmActive: (active: boolean) => void
   setShowSettings: (show: boolean) => void
   setShowQueue: (show: boolean) => void
   setViewMode: (mode: 'list' | 'grid') => void
@@ -136,6 +138,7 @@ export const useStore = create<AppStore>((set, get, store) => ({
   showNowPlaying: false,
   showSettings: false,
   showQueue: false,
+  radioFmActive: false,
   viewMode: ls.get<'list' | 'grid'>('viewMode') ?? 'list',
   theme: ls.get<'dark' | 'light'>('theme') ?? 'dark',
   searchQuery: '',
@@ -156,6 +159,7 @@ export const useStore = create<AppStore>((set, get, store) => ({
     set({ activeView: view })
   },
   setShowNowPlaying: (showNowPlaying) => set({ showNowPlaying }),
+  setRadioFmActive: (radioFmActive) => set({ radioFmActive }),
   setShowSettings: (showSettings) => set({ showSettings }),
   setShowQueue: (showQueue) => set({ showQueue }),
   setViewMode: (viewMode) => { set({ viewMode }); ls.set('viewMode', viewMode) },

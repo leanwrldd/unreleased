@@ -5,7 +5,10 @@ import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
 import { seekAudio } from './Player'
 
 export default function WrldView(): JSX.Element {
-  const { currentTrack, currentTrackFull, currentTime, account, setActiveView } = useStore()
+  const {
+    currentTrack, currentTrackFull, currentTime, account,
+    setActiveView, radioFmActive, setRadioFmActive,
+  } = useStore()
   const containerRef = useRef<HTMLDivElement>(null)
   const activeRef    = useRef<HTMLDivElement>(null)
 
@@ -32,25 +35,28 @@ export default function WrldView(): JSX.Element {
   return (
     <div className="relative flex flex-1 h-full w-full overflow-hidden">
 
-      {/* ── 999 FM button — always top-left ───────────────────────────────── */}
+      {/* ── 999 FM toggle — always top-left ───────────────────────────────── */}
       <button
-        onClick={() => setActiveView('radio-fm')}
-        className="absolute top-4 left-4 z-30 flex items-center gap-2 text-white/50 hover:text-white/90 transition-colors text-xs font-medium bg-black/25 hover:bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5"
-        title="Open 999 FM"
+        onClick={() => setRadioFmActive(!radioFmActive)}
+        className={`absolute top-4 left-4 z-30 flex items-center gap-2 text-xs font-medium rounded-full px-3 py-1.5 transition-all ${
+          radioFmActive
+            ? 'bg-white/20 text-white backdrop-blur-sm ring-1 ring-white/30'
+            : 'bg-black/25 text-white/50 hover:text-white/90 hover:bg-black/50 backdrop-blur-sm'
+        }`}
+        title={radioFmActive ? 'Turn off 999 FM' : 'Turn on 999 FM'}
       >
-        <Radio size={13} />
-        <span>999 FM</span>
+        <Radio size={13} className={radioFmActive ? 'animate-pulse' : ''} />
+        <span>999 FM{radioFmActive ? ' · ON' : ''}</span>
       </button>
 
       {!currentTrack ? (
-        /* ── Empty state ─────────────────────────────────────────────────── */
         <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-black">
           <div className="text-6xl opacity-10">&#9834;</div>
           <p className="text-white/30 text-sm">Play a track to see lyrics</p>
         </div>
       ) : (
         <>
-          {/* ── Blurred background ──────────────────────────────────────── */}
+          {/* Blurred background */}
           <div className="absolute inset-0 overflow-hidden">
             {artSrc ? (
               <img
@@ -65,7 +71,7 @@ export default function WrldView(): JSX.Element {
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
           </div>
 
-          {/* ── Left column — art + meta ─────────────────────────────────── */}
+          {/* Left column — art + meta */}
           <div
             className="relative z-10 flex flex-col items-center justify-center shrink-0 px-10 gap-6"
             style={{ width: '38%', minWidth: 240 }}
@@ -92,10 +98,10 @@ export default function WrldView(): JSX.Element {
             </div>
           </div>
 
-          {/* ── Vertical divider ────────────────────────────────────────── */}
+          {/* Vertical divider */}
           <div className="relative z-10 w-px bg-white/8 shrink-0 my-10" />
 
-          {/* ── Right column — lyrics ────────────────────────────────────── */}
+          {/* Right column — lyrics */}
           <div className="relative z-10 flex-1 overflow-hidden flex flex-col">
             {!rawLyrics ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 px-12">

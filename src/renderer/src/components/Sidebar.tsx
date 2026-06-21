@@ -25,7 +25,7 @@ export default function Sidebar(): JSX.Element {
     { icon: <Archive size={18} />, label: 'Compilation', view: 'compilation' },
     { icon: <HardDrive size={18} />, label: 'Files', view: 'api-files' },
     { icon: <ListMusic size={18} />, label: 'Playlists', view: 'playlists' },
-    { icon: <img src={logo} alt="WRLD" className="w-[18px] h-[18px] object-contain opacity-80" />, label: 'WRLD', view: 'wrld' },
+    { icon: <img src={logo} alt="WRLD" className="w-[22px] h-[22px] object-contain" />, label: 'WRLD', view: 'wrld' },
   ]
 
   return (
