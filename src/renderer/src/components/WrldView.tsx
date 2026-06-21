@@ -1,22 +1,17 @@
-import { useEffect, useRef, useMemo, useState } from 'react'
+import { useEffect, useRef, useMemo } from 'react'
 import { Music, Radio } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { apiFetch, songToTrack } from '../lib/juicewrldApi'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
 import { seekAudio } from './Player'
-
-interface RadioResponse { song: Parameters<typeof songToTrack>[0] }
 
 export default function WrldView(): JSX.Element {
   const {
     currentTrack, currentTrackFull, currentTime, account,
-    radioFmActive, setRadioFmActive,
-    startRadio, stopRadio,
+    radioFmActive, setRadioFmActive, radioFmIsLive,
   } = useStore()
 
   const containerRef = useRef<HTMLDivElement>(null)
   const activeRef    = useRef<HTMLDivElement>(null)
-  const [fmLoading, setFmLoading] = useState(false)
 
   const artSrc       = currentTrackFull?.albumArt ?? currentTrack?.imageUrl
   const lyrics       = currentTrackFull?.lyrics
@@ -38,41 +33,33 @@ export default function WrldView(): JSX.Element {
     }
   }, [currentLineIdx])
 
-  const toggle999FM = async (): Promise<void> => {
-    if (radioFmActive) {
-      stopRadio()
-      setRadioFmActive(false)
-      return
-    }
-    setFmLoading(true)
-    try {
-      const data = await apiFetch<RadioResponse>('/radio/random/')
-      const track = songToTrack(data.song)
-      startRadio(track)
-      setRadioFmActive(true)
-    } catch {
-      // silently fail — button reverts to off
-    } finally {
-      setFmLoading(false)
-    }
-  }
+  // Button label based on state
+  const fmLabel = radioFmActive
+    ? (radioFmIsLive ? '999 FM · LIVE' : '999 FM · OFFLINE')
+    : radioFmIsLive === false
+    ? '999 FM · OFFLINE'
+    : '999 FM'
+
+  const fmDisabled = radioFmIsLive === false && !radioFmActive
 
   return (
     <div className="relative flex flex-1 h-full w-full overflow-hidden">
 
       {/* ── 999 FM toggle — always top-left ───────────────────────────────── */}
       <button
-        onClick={() => { void toggle999FM() }}
-        disabled={fmLoading}
-        className={`absolute top-4 left-4 z-30 flex items-center gap-2 text-xs font-medium rounded-full px-3 py-1.5 transition-all disabled:opacity-50 ${
+        onClick={() => setRadioFmActive(!radioFmActive)}
+        disabled={fmDisabled}
+        className={`absolute top-4 left-4 z-30 flex items-center gap-2 text-xs font-medium rounded-full px-3 py-1.5 transition-all disabled:opacity-40 ${
           radioFmActive
-            ? 'bg-white/20 text-white backdrop-blur-sm ring-1 ring-white/30'
+            ? radioFmIsLive
+              ? 'bg-red-600/80 text-white backdrop-blur-sm ring-1 ring-red-400/50'
+              : 'bg-white/10 text-white/50 backdrop-blur-sm'
             : 'bg-black/25 text-white/50 hover:text-white/90 hover:bg-black/50 backdrop-blur-sm'
         }`}
         title={radioFmActive ? 'Turn off 999 FM' : 'Turn on 999 FM'}
       >
-        <Radio size={13} className={radioFmActive ? 'animate-pulse' : ''} />
-        <span>{fmLoading ? 'Tuning in…' : radioFmActive ? '999 FM · ON' : '999 FM'}</span>
+        <Radio size={13} className={radioFmActive && radioFmIsLive ? 'animate-pulse' : ''} />
+        <span>{fmLabel}</span>
       </button>
 
       {!currentTrack ? (

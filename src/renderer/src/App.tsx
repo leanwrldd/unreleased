@@ -35,6 +35,7 @@ import EditorProfileView from './components/EditorProfileView'
 import NotFoundView from './components/NotFoundView'
 import DocsPage from './components/DocsPage'
 import RadioFmView from './components/RadioFmView'
+import RadioFmPlayer from './components/RadioFmPlayer'
 import WrldView from './components/WrldView'
 import UserAuthModal from './components/UserAuthModal'
 import Player from './components/Player'
@@ -132,6 +133,7 @@ export default function App(): JSX.Element {
         </main>
       </div>
       <Player />
+      <RadioFmPlayer />
       <BottomNav />
       {showSettings && <Settings />}
       {showUserAuth && <UserAuthModal onClose={() => setShowUserAuth(false)} />}
