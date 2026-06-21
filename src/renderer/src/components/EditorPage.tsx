@@ -52,7 +52,7 @@ function diff(before: Record<string, unknown>, after: Record<string, unknown>): 
 function SectionLabel({ label }: { label: string }): JSX.Element {
   return (
     <div className="flex items-center gap-2.5 px-4 pt-5 pb-1.5">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted/35 shrink-0 select-none">{label}</span>
+      <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted opacity-[0.35] shrink-0 select-none">{label}</span>
       <div className="flex-1 h-px bg-[var(--border)]/50" />
     </div>
   )
@@ -67,7 +67,7 @@ function FieldRow({ label, value, original, onChange, placeholder, mono = false 
   return (
     <div className={`group grid grid-cols-[84px_1fr] gap-x-3 items-baseline px-4 py-[7px] border-l-2 transition-all
       ${changed ? 'border-accent/70 bg-accent/[0.025]' : 'border-transparent hover:bg-white/[0.015]'}`}>
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted/40 select-none truncate pt-px">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-40 select-none truncate pt-px">
         {label}
       </span>
       <div className="flex items-center gap-2 min-w-0">
@@ -93,7 +93,7 @@ function SelectRow({ label, value, original, onChange, options, placeholder }: {
   return (
     <div className={`group grid grid-cols-[84px_1fr] gap-x-3 items-baseline px-4 py-[7px] border-l-2 transition-all
       ${changed ? 'border-accent/70 bg-accent/[0.025]' : 'border-transparent hover:bg-white/[0.015]'}`}>
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted/40 select-none truncate pt-px">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-40 select-none truncate pt-px">
         {label}
       </span>
       <div className="flex items-center gap-2 min-w-0">
@@ -119,7 +119,7 @@ function TextareaRow({ label, value, original, onChange, rows = 3, placeholder, 
   return (
     <div className={`group border-l-2 transition-all px-4 py-2 ${changed ? 'border-accent/70 bg-accent/[0.025]' : 'border-transparent'}`}>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted/40 select-none">{label}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-40 select-none">{label}</span>
         {changed && <span className="w-1.5 h-1.5 rounded-full bg-accent/80" />}
       </div>
       <textarea
@@ -320,8 +320,8 @@ export default function EditorPage(): JSX.Element {
         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${isAdmin ? 'bg-accent/20 text-accent' : 'bg-emerald-500/20 text-emerald-400'}`}>
           {isAdmin ? 'admin' : 'editor'}
         </span>
-        <span className="text-text-muted/60 text-xs truncate max-w-[90px]">{account.display_name || account.discord_username}</span>
-        <button onClick={() => logoutAccount()} className="text-text-muted/40 hover:text-text-muted text-xs transition-colors">out</button>
+        <span className="text-text-muted opacity-60 text-xs truncate max-w-[90px]">{account.display_name || account.discord_username}</span>
+        <button onClick={() => logoutAccount()} className="text-text-muted opacity-40 hover:opacity-100 text-xs transition-colors">out</button>
       </div>
 
       {/* Scrollable body */}
@@ -334,11 +334,11 @@ export default function EditorPage(): JSX.Element {
         ) : !song ? (
           <div className="flex flex-col items-center justify-center gap-3 h-64 px-6 text-center">
             <div className="w-12 h-12 rounded-2xl bg-surface-overlay border border-[var(--border)] flex items-center justify-center">
-              <FileText size={18} className="text-text-muted/50" />
+              <FileText size={18} className="text-text-muted opacity-50" />
             </div>
             <div className="space-y-1">
               <p className="text-text-primary text-sm font-medium">No song selected</p>
-              <p className="text-text-muted/50 text-xs leading-relaxed">Play a song to start editing,<br/>or use the context menu.</p>
+              <p className="text-text-muted opacity-50 text-xs leading-relaxed">Play a song to start editing,<br/>or use the context menu.</p>
             </div>
           </div>
         ) : (
@@ -369,14 +369,14 @@ export default function EditorPage(): JSX.Element {
                       {CATEGORY_LABELS[song.category] || song.category}
                     </span>
                     {song.era?.name && (
-                      <span className="text-text-muted/60 text-[11px] truncate">{song.era.name}</span>
+                      <span className="text-text-muted opacity-60 text-[11px] truncate">{song.era.name}</span>
                     )}
-                    <span className="text-text-muted/25 text-[11px]">#{song.id}</span>
+                    <span className="text-text-muted opacity-25 text-[11px]">#{song.id}</span>
                   </div>
                 </div>
                 <button
                   onClick={() => setSong(null)}
-                  className="p-1.5 rounded-lg text-text-muted/30 hover:text-text-muted hover:bg-white/10 transition-colors shrink-0 mb-0.5">
+                  className="p-1.5 rounded-lg text-text-muted opacity-30 hover:opacity-100 hover:bg-white/10 transition-colors shrink-0 mb-0.5">
                   <X size={14} />
                 </button>
               </div>
@@ -397,7 +397,7 @@ export default function EditorPage(): JSX.Element {
               {/* Category pills */}
               <div className={`border-l-2 transition-all px-4 py-2 ${cat !== String(base.category || '') ? 'border-accent/70 bg-accent/[0.025]' : 'border-transparent'}`}>
                 <div className="grid grid-cols-[84px_1fr] gap-x-3 items-start">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted/40 select-none pt-1">Category</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-40 select-none pt-1">Category</span>
                   <div className="flex flex-wrap gap-1.5">
                     {CATEGORIES.map(c => (
                       <button key={c.value} onClick={() => setCat(c.value)}
@@ -432,7 +432,7 @@ export default function EditorPage(): JSX.Element {
               {/* More fields */}
               <button
                 onClick={() => setShowMore(v => !v)}
-                className="flex items-center gap-1.5 w-full px-4 pt-4 pb-1 text-[11px] text-text-muted/40 hover:text-text-muted/70 transition-colors select-none">
+                className="flex items-center gap-1.5 w-full px-4 pt-4 pb-1 text-[11px] text-text-muted opacity-40 hover:opacity-70 transition-colors select-none">
                 {showMore ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                 {showMore ? 'Fewer fields' : 'More fields'}
               </button>
@@ -462,7 +462,7 @@ export default function EditorPage(): JSX.Element {
                   return (
                     <button key={tab} onClick={() => setLyricsTab(tab)}
                       className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                        active ? 'bg-surface-overlay text-text-primary' : 'text-text-muted/60 hover:text-text-muted'
+                        active ? 'bg-surface-overlay text-text-primary' : 'text-text-muted opacity-60 hover:text-text-muted'
                       }`}>
                       {tab === 'lyrics' ? 'Lyrics' : 'Synced'}
                       {dirty && <span className="w-1 h-1 rounded-full bg-accent inline-block" />}
@@ -509,7 +509,7 @@ export default function EditorPage(): JSX.Element {
             </div>
           )}
           <div className="flex items-center gap-2.5">
-            <span className={`text-xs font-bold tabular-nums min-w-[60px] ${changedCount > 0 ? 'text-accent' : 'text-text-muted/30'}`}>
+            <span className={`text-xs font-bold tabular-nums min-w-[60px] ${changedCount > 0 ? 'text-accent' : 'text-text-muted opacity-30'}`}>
               {changedCount} field{changedCount !== 1 ? 's' : ''}
             </span>
             <button
@@ -518,7 +518,7 @@ export default function EditorPage(): JSX.Element {
               className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                 submitState === 'submitted' ? 'bg-emerald-500/20 text-emerald-400' :
                 submitState === 'error'     ? 'bg-red-500/20 text-red-400' :
-                changedCount === 0          ? 'bg-surface-overlay text-text-muted/30 cursor-not-allowed' :
+                changedCount === 0          ? 'bg-surface-overlay text-text-muted opacity-30 cursor-not-allowed' :
                 'bg-accent text-white hover:bg-accent/90 shadow-lg shadow-accent/20'
               }`}>
               {submitState === 'submitting' && <Loader2 size={12} className="animate-spin" />}
@@ -571,7 +571,7 @@ function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
         <p className="text-text-primary font-bold">Application pending</p>
         <p className="text-text-muted text-sm max-w-[220px] leading-relaxed">Your application is under review. You'll be notified on Discord.</p>
       </div>
-      <button onClick={onSignOut} className="text-xs text-text-muted/50 hover:text-text-muted transition-colors mt-1">Sign out</button>
+      <button onClick={onSignOut} className="text-xs text-text-muted opacity-50 hover:text-text-muted transition-colors mt-1">Sign out</button>
     </div>
   )
 
@@ -584,7 +584,7 @@ function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
         <p className="text-text-primary font-bold">Not approved</p>
         {application.review_notes && <p className="text-text-muted text-sm max-w-[220px] italic leading-relaxed">"{application.review_notes}"</p>}
       </div>
-      <button onClick={onSignOut} className="text-xs text-text-muted/50 hover:text-text-muted transition-colors mt-1">Sign out</button>
+      <button onClick={onSignOut} className="text-xs text-text-muted opacity-50 hover:text-text-muted transition-colors mt-1">Sign out</button>
     </div>
   )
 
@@ -594,8 +594,8 @@ function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
   }): JSX.Element => (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted/50">{label}</label>
-        {hint && <span className="text-[10px] text-text-muted/35">{hint}</span>}
+        <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted opacity-50">{label}</label>
+        {hint && <span className="text-[10px] text-text-muted opacity-[0.35]">{hint}</span>}
       </div>
       {(rows ?? 1) > 1
         ? <textarea rows={rows} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
@@ -614,7 +614,7 @@ function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
         </div>
         <div>
           <p className="text-text-primary font-bold text-sm">Become an editor</p>
-          <p className="text-text-muted/60 text-xs mt-0.5">Propose corrections. Admins review and apply them.</p>
+          <p className="text-text-muted opacity-60 text-xs mt-0.5">Propose corrections. Admins review and apply them.</p>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
@@ -635,7 +635,7 @@ function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
           {submitting && <Loader2 size={14} className="animate-spin" />}
           Submit application
         </button>
-        <button onClick={onSignOut} className="w-full text-xs text-text-muted/40 hover:text-text-muted transition-colors py-1">Sign out</button>
+        <button onClick={onSignOut} className="w-full text-xs text-text-muted opacity-40 hover:opacity-100 transition-colors py-1">Sign out</button>
       </div>
     </div>
   )
