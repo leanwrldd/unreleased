@@ -131,6 +131,27 @@ function TextareaRow({ label, value, original, onChange, rows = 3, placeholder, 
   )
 }
 
+/* ── Genius lyrics helpers ─────────────────────────────────────────────────── */
+const isGeniusUrl = (s: string): boolean =>
+  /^https?:\/\/(www\.)?genius\.com\/.+/i.test(s.trim())
+
+function extractGeniusLyrics(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const containers = Array.from(doc.querySelectorAll('[data-lyrics-container="true"]'))
+  if (!containers.length) throw new Error('No lyrics containers found')
+  return containers
+    .map(c => {
+      const clone = c.cloneNode(true) as Element
+      clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'))
+      return clone.textContent?.trim() ?? ''
+    })
+    .filter(Boolean)
+    .join('\n\n')
+    .replace(/^\[.*?\]\n?/gm, '')   // strip section tags
+    .replace(/\n{2,}/g, '\n\n')     // collapse blanks
+    .trim()
+}
+
 /* ── Main export ──────────────────────────────────────────────────────────── */
 export default function EditorPage(): JSX.Element {
   const {
@@ -167,6 +188,8 @@ export default function EditorPage(): JSX.Element {
   const [edNotes,  setEdNotes]  = useState('')
 
   const [lyricsTab,    setLyricsTab]    = useState<LyricsTab>('lyrics')
+  const [lyricsLoading, setLyricsLoading] = useState(false)
+  const [lyricsError,   setLyricsError]   = useState<string | null>(null)
   const [submitState,  setSubmitState]  = useState<SubmitState>('idle')
   const [submitError,  setSubmitError]  = useState<string | null>(null)
   const [showMore,     setShowMore]     = useState(false)
@@ -320,23 +343,41 @@ export default function EditorPage(): JSX.Element {
   }
 
 
-  const handleLyricsPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>): void => {
+  const handleLyricsPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>): Promise<void> => {
     const pasted = e.clipboardData.getData('text')
-    if (!pasted || !/\[.*?\]/.test(pasted)) return  // nothing to strip
+    if (!pasted) return
+
+    // ── Genius URL → fetch lyrics ──────────────────────────────────────────
+    if (isGeniusUrl(pasted)) {
+      e.preventDefault()
+      setLyricsLoading(true)
+      setLyricsError(null)
+      try {
+        const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(pasted.trim())}`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        setLyrics(extractGeniusLyrics(await res.text()))
+      } catch {
+        setLyricsError('Could not fetch lyrics — check the URL or try again')
+        setTimeout(() => setLyricsError(null), 4000)
+      } finally {
+        setLyricsLoading(false)
+      }
+      return
+    }
+
+    // ── Genius-style [tags] → strip ────────────────────────────────────────
+    if (!/\[.*?\]/.test(pasted)) return
     e.preventDefault()
     const cleaned = pasted
-      .replace(/\r\n/g, '\n')              // normalize line endings
-      .replace(/^\[.*?\]\n?/gm, '')        // remove entire tag lines (incl. their newline)
-      .replace(/\n{2,}/g, '\n\n')          // collapse any double+ blank lines to one
+      .replace(/\r\n/g, '\n')
+      .replace(/^\[.*?\]\n?/gm, '')
+      .replace(/\n{2,}/g, '\n\n')
       .trim()
     const el = e.currentTarget
     const start = el.selectionStart ?? lyrics.length
     const end   = el.selectionEnd   ?? lyrics.length
-    const next  = lyrics.substring(0, start) + cleaned + lyrics.substring(end)
-    setLyrics(next)
-    requestAnimationFrame(() => {
-      el.selectionStart = el.selectionEnd = start + cleaned.length
-    })
+    setLyrics(lyrics.substring(0, start) + cleaned + lyrics.substring(end))
+    requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = start + cleaned.length })
   }
 
   /* ── Guards ──────────────────────────────────────────────────────────────── */
@@ -539,14 +580,29 @@ export default function EditorPage(): JSX.Element {
 
               <div className="px-4">
                 {lyricsTab === 'lyrics' ? (
-                  <textarea
-                    rows={15} value={lyrics} onChange={e => setLyrics(e.target.value)}
-                    onPaste={handleLyricsPaste}
-                    placeholder="Full lyrics…"
-                    className={`w-full bg-surface-overlay rounded-xl px-3.5 py-3 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted placeholder:opacity-25 border transition-colors leading-relaxed ${
-                      lyrics !== String(base.lyrics || '') ? 'border-accent/30' : 'border-[var(--border)]'
-                    }`}
-                  />
+                  <div className="relative">
+                    <textarea
+                      rows={15} value={lyrics} onChange={e => setLyrics(e.target.value)}
+                      onPaste={handleLyricsPaste}
+                      disabled={lyricsLoading}
+                      placeholder="Full lyrics… or paste a Genius URL"
+                      className={`w-full bg-surface-overlay rounded-xl px-3.5 py-3 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted placeholder:opacity-25 border transition-colors leading-relaxed ${
+                        lyrics !== String(base.lyrics || '') ? 'border-accent/30' : 'border-[var(--border)]'
+                      } ${lyricsLoading ? 'opacity-40' : ''}`}
+                    />
+                    {lyricsLoading && (
+                      <div className="absolute inset-0 flex items-center justify-center rounded-xl pointer-events-none">
+                        <div className="flex items-center gap-2 text-text-muted text-xs bg-surface-overlay/80 px-3 py-1.5 rounded-lg">
+                          <Loader2 size={13} className="animate-spin" /> Fetching from Genius…
+                        </div>
+                      </div>
+                    )}
+                    {lyricsError && (
+                      <div className="absolute bottom-2 inset-x-2 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/20 text-red-400 text-xs pointer-events-none">
+                        <AlertCircle size={12} className="shrink-0" /> {lyricsError}
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <textarea
                     rows={15} value={synced} onChange={e => setSynced(e.target.value)}
