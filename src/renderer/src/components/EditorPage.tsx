@@ -253,7 +253,7 @@ export default function EditorPage(): JSX.Element {
   const loadSong = useCallback(async (id: number): Promise<void> => {
     setLoading(true)
     try {
-      const s = await apiFetch<JWApiSong>(`/songs/${id}/`)
+      const s = await userApi.fetchSong(id)
       setSong(s)
       populate(s)
     } catch {} finally { setLoading(false) }

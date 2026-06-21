@@ -1,5 +1,5 @@
 import { Track } from '../types'
-import { JWAPI_BASE, buildStreamUrl, buildImageUrl, parseDuration } from './juicewrldApi'
+import { JWAPI_BASE, buildStreamUrl, buildImageUrl, parseDuration, JWApiSong } from './juicewrldApi'
 
 const ACCOUNT_BASE = `${JWAPI_BASE}/accounts`
 const LIBRARY_BASE = `${JWAPI_BASE}/library`
@@ -112,6 +112,12 @@ async function request<T>(url: string, options: RequestInit = {}, auth = true): 
   const text = await res.text()
   return (text ? JSON.parse(text) : undefined) as T
 }
+
+/** Fetch a full song object with auth token — ensures synced_lyrics is returned. */
+export async function fetchSong(songId: number): Promise<JWApiSong> {
+  return request<JWApiSong>(`${JWAPI_BASE}/songs/${songId}/`, { method: 'GET' })
+}
+
 
 export function liteSongToTrack(song: ApiSongLite): Track {
   const title = song.track_titles?.[0] || song.name

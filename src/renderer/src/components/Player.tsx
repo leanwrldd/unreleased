@@ -24,7 +24,7 @@ import {
 import { useStore } from '../store/useStore'
 import { formatDuration } from '../lib/lyrics'
 import { apiFetch, JWApiSong } from '../lib/juicewrldApi'
-import { trackIdToSongId, getApprovedSyncedLyrics} from '../lib/userApi'
+import { trackIdToSongId, getApprovedSyncedLyrics, fetchSong} from '../lib/userApi'
 import { FullTrack } from '../types'
 import AddToPlaylistMenu from './AddToPlaylistMenu'
 import SongInfoModal from './SongInfoModal'
@@ -203,7 +203,7 @@ export default function Player(): JSX.Element {
       const songId = Number(match[1])
       const isEditor = account?.is_editor || account?.is_administrator
       const isAdmin = !!account?.is_administrator
-      apiFetch<JWApiSong>(`/songs/${songId}/`)
+      fetchSong(songId)
         .then(async (song) => {
           let syncedLyrics = song.synced_lyrics || null
           // Public API never populates synced_lyrics — fall back to approved proposals
