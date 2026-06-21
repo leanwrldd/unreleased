@@ -195,8 +195,14 @@ export async function createPlaylist(name: string): Promise<PlaylistDetail> {
   })
 }
 
+// Fetches playlist tracks/metadata only — omits cover_image so the response is small
 export async function getPlaylist(id: number): Promise<PlaylistDetail> {
-  return request(`${LIBRARY_BASE}/playlists/${id}/`, { method: 'GET' })
+  return request(`${LIBRARY_BASE}/playlists/${id}/?omit=cover_image`)
+}
+
+// Fetches just the cover fields — called separately after tracks are shown
+export async function getPlaylistCover(id: number): Promise<{ cover_image?: string | null; cover_image_url?: string | null }> {
+  return request(`${LIBRARY_BASE}/playlists/${id}/?fields=id,cover_image,cover_image_url`)
 }
 
 export async function renamePlaylist(id: number, name: string): Promise<PlaylistDetail> {
