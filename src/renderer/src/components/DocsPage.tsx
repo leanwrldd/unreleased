@@ -117,7 +117,7 @@ function OverviewTab() {
           <Endpoint method="GET" path="/songs/" description="List, filter, search and paginate songs" />
           <Endpoint method="GET" path="/songs/{id}/" description="Single song by internal ID" />
           <Endpoint method="GET" path="/categories/" description="Available category values with labels" />
-          <Endpoint method="GET" path="/eras/" description="All eras — flat array, not paginated" />
+          <Endpoint method="GET" path="/eras/" description="All eras — paginated (34 total, 20 per page)" />
           <Endpoint method="GET" path="/stats/" description="Database-wide counts by category and era" />
           <Endpoint method="GET" path="/radio/random/" description="Random playable song with full metadata" />
           <Endpoint method="GET" path="/files/browse/" description="Browse the file system" />
@@ -167,12 +167,22 @@ function OverviewTab() {
   "bitrate": "Bitrate Info",
   "additional_information": "Extra Info",
   "file_names": "File Name(s)",
+  "instrumentals": "Instrumental beat name",
+  "instrumental_names": "Instrumental track names",
   "preview_date": "Preview Date",
   "release_date": "Release Date",
   "dates": "Additional Dates",
   "session_titles": "Session Titles",
   "session_tracking": "Session Tracking",
-  "notes": "Combined Notes (JSON string)",
+  "groupbuy_info": {
+    "additional_info": "",
+    "price": "",
+    "start_date": "",
+    "end_date": "",
+    "blind": false,
+    "finished": false,
+    "surfaced_with_og": false
+  },
   "lyrics": "Song Lyrics",
   "synced_lyrics": "Timestamped lyrics (karaoke-style)",
   "album": "Album Name",
@@ -200,7 +210,7 @@ function SongsTab() {
             [<Code>page</Code>, 'number', 'Page number (default: 1)'],
             [<Code>page_size</Code>, 'number', 'Results per page (default: 20)'],
             [<Code>category</Code>, 'string', <><Code>released</Code>, <Code>unreleased</Code>, <Code>unsurfaced</Code>, <Code>recording_session</Code></>],
-            [<Code>era</Code>, 'string', 'Era name e.g. "Goodbye & Good Riddance"'],
+            [<Code>era</Code>, 'string', 'Era abbreviation e.g. "GB&GR", "DRFL", "WOD", "OUT", "POST" — use name from /eras/'],
             [<Code>search</Code>, 'string', 'Search names, artists, track titles (normalizes special chars — "dont" matches "don\'t")'],
             [<Code>searchall</Code>, 'string', 'Search names, artists, producers, track titles'],
             [<Code>lyrics</Code>, 'string', 'Full-text search within lyrics content'],
@@ -226,38 +236,55 @@ function SongsTab() {
     { "value": "released",          "label": "Released" },
     { "value": "unreleased",        "label": "Unreleased" },
     { "value": "unsurfaced",        "label": "Unsurfaced" },
-    { "value": "recording_session", "label": "Studio Sessions" }
+    { "value": "recording_session", "label": "Recording Session" }
   ]
 }`}</Pre>
       </Section>
 
       <Section title="GET /eras/">
-        <p className="text-sm text-text-secondary">Returns a flat array — not paginated.</p>
-        <Pre>{`[
-  { "id": 1, "name": "JuiceTheKidd",            "time_frame": "(~2014–February 2017)" },
-  { "id": 2, "name": "Affliction",              "time_frame": "(February 2017–May 2017)" },
-  { "id": 3, "name": "Juice WRLD 999",          "time_frame": "(May 2017–May 2018)" },
-  { "id": 4, "name": "Goodbye & Good Riddance", "time_frame": "(May 2018–August 2018)" },
-  { "id": 5, "name": "World On Drugs",          "time_frame": "(August 2018–December 2018)" },
-  { "id": 6, "name": "Death Race For Love",     "time_frame": "(December 2018–December 2019)" }
-]`}</Pre>
+        <p className="text-sm text-text-secondary">Paginated — same envelope as /songs/. 34 eras total. Era names use short abbreviation strings.</p>
+        <Pre>{`{
+  "count": 34,
+  "next": "http://juicewrldapi.com/juicewrld/eras/?page=2",
+  "previous": null,
+  "results": [
+    { "id": 101, "name": "jute",        "description": "JUICED UP THE EP era (~2014-February 2017)", "time_frame": "(January 2014-February 2017)", "play_count": 2980 },
+    { "id": 103, "name": "afflictions", "description": "Affliction era (February 2017-May 2017)",    "time_frame": "(February 2017-May 2017)",   "play_count": 1398 },
+    { "id": 105, "name": "jw 999",      "description": "Juice WRLD 999 era (May 2017-May 2018)",     "time_frame": "(May 2017-May 2018)",        "play_count": 1389 },
+    { "id": 108, "name": "GB&GR",       "description": "Goodbye & Good Riddance era",                "time_frame": "(December 2017-May 2018)",   "play_count": 15485 },
+    { "id": 109, "name": "WOD",         "description": "WRLD On Drugs era",                          "time_frame": "(August 2018-December 2018)", "play_count": 11228 },
+    { "id": 110, "name": "DRFL",        "description": "Death Race For Love era",                    "time_frame": "(May 2018-March 2019)",      "play_count": 11040 },
+    { "id": 111, "name": "OUT",         "description": "Outsiders era",                              "time_frame": "(March 2019-December 2019)", "play_count": 13729 },
+    { "id": 112, "name": "POST",        "description": "Posthumous era",                             "time_frame": "(December 2019-Present)",    "play_count": 3660 }
+    // ... 34 total
+  ]
+}`}</Pre>
+        <p className="text-xs text-text-muted mt-1">
+          Pass <Code>name</Code> as the <Code>era</Code> filter param on /songs/ — e.g. <Code>era=GB%26GR</Code>.
+        </p>
       </Section>
 
       <Section title="GET /stats/">
         <Pre>{`{
-  "total_songs": 39847,
+  "total_songs": 2452,
   "category_stats": {
-    "released": 156,
-    "unreleased": 2847,
-    "unsurfaced": 15234,
-    "recording_session": 21610
+    "released":          320,
+    "unreleased":        1462,
+    "unsurfaced":        269,
+    "recording_session": 401
   },
   "era_stats": {
-    "JuiceTheKidd": 5234,
-    "Affliction": 1847,
-    "Juice WRLD 999": 8934
+    "GB&GR":       574,
+    "OUT":         312,
+    "POST":        369,
+    "WOD":         488,
+    "DRFL":        326,
+    "Mainstream":  63,
+    "jute":        37
+    // ... one key per era
   }
 }`}</Pre>
+        <p className="text-xs text-text-muted">Era keys in <Code>era_stats</Code> match the <Code>name</Code> field from <Code>/eras/</Code>.</p>
       </Section>
 
       <Section title="GET /radio/random/">
