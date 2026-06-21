@@ -6,7 +6,7 @@ A browser-based music player for Juice WRLD unreleased songs, powered by the [Ju
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
-[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/qq7DMNkBJ4)
+[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/jwa)
 
 **Live:** [player.juicewrldpapi.com](https://player.juicewrldpapi.com)
 
@@ -64,10 +64,10 @@ npm run preview
 
 ## Credits
 
-- **[juicewrldapi.com](https://juicewrldapi.com)** — the API powering everything: song metadata, streaming, lyrics, eras, categories, and the file browser
-- **juicewrldapi** on Discord — for help and support building the integration
-- Built by **freakylatif** — find me on Discord
-- Join the **[Discord](https://discord.gg/qq7DMNkBJ4)** server
+- **[juicewrldapi.com](https://juicewrldapi.com)** — the API powering everything: song metadata, streaming, lyrics, eras, categories, and the file browser.
+- **juicewrldapi** on Discord — for the help and support building the integration.
+- Built by **freakylatif** — find me on Discord.
+- Join the **[Discord](https://discord.gg/jwa)** server
 
 ---
 
