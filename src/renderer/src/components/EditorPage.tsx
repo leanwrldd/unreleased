@@ -291,8 +291,9 @@ export default function EditorPage(): JSX.Element {
     if (!pasted || !/\[.*?\]/.test(pasted)) return  // nothing to strip
     e.preventDefault()
     const cleaned = pasted
-      .replace(/\[.*?\]/g, '')     // remove [Chorus], [Verse 1: Artist], etc.
-      .replace(/\n{3,}/g, '\n\n') // collapse runs of 3+ blank lines
+      .replace(/\r\n/g, '\n')              // normalize line endings
+      .replace(/^\[.*?\]\n?/gm, '')        // remove entire tag lines (incl. their newline)
+      .replace(/\n{2,}/g, '\n\n')          // collapse any double+ blank lines to one
       .trim()
     const el = e.currentTarget
     const start = el.selectionStart ?? lyrics.length
