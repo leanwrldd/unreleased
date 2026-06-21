@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Heart, Play, Loader2, MoreHorizontal, PlayCircle, ListPlus, Info, Pencil } from 'lucide-react'
+import { Heart, Play, Loader2, MoreHorizontal, PlayCircle, ListPlus, Info, Pencil, Download } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
 import { Track } from '../types'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
-import { apiFetch, JWApiSong } from '../lib/juicewrldApi'
+import { apiFetch, JWApiSong, buildStreamUrl } from '../lib/juicewrldApi'
 import SongInfoModal from './SongInfoModal'
 
 function formatDuration(seconds: number): string {
@@ -183,6 +183,12 @@ export default function LikedSongsView(): JSX.Element {
           </div>
         )}
         <div className="border-t border-[var(--border)] my-1" />
+        {ctxMenu.track.path && (
+          <button onClick={() => { const a = document.createElement('a'); a.href = buildStreamUrl(ctxMenu.track.path!); a.download = `${ctxMenu.track.title}.mp3`; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.click(); setCtxMenu(null) }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
+            <Download size={14} className="text-text-muted" /> Download
+          </button>
+        )}
         <button onClick={() => { toggleLike(ctxMenu.track.id); setCtxMenu(null) }}
           className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-red-400 hover:bg-surface-overlay transition-colors">
           <Heart size={14} /> Unlike
