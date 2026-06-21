@@ -545,19 +545,29 @@ export default function Player(): JSX.Element {
       {/* ── Mobile player ── */}
       <div className="md:hidden bg-surface border-t border-[var(--border)] shrink-0">
         {/* Thin progress bar */}
+        {radioFmActive ? (
+          <div className="h-[2px] bg-red-900/60 relative">
+            <div className="h-full bg-red-500 absolute left-0 top-0 animate-pulse" style={{ width: '100%' }} />
+          </div>
+        ) : (
         <div className="h-[2px] bg-surface-overlay relative">
           <div
             className="h-full bg-accent absolute left-0 top-0 transition-none"
             style={{ width: `${(seekDrag !== null ? seekDrag : progress) * 100}%` }}
           />
         </div>
+        )}
         {/* Track row */}
         <div className="flex items-center px-3 py-2 gap-3 h-14">
           <button
             className="w-10 h-10 rounded bg-surface-overlay shrink-0 overflow-hidden"
             onClick={() => setShowNowPlaying(!showNowPlaying)}
           >
-            {(!coverArtError && (currentTrackFull?.albumArt ?? currentTrack?.imageUrl)) ? (
+            {radioFmActive ? (
+              <div className="w-full h-full bg-gradient-to-br from-red-900/70 to-black flex items-center justify-center">
+                <Radio size={16} className="text-red-400 opacity-80" />
+              </div>
+            ) : (!coverArtError && (currentTrackFull?.albumArt ?? currentTrack?.imageUrl)) ? (
               <img src={currentTrackFull?.albumArt ?? currentTrack?.imageUrl} alt="" className="w-full h-full object-cover" onError={() => setCoverArtError(true)} />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-text-muted">
@@ -711,10 +721,10 @@ export default function Player(): JSX.Element {
         {/* Center: controls + progress */}
         <div className="flex-1 flex flex-col items-center gap-2">
           <div className="flex items-center gap-5">
-            <button onClick={toggleShuffle}
+            {!radioFmActive && <button onClick={toggleShuffle}
               className={`transition-colors ${shuffle ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}>
               <Shuffle size={18} />
-            </button>
+            </button>}
 
             <button onClick={handlePrev} className="text-text-secondary hover:text-text-primary transition-colors">
               <SkipBack size={20} fill="currentColor" />
@@ -734,13 +744,21 @@ export default function Player(): JSX.Element {
               <SkipForward size={20} fill="currentColor" />
             </button>
 
-            <button onClick={toggleRepeat}
+            {!radioFmActive && <button onClick={toggleRepeat}
               className={`transition-colors ${repeat !== 'none' ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}>
               {repeat === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
-            </button>
+            </button>}
           </div>
 
-          {/* Progress bar */}
+          {/* Progress bar / Live indicator */}
+          {radioFmActive ? (
+            <div className="flex items-center justify-center w-full max-w-xl h-4">
+              <span className="flex items-center gap-1.5 text-red-400 text-xs font-semibold tracking-wider">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                LIVE
+              </span>
+            </div>
+          ) : (
           <div className="flex items-center gap-2 w-full max-w-xl">
             <span className="text-text-muted text-xs w-10 text-right tabular-nums">
               {formatDuration(currentTime)}
@@ -761,6 +779,7 @@ export default function Player(): JSX.Element {
               {formatDuration(duration)}
             </span>
           </div>
+          )}
         </div>
 
         {/* Right: speed + queue + NP + volume */}
@@ -778,7 +797,7 @@ export default function Player(): JSX.Element {
           </button>
           )}
 
-          <button onClick={() => setShowQueue(!showQueue)}
+          {!radioFmActive && <button onClick={() => setShowQueue(!showQueue)}
             className={`relative transition-colors ${showQueue ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}
             title="Queue">
             <ListOrdered size={16} />
@@ -787,13 +806,13 @@ export default function Player(): JSX.Element {
                 {Math.min(queue.length - queueIndex - 1, 99)}
               </span>
             )}
-          </button>
+          </button>}
 
-          <button onClick={() => setShowNowPlaying(!showNowPlaying)}
+          {!radioFmActive && <button onClick={() => setShowNowPlaying(!showNowPlaying)}
             className={`transition-colors ${showNowPlaying ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}
             title="Now Playing">
             <Maximize2 size={16} />
-          </button>
+          </button>}
 
           {/* Volume: mute + slider + output picker */}
           <div className="flex items-center gap-1.5">

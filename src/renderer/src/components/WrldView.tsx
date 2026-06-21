@@ -3,7 +3,7 @@ import { Music, Radio } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
 import { seekAudio } from './Player'
-import { JWAPI_BASE } from '../lib/juicewrldApi'
+import { buildImageUrl } from '../lib/juicewrldApi'
 
 export default function WrldView(): JSX.Element {
   const {
@@ -18,11 +18,7 @@ export default function WrldView(): JSX.Element {
   const displayTitle  = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.title  : currentTrack?.title
   const displayArtist = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.artist : currentTrack?.artist
   const displayAlbum  = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.album  : currentTrack?.album
-  const fmArtUrl      = radioFmActive && radioFmNowPlaying?.image_url
-    ? (radioFmNowPlaying.image_url.startsWith('http')
-        ? radioFmNowPlaying.image_url
-        : `${JWAPI_BASE}${radioFmNowPlaying.image_url}`)
-    : null
+  const fmArtUrl      = radioFmActive ? (buildImageUrl(radioFmNowPlaying?.image_url) ?? null) : null
   const artSrc = radioFmActive
     ? (fmArtUrl ?? null)
     : (currentTrackFull?.albumArt ?? currentTrack?.imageUrl ?? null)
@@ -107,7 +103,8 @@ export default function WrldView(): JSX.Element {
               style={{ aspectRatio: '1' }}
             >
               {artSrc ? (
-                <img src={artSrc} alt="Album art" className="w-full h-full object-cover" />
+                <img src={artSrc} alt="Album art" className="w-full h-full object-cover"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; (e.currentTarget.nextElementSibling as HTMLElement | null)?.style && ((e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex') }} />
               ) : radioFmActive ? (
                 /* 999 FM placeholder art */
                 <div className="w-full h-full bg-gradient-to-br from-red-900/60 to-black flex flex-col items-center justify-center gap-3">
