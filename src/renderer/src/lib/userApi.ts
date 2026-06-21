@@ -188,10 +188,11 @@ export async function getPlaylists(): Promise<PlaylistSummary[]> {
   return request(`${LIBRARY_BASE}/playlists/?omit_cover_image=true`, { method: 'GET' })
 }
 
-/** Fetch just the cover fields for a single playlist. */
-export async function getPlaylistCover(id: number): Promise<{ cover_image_url?: string | null; cover_image?: string | null }> {
+/** Fetch just the cover fields (+ first 4 track image URLs) for a single playlist. */
+export async function getPlaylistCover(id: number): Promise<{ cover_image_url?: string | null; cover_image?: string | null; trackImages: string[] }> {
   const d = await request<PlaylistDetail>(`${LIBRARY_BASE}/playlists/${id}/`)
-  return { cover_image_url: d.cover_image_url, cover_image: d.cover_image }
+  const trackImages = (d.items ?? []).slice(0, 4).map(it => it.song.image_url).filter((u): u is string => !!u)
+  return { cover_image_url: d.cover_image_url, cover_image: d.cover_image, trackImages }
 }
 
 export async function createPlaylist(

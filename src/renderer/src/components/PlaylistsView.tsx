@@ -167,10 +167,12 @@ export default function PlaylistsView(): JSX.Element {
   // Cover is fetched separately so tracks render without waiting for it
   type CoverData = { cover_image?: string | null; cover_image_url?: string | null }
   const [coverData, setCoverData] = useState<CoverData | null>(null)
+  const [coverLoading, setCoverLoading] = useState(false)
   const [coverImgError, setCoverImgError] = useState(false)
 
   // Async cover thumbnails for the grid (keyed by playlist id)
   const [covers, setCovers] = useState<Record<number, string | null>>({})
+  const [mosaicImages, setMosaicImages] = useState<Record<number, string[]>>({})
   const coversLoadedRef = useRef<Set<number>>(new Set())
 
   // Description editing
@@ -198,6 +200,7 @@ export default function PlaylistsView(): JSX.Element {
           .then(c => {
             const url = c.cover_image_url ?? c.cover_image ?? null
             setCovers(prev => ({ ...prev, [p.id]: url }))
+            if (c.trackImages.length) setMosaicImages(prev => ({ ...prev, [p.id]: c.trackImages }))
           })
           .catch(() => setCovers(prev => ({ ...prev, [p.id]: null })))
       }
@@ -272,6 +275,7 @@ export default function PlaylistsView(): JSX.Element {
     const gen = ++loadGen.current
     setLoadingDetail(true)
     setCoverData(null)
+    setCoverLoading(true)
     try {
       const result = await userApi.getPlaylist(id)
       if (gen !== loadGen.current) return
@@ -282,7 +286,8 @@ export default function PlaylistsView(): JSX.Element {
         if (gen !== loadGen.current) return
         setCoverImgError(false)
         setCoverData({ cover_image: c.cover_image, cover_image_url: c.cover_image_url })
-      }).catch(() => undefined)
+        setCoverLoading(false)
+      }).catch(() => { if (gen === loadGen.current) setCoverLoading(false) })
     } catch {
       if (gen === loadGen.current) setDetail(null)
     } finally {
@@ -564,6 +569,10 @@ export default function PlaylistsView(): JSX.Element {
             <div className={`shrink-0 group/cover relative rounded-xl shadow-2xl overflow-hidden ${isSharedView ? "cursor-default" : "cursor-pointer"}`} style={{ width: 180, height: 180 }} onClick={() => !isSharedView && coverInputRef.current?.click()}>
               {loadingDetail && tracks.length === 0 ? (
                 <div className="w-full h-full bg-surface-overlay animate-pulse" />
+              ) : coverLoading ? (
+                <div className="w-full h-full bg-surface-overlay flex items-center justify-center">
+                  <Loader2 size={28} className="text-text-muted opacity-50 animate-spin" />
+                </div>
               ) : playlistCoverUrl(coverData ?? {}) && !coverImgError ? (
                 <img
                   src={playlistCoverUrl(coverData ?? {})}
@@ -939,11 +948,20 @@ export default function PlaylistsView(): JSX.Element {
                   <div className="w-full h-full bg-surface-raised animate-pulse" />
                 ) : covers[p.id] ? (
                   <img src={covers[p.id]!} alt={p.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-surface-raised to-surface-overlay flex items-center justify-center">
-                    <Music2 size={40} className="text-text-muted opacity-40" />
-                  </div>
-                )}
+                ) : (() => {
+                  const imgs = mosaicImages[p.id] ?? []
+                  if (imgs.length >= 4) return (
+                    <div className="w-full h-full grid grid-cols-2" style={{ overflow: 'hidden' }}>
+                      {imgs.map((url, i) => <img key={i} src={url} alt="" className="w-full h-full object-cover" style={{ aspectRatio: '1' }} />)}
+                    </div>
+                  )
+                  if (imgs.length > 0) return <img src={imgs[0]} alt="" className="w-full h-full object-cover" />
+                  return (
+                    <div className="w-full h-full bg-gradient-to-br from-accent/40 to-accent/10 flex items-center justify-center">
+                      <Music2 size={40} className="text-accent/50" />
+                    </div>
+                  )
+                })()}
               </div>
               <p className="text-text-primary text-sm font-semibold truncate">{p.name}</p>
               <p className="text-text-muted text-xs mt-0.5">{p.track_count} {p.track_count === 1 ? 'track' : 'tracks'}</p>
