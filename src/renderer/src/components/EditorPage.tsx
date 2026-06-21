@@ -366,12 +366,30 @@ export default function EditorPage(): JSX.Element {
       setLyricsLoading(true)
       setLyricsError(null)
       try {
-        const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(pasted.trim())}`)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        setLyrics(extractGeniusLyrics(await res.text()))
-      } catch {
-        setLyricsError('Could not fetch lyrics — check the URL or try again')
-        setTimeout(() => setLyricsError(null), 4000)
+        const url = pasted.trim()
+        // Try allorigins first, fall back to corsproxy
+        const proxies = [
+          `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+          `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        ]
+        let html: string | null = null
+        let lastErr = ''
+        for (const proxy of proxies) {
+          try {
+            const res = await fetch(proxy)
+            if (!res.ok) { lastErr = `HTTP ${res.status}`; continue }
+            html = await res.text()
+            break
+          } catch (err) {
+            lastErr = String(err)
+          }
+        }
+        if (!html) throw new Error(lastErr || 'All proxies failed')
+        setLyrics(extractGeniusLyrics(html))
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        setLyricsError(`Could not fetch lyrics: ${msg}`)
+        setTimeout(() => setLyricsError(null), 6000)
       } finally {
         setLyricsLoading(false)
       }

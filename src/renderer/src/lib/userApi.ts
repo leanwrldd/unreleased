@@ -113,9 +113,14 @@ async function request<T>(url: string, options: RequestInit = {}, auth = true): 
   return (text ? JSON.parse(text) : undefined) as T
 }
 
-/** Fetch a full song object with auth token — ensures synced_lyrics is returned. */
+/** Fetch a full song object — sends auth token without Content-Type to avoid CORS preflight. */
 export async function fetchSong(songId: number): Promise<JWApiSong> {
-  return request<JWApiSong>(`https://juicewrldapi.com/api/songs/${songId}/`, { method: 'GET' })
+  const headers: Record<string, string> = {}
+  const token = getToken()
+  if (token) headers['Authorization'] = `Token ${token}`
+  const res = await fetch(`${JWAPI_BASE}/songs/${songId}/`, { headers })
+  if (!res.ok) throw new Error(`Song fetch failed (${res.status})`)
+  return res.json()
 }
 
 
