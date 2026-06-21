@@ -258,7 +258,6 @@ export async function uploadPlaylistCover(id: number, file: File): Promise<Playl
     method: 'PATCH',
     body: JSON.stringify({ cover_image: base64 }),
   })
-  writeCoverCache(id, { cover_image: result.cover_image, cover_image_url: result.cover_image_url })
   return result
 }
 
