@@ -223,7 +223,7 @@ export default function EditorPage(): JSX.Element {
       release_date:           cleanDate(s.release_date),
       leak_type:              s.leak_type || '',
       lyrics:                 s.lyrics || '',
-      synced_lyrics:          '',
+      synced_lyrics:          s.synced_lyrics || '',
       additional_information: s.additional_information || '',
       notes:                  s.notes || '',
     }
@@ -242,7 +242,7 @@ export default function EditorPage(): JSX.Element {
     setRelDate(cleanDate(s.release_date))
     setLeak(s.leak_type || '')
     setLyrics(s.lyrics || '')
-    setSynced('')
+    setSynced(s.synced_lyrics || '')
     setAddInfo(s.additional_information || '')
     setNotes(s.notes || '')
     setEdNotes('')

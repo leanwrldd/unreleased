@@ -203,7 +203,11 @@ export default function Player(): JSX.Element {
     if (match) {
       apiFetch<JWApiSong>(`/songs/${match[1]}/`)
         .then((song) => {
-          if (song.lyrics) setCurrentTrackFull({ ...synthetic, lyrics: song.lyrics })
+          setCurrentTrackFull({
+            ...synthetic,
+            lyrics: song.lyrics || null,
+            syncedLyrics: song.synced_lyrics || null,
+          })
         })
         .catch(() => {/* no lyrics — that's fine */})
     }
