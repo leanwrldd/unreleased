@@ -195,14 +195,62 @@ export async function createPlaylist(name: string): Promise<PlaylistDetail> {
   })
 }
 
-// Fetches playlist tracks/metadata only — omits cover_image so the response is small
-export async function getPlaylist(id: number): Promise<PlaylistDetail> {
-  return request(`${LIBRARY_BASE}/playlists/${id}/?omit=cover_image`)
+// ── Cover cache (sessionStorage) ────────────────────────────────────────────
+type CoverCache = { cover_image?: string | null; cover_image_url?: string | null }
+const coverCacheKey = (id: number) => `pl_cover:${id}`
+function readCoverCache(id: number): CoverCache | null {
+  try { return JSON.parse(sessionStorage.getItem(coverCacheKey(id)) ?? 'null') } catch { return null }
+}
+function writeCoverCache(id: number, data: CoverCache): void {
+  try { sessionStorage.setItem(coverCacheKey(id), JSON.stringify(data)) } catch {}
+}
+export function evictCoverCache(id: number): void {
+  try { sessionStorage.removeItem(coverCacheKey(id)) } catch {}
 }
 
-// Fetches just the cover fields — called separately after tracks are shown
-export async function getPlaylistCover(id: number): Promise<{ cover_image?: string | null; cover_image_url?: string | null }> {
-  return request(`${LIBRARY_BASE}/playlists/${id}/?fields=id,cover_image,cover_image_url`)
+// ── Image compression (canvas → JPEG, max 400px / ~200 KB) ─────────────────
+export async function compressImageFile(file: File, maxDim = 400, maxKB = 200): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w; canvas.height = h
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
+      let q = 0.85
+      let result = canvas.toDataURL('image/jpeg', q)
+      while (result.length > maxKB * 1024 * 1.37 && q > 0.3) {
+        q = Math.round((q - 0.1) * 10) / 10
+        result = canvas.toDataURL('image/jpeg', q)
+      }
+      resolve(result)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image load failed')) }
+    img.src = url
+  })
+}
+
+// Full playlist fetch — caches cover on the way through so getPlaylistCover is instant
+export async function getPlaylist(id: number): Promise<PlaylistDetail> {
+  const result = await request<PlaylistDetail>(`${LIBRARY_BASE}/playlists/${id}/`)
+  writeCoverCache(id, { cover_image: result.cover_image, cover_image_url: result.cover_image_url })
+  return result
+}
+
+// Returns cover immediately from sessionStorage cache (no HTTP call after first load)
+export async function getPlaylistCover(id: number): Promise<CoverCache> {
+  const cached = readCoverCache(id)
+  if (cached !== null) return cached
+  // Cache miss (first load before getPlaylist finished) — fetch full detail
+  const result = await request<PlaylistDetail>(`${LIBRARY_BASE}/playlists/${id}/`)
+  const cover = { cover_image: result.cover_image, cover_image_url: result.cover_image_url }
+  writeCoverCache(id, cover)
+  return cover
 }
 
 export async function renamePlaylist(id: number, name: string): Promise<PlaylistDetail> {
@@ -220,20 +268,25 @@ export async function updatePlaylist(id: number, data: { name?: string; descript
 }
 
 export async function uploadPlaylistCover(id: number, file: File): Promise<PlaylistDetail> {
-  // API expects JSON with base64 data URI — multipart/form-data is not supported
-  const base64 = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-  return request(`${LIBRARY_BASE}/playlists/${id}/`, {
+  // Compress to max 400px / 200 KB before encoding — prevents large covers in future
+  const base64 = await compressImageFile(file).catch(() =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  )
+  const result = await request<PlaylistDetail>(`${LIBRARY_BASE}/playlists/${id}/`, {
     method: 'PATCH',
     body: JSON.stringify({ cover_image: base64 }),
   })
+  writeCoverCache(id, { cover_image: result.cover_image, cover_image_url: result.cover_image_url })
+  return result
 }
 
 export async function removePlaylistCover(id: number): Promise<void> {
+  evictCoverCache(id)
   await request(`${LIBRARY_BASE}/playlists/${id}/`, {
     method: 'PATCH',
     body: JSON.stringify({ cover_image: '', cover_image_url: '' }),
