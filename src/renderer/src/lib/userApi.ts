@@ -41,6 +41,7 @@ export interface PlaylistSummary {
   description: string | null
   track_count: number
   cover_image_url: string | null
+  cover_image: string | null
   created_at: string
   updated_at: string
 }
@@ -57,6 +58,7 @@ export interface PlaylistDetail {
   name: string
   description: string | null
   cover_image_url: string | null
+  cover_image: string | null
   items: PlaylistItemEntry[]
   created_at: string
   updated_at: string

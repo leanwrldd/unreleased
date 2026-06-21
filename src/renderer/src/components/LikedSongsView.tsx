@@ -1,10 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Heart, Play, Loader2, Plus, ListMusic } from 'lucide-react'
+import { Heart, Play, Loader2, ListMusic, MoreHorizontal, PlayCircle, ListPlus } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
 import { Track } from '../types'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
-import AddToPlaylistMenu from './AddToPlaylistMenu'
 
 function formatDuration(seconds: number): string {
   if (!seconds) return ''
@@ -14,10 +13,11 @@ function formatDuration(seconds: number): string {
 }
 
 export default function LikedSongsView(): JSX.Element {
-  const { account, playTrack, likedTrackIds, toggleLike, setShowUserAuth } = useStore()
+  const { account, playTrack, addToQueue, likedTrackIds, toggleLike, setShowUserAuth, playlists, refreshPlaylists } = useStore()
   const [tracks, setTracks] = useState<Track[]>([])
   const [loading, setLoading] = useState(true)
-  const [menuFor, setMenuFor] = useState<number | null>(null)
+  type CtxMenu = { track: Track; songId: number; x: number; y: number; showPlaylists: boolean }
+  const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
 
   const load = useCallback(async () => {
     if (!account) { setLoading(false); return }
@@ -33,6 +33,13 @@ export default function LikedSongsView(): JSX.Element {
   }, [account])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (!ctxMenu) return
+    const close = () => setCtxMenu(null)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [ctxMenu])
 
   const visible = tracks.filter((t) => likedTrackIds.includes(t.id))
 
@@ -53,6 +60,7 @@ export default function LikedSongsView(): JSX.Element {
   }
 
   return (
+    <>
     <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
       <div className="px-5 pt-5 pb-8">
         <div className="flex items-center gap-4 mb-5">
@@ -87,6 +95,7 @@ export default function LikedSongsView(): JSX.Element {
                 <div
                   key={track.id}
                   className="group flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-surface-raised transition-colors"
+                  onContextMenu={e => { e.preventDefault(); if (songId != null) setCtxMenu({ track, songId, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
                 >
                   <span className="w-6 text-center text-xs text-text-muted tabular-nums shrink-0">{i + 1}</span>
                   <button onClick={() => playTrack(track, visible)} className="relative shrink-0">
@@ -100,18 +109,13 @@ export default function LikedSongsView(): JSX.Element {
                     <p className="text-text-muted text-xs truncate">{track.artist}{track.album ? ` · ${track.album}` : ''}</p>
                   </div>
                   <span className="text-text-muted text-xs tabular-nums shrink-0 hidden sm:block">{formatDuration(track.duration)}</span>
-                  <div className="relative shrink-0">
-                    <button
-                      onClick={() => songId != null && setMenuFor(menuFor === songId ? null : songId)}
-                      className="p-1.5 text-text-muted hover:text-text-primary opacity-0 group-hover:opacity-100 transition-all"
-                      title="Add to playlist"
-                    >
-                      <Plus size={16} />
-                    </button>
-                    {menuFor === songId && songId != null && (
-                      <AddToPlaylistMenu songId={songId} onClose={() => setMenuFor(null)} />
-                    )}
-                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); if (songId != null) setCtxMenu(prev => prev?.songId === songId ? null : { track, songId, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                    className="p-1.5 text-text-muted hover:text-text-primary opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                    title="More options"
+                  >
+                    <MoreHorizontal size={16} />
+                  </button>
                   <button
                     onClick={() => toggleLike(track.id)}
                     className="p-1.5 text-accent shrink-0"
@@ -132,5 +136,48 @@ export default function LikedSongsView(): JSX.Element {
         )}
       </div>
     </div>
+
+    {ctxMenu && (
+      <div
+        className="fixed z-50 min-w-[180px] rounded-xl border border-[var(--border)] bg-surface-raised shadow-xl py-1 overflow-hidden"
+        style={{ left: Math.min(ctxMenu.x, window.innerWidth - 200), top: Math.min(ctxMenu.y, window.innerHeight - 240) }}
+        onClick={e => e.stopPropagation()}
+      >
+        <button onClick={() => { playTrack(ctxMenu.track, visible); setCtxMenu(null) }}
+          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
+          <Play size={14} className="text-text-muted" /> Play
+        </button>
+        <button onClick={() => { addToQueue(ctxMenu.track); setCtxMenu(null) }}
+          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
+          <PlayCircle size={14} className="text-text-muted" /> Play next
+        </button>
+        <div className="border-t border-[var(--border)] my-1" />
+        <button
+          onClick={e => { e.stopPropagation(); setCtxMenu(prev => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null) }}
+          className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
+        >
+          <span className="flex items-center gap-2.5"><ListPlus size={14} className="text-text-muted" /> Add to playlist</span>
+          <span className="text-text-muted text-xs">›</span>
+        </button>
+        {ctxMenu.showPlaylists && (
+          <div className="border-t border-[var(--border)] max-h-40 overflow-y-auto">
+            {playlists.length === 0 ? (
+              <p className="px-3.5 py-2 text-xs text-text-muted">No playlists</p>
+            ) : playlists.map(p => (
+              <button key={p.id} onClick={async () => { setCtxMenu(null); await userApi.addToPlaylist(p.id, ctxMenu.songId); await refreshPlaylists() }}
+                className="w-full text-left px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay truncate block">
+                {p.name}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="border-t border-[var(--border)] my-1" />
+        <button onClick={() => { toggleLike(ctxMenu.track.id); setCtxMenu(null) }}
+          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-red-400 hover:bg-surface-overlay transition-colors">
+          <Heart size={14} /> Unlike
+        </button>
+      </div>
+    )}
+    </>
   )
 }

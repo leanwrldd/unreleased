@@ -72,6 +72,12 @@ function parseTracks(data: unknown): Track[] {
     if (dataParsed.length) return dataParsed
   }
 
+  // playlist field — API wraps songs in { playlist: { songs: [...] } }
+  if (obj.playlist && typeof obj.playlist === 'object') {
+    const playlistParsed = parseTracks(obj.playlist)
+    if (playlistParsed.length) return playlistParsed
+  }
+
   // paths field (strings or song objects)
   if (Array.isArray(obj.paths) && obj.paths.length > 0) {
     if (typeof obj.paths[0] === 'string') return (obj.paths as string[]).filter(Boolean).map(pathToTrack)

@@ -10,7 +10,7 @@ import * as userApi from '../lib/userApi'
 import type { PlaylistDetail, PlaylistSummary } from '../lib/userApi'
 import { Track } from '../types'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
-import { buildImageUrl, buildStreamUrl, JWAPI_BASE, apiFetch, JWApiSong } from '../lib/juicewrldApi'
+import { buildImageUrl, buildStreamUrl, JWAPI_BASE, apiFetch, JWApiSong, playlistCoverUrl } from '../lib/juicewrldApi'
 import { formatDuration } from '../lib/lyrics'
 import LikedSongsView from './LikedSongsView'
 import SongInfoModal from './SongInfoModal'
@@ -470,8 +470,8 @@ export default function PlaylistsView(): JSX.Element {
 
         {/* ── Hero (shown immediately using summary data) ── */}
         <div className="relative px-6 pb-6 shrink-0">
-          {(detail?.cover_image_url ? buildImageUrl(detail.cover_image_url) : tracks[0]?.imageUrl) && (
-            <div className="absolute inset-0 opacity-20 blur-3xl scale-110 pointer-events-none" style={{ background: `url(${detail?.cover_image_url ? buildImageUrl(detail.cover_image_url) : tracks[0]?.imageUrl}) center/cover`, zIndex: 0 }} />
+          {(playlistCoverUrl(detail ?? {}) ?? tracks[0]?.imageUrl) && (
+            <div className="absolute inset-0 opacity-20 blur-3xl scale-110 pointer-events-none" style={{ background: `url(${playlistCoverUrl(detail ?? {}) ?? tracks[0]?.imageUrl}) center/cover`, zIndex: 0 }} />
           )}
 
           {/* Hidden file input */}
@@ -488,8 +488,8 @@ export default function PlaylistsView(): JSX.Element {
             <div className="shrink-0 group/cover relative rounded-xl shadow-2xl overflow-hidden cursor-pointer" style={{ width: 180, height: 180 }} onClick={() => coverInputRef.current?.click()}>
               {loadingDetail && tracks.length === 0 ? (
                 <div className="w-full h-full bg-surface-overlay animate-pulse" />
-              ) : detail?.cover_image_url ? (
-                <img src={buildImageUrl(detail.cover_image_url)} alt="" className="w-full h-full object-cover" />
+              ) : playlistCoverUrl(detail ?? {}) ? (
+                <img src={playlistCoverUrl(detail ?? {})} alt="" className="w-full h-full object-cover" />
               ) : (
                 <PlaylistMosaic tracks={tracks} className="w-full h-full" />
               )}
@@ -505,7 +505,7 @@ export default function PlaylistsView(): JSX.Element {
                 )}
               </div>
               {/* Remove cover button */}
-              {detail?.cover_image_url && (
+              {(detail?.cover_image_url || detail?.cover_image) && (
                 <button
                   className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/60 text-white opacity-0 group-hover/cover:opacity-100 transition-opacity hover:bg-red-500/80"
                   onClick={e => { e.stopPropagation(); handleRemoveCover() }}
@@ -825,8 +825,8 @@ export default function PlaylistsView(): JSX.Element {
               className="group text-left"
             >
               <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
-                {p.cover_image_url ? (
-                  <img src={buildImageUrl(p.cover_image_url)} alt={p.name} className="w-full h-full object-cover" />
+                {playlistCoverUrl(p) ? (
+                  <img src={playlistCoverUrl(p)} alt={p.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-surface-raised to-surface-overlay flex items-center justify-center">
                     <Music2 size={40} className="text-text-muted opacity-40" />

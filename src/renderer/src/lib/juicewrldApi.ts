@@ -114,6 +114,12 @@ export function buildImageUrl(imageUrl: string | null | undefined): string | und
   return `https://juicewrldapi.com${rel}`
 }
 
+/** Picks the best cover URL from a playlist summary or detail object.
+ *  cover_image may contain a base64 data URI; cover_image_url may be a relative path. */
+export function playlistCoverUrl(p: { cover_image_url?: string | null; cover_image?: string | null }): string | undefined {
+  return buildImageUrl(p.cover_image_url ?? p.cover_image ?? undefined)
+}
+
 // ─── Duration parse ───────────────────────────────────────────────────────────
 
 /** "3:59" → 239 seconds. Returns 0 on invalid input. */
