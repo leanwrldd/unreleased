@@ -1,16 +1,22 @@
-import { useEffect, useRef, useMemo } from 'react'
+import { useEffect, useRef, useMemo, useState } from 'react'
 import { Music, Radio } from 'lucide-react'
 import { useStore } from '../store/useStore'
+import { apiFetch, songToTrack } from '../lib/juicewrldApi'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
 import { seekAudio } from './Player'
+
+interface RadioResponse { song: Parameters<typeof songToTrack>[0] }
 
 export default function WrldView(): JSX.Element {
   const {
     currentTrack, currentTrackFull, currentTime, account,
-    setActiveView, radioFmActive, setRadioFmActive,
+    radioFmActive, setRadioFmActive,
+    startRadio, stopRadio,
   } = useStore()
+
   const containerRef = useRef<HTMLDivElement>(null)
   const activeRef    = useRef<HTMLDivElement>(null)
+  const [fmLoading, setFmLoading] = useState(false)
 
   const artSrc       = currentTrackFull?.albumArt ?? currentTrack?.imageUrl
   const lyrics       = currentTrackFull?.lyrics
@@ -32,13 +38,33 @@ export default function WrldView(): JSX.Element {
     }
   }, [currentLineIdx])
 
+  const toggle999FM = async (): Promise<void> => {
+    if (radioFmActive) {
+      stopRadio()
+      setRadioFmActive(false)
+      return
+    }
+    setFmLoading(true)
+    try {
+      const data = await apiFetch<RadioResponse>('/radio/random/')
+      const track = songToTrack(data.song)
+      startRadio(track)
+      setRadioFmActive(true)
+    } catch {
+      // silently fail — button reverts to off
+    } finally {
+      setFmLoading(false)
+    }
+  }
+
   return (
     <div className="relative flex flex-1 h-full w-full overflow-hidden">
 
       {/* ── 999 FM toggle — always top-left ───────────────────────────────── */}
       <button
-        onClick={() => setRadioFmActive(!radioFmActive)}
-        className={`absolute top-4 left-4 z-30 flex items-center gap-2 text-xs font-medium rounded-full px-3 py-1.5 transition-all ${
+        onClick={() => { void toggle999FM() }}
+        disabled={fmLoading}
+        className={`absolute top-4 left-4 z-30 flex items-center gap-2 text-xs font-medium rounded-full px-3 py-1.5 transition-all disabled:opacity-50 ${
           radioFmActive
             ? 'bg-white/20 text-white backdrop-blur-sm ring-1 ring-white/30'
             : 'bg-black/25 text-white/50 hover:text-white/90 hover:bg-black/50 backdrop-blur-sm'
@@ -46,7 +72,7 @@ export default function WrldView(): JSX.Element {
         title={radioFmActive ? 'Turn off 999 FM' : 'Turn on 999 FM'}
       >
         <Radio size={13} className={radioFmActive ? 'animate-pulse' : ''} />
-        <span>999 FM{radioFmActive ? ' · ON' : ''}</span>
+        <span>{fmLoading ? 'Tuning in…' : radioFmActive ? '999 FM · ON' : '999 FM'}</span>
       </button>
 
       {!currentTrack ? (

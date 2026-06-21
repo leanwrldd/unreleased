@@ -703,7 +703,7 @@ export default function Player(): JSX.Element {
               <Shuffle size={18} />
             </button>
 
-            <button onClick={handlePrev} className="text-text-secondary hover:text-text-primary transition-colors">
+            <button onClick={handlePrev} disabled={radioMode} className={`transition-colors ${radioMode ? 'opacity-20 cursor-not-allowed' : 'text-text-secondary hover:text-text-primary'}`}>
               <SkipBack size={20} fill="currentColor" />
             </button>
 
@@ -736,11 +736,11 @@ export default function Player(): JSX.Element {
               <input
                 type="range" min={0} max={1} step={0.001}
                 value={seekDrag !== null ? seekDrag : progress}
-                onMouseDown={handleSeekMouseDown}
-                onChange={handleSeekChange}
-                onMouseUp={handleSeekCommit}
-                onTouchEnd={handleSeekCommit}
-                disabled={!currentTrack} className="w-full"
+                onMouseDown={radioMode ? undefined : handleSeekMouseDown}
+                onChange={radioMode ? undefined : handleSeekChange}
+                onMouseUp={radioMode ? undefined : handleSeekCommit}
+                onTouchEnd={radioMode ? undefined : handleSeekCommit}
+                disabled={!currentTrack || radioMode} className="w-full"
                 style={{ '--val': `${(seekDrag !== null ? seekDrag : progress) * 100}%` } as React.CSSProperties}
               />
             </div>

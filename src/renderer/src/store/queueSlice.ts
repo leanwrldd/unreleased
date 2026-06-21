@@ -80,6 +80,8 @@ export interface QueueSlice {
    * subsequent songs come from /radio/random/ one at a time.
    */
   startRadio: (track: Track) => void
+  /** Exit radio mode, keep current track playing. */
+  stopRadio: () => void
 
   /** Advance to the next track. Returns the track, or null if playback stops. */
   nextTrack: () => Track | null
@@ -176,6 +178,11 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       currentTime: 0,
     })
     if (filter?.hasMore) get()._loadMore()
+  },
+
+  // ── stopRadio ──────────────────────────────────────────────────────────────
+  stopRadio: () => {
+    set({ radioMode: false, radioNext: null, _radioWaiting: false })
   },
 
   // ── startRadio ─────────────────────────────────────────────────────────────
