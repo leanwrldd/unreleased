@@ -75,7 +75,7 @@ function FieldRow({ label, value, original, onChange, placeholder, mono = false 
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder ?? (original || '—')}
-          className={`flex-1 bg-transparent text-sm text-text-primary focus:outline-none placeholder:text-text-muted/25 min-w-0 ${mono ? 'font-mono' : ''}`}
+          className={`flex-1 bg-transparent text-sm text-text-primary focus:outline-none placeholder:text-text-muted placeholder:opacity-25 min-w-0 ${mono ? 'font-mono' : ''}`}
         />
         {changed && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-accent/80" />}
       </div>
@@ -99,7 +99,7 @@ function SelectRow({ label, value, original, onChange, options, placeholder }: {
       <div className="flex items-center gap-2 min-w-0">
         <select
           value={value} onChange={e => onChange(e.target.value)}
-          className="flex-1 bg-transparent text-sm text-text-primary focus:outline-none appearance-none cursor-pointer min-w-0 placeholder:text-text-muted/25"
+          className="flex-1 bg-transparent text-sm text-text-primary focus:outline-none appearance-none cursor-pointer min-w-0 placeholder:text-text-muted placeholder:opacity-25"
         >
           <option value="">{placeholder || '—'}</option>
           {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -125,7 +125,7 @@ function TextareaRow({ label, value, original, onChange, rows = 3, placeholder, 
       <textarea
         rows={rows} value={value} onChange={e => onChange(e.target.value)}
         placeholder={placeholder || '—'}
-        className={`w-full bg-surface-overlay/40 rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted/25 border transition-colors ${changed ? 'border-accent/20' : 'border-[var(--border)]/60'} ${mono ? 'font-mono' : ''}`}
+        className={`w-full bg-surface-overlay rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted placeholder:opacity-25 border transition-colors ${changed ? 'border-accent/20' : 'border-[var(--border)]'} ${mono ? 'font-mono' : ''}`}
       />
     </div>
   )
@@ -351,7 +351,7 @@ export default function EditorPage(): JSX.Element {
                   className="absolute inset-0 w-full h-full object-cover scale-150 blur-3xl opacity-[0.18] pointer-events-none select-none"
                 />
               )}
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-surface/50 to-surface pointer-events-none" />
+              <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent 0%, var(--surface) 100%)" }} />
               <div className="relative flex items-end gap-3.5 px-4 pt-7 pb-4">
                 {song.image_url
                   ? <img src={buildImageUrl(song.image_url)} alt=""
@@ -476,16 +476,16 @@ export default function EditorPage(): JSX.Element {
                   <textarea
                     rows={15} value={lyrics} onChange={e => setLyrics(e.target.value)}
                     placeholder="Full lyrics…"
-                    className={`w-full bg-surface-overlay/40 rounded-xl px-3.5 py-3 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted/25 border transition-colors leading-relaxed ${
-                      lyrics !== String(base.lyrics || '') ? 'border-accent/30' : 'border-[var(--border)]/60'
+                    className={`w-full bg-surface-overlay rounded-xl px-3.5 py-3 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted placeholder:opacity-25 border transition-colors leading-relaxed ${
+                      lyrics !== String(base.lyrics || '') ? 'border-accent/30' : 'border-[var(--border)]'
                     }`}
                   />
                 ) : (
                   <textarea
                     rows={15} value={synced} onChange={e => setSynced(e.target.value)}
                     placeholder={"[00:00.00] Line one\n[00:05.20] Line two\n…"}
-                    className={`w-full bg-surface-overlay/40 rounded-xl px-3.5 py-3 text-sm font-mono text-text-primary focus:outline-none resize-none placeholder:text-text-muted/25 border transition-colors ${
-                      synced ? 'border-accent/30' : 'border-[var(--border)]/60'
+                    className={`w-full bg-surface-overlay rounded-xl px-3.5 py-3 text-sm font-mono text-text-primary focus:outline-none resize-none placeholder:text-text-muted placeholder:opacity-25 border transition-colors ${
+                      synced ? 'border-accent/30' : 'border-[var(--border)]'
                     }`}
                   />
                 )}
@@ -497,11 +497,11 @@ export default function EditorPage(): JSX.Element {
 
       {/* ── Sticky footer ── */}
       {song && (
-        <div className="shrink-0 border-t border-[var(--border)] bg-surface/90 backdrop-blur-sm px-4 py-3 space-y-2.5">
+        <div className="shrink-0 border-t border-[var(--border)] bg-surface backdrop-blur-sm px-4 py-3 space-y-2.5">
           <input
             value={edNotes} onChange={e => setEdNotes(e.target.value)}
             placeholder="Editor notes…"
-            className="w-full bg-surface-overlay/60 border border-[var(--border)]/60 rounded-xl px-3 py-2 text-xs text-text-primary placeholder:text-text-muted/30 focus:outline-none focus:border-accent/40 transition-colors"
+            className="w-full bg-surface-overlay border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-text-primary placeholder:text-text-muted placeholder:opacity-30 focus:outline-none focus:border-accent/40 transition-colors"
           />
           {submitError && (
             <div className="flex items-center gap-2 text-red-400 text-xs">
@@ -599,9 +599,9 @@ function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
       </div>
       {(rows ?? 1) > 1
         ? <textarea rows={rows} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-            className="w-full bg-surface-overlay/60 border border-[var(--border)]/60 rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/40 resize-none placeholder:text-text-muted/30 transition-colors" />
+            className="w-full bg-surface-overlay border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/40 resize-none placeholder:text-text-muted placeholder:opacity-30 transition-colors" />
         : <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-            className="w-full bg-surface-overlay/60 border border-[var(--border)]/60 rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/40 placeholder:text-text-muted/30 transition-colors" />
+            className="w-full bg-surface-overlay border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/40 placeholder:text-text-muted placeholder:opacity-30 transition-colors" />
       }
     </div>
   )

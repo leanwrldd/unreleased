@@ -822,7 +822,7 @@ export default function Player(): JSX.Element {
                   onClick={() => { setAudioOutput(d.deviceId); setShowOutputPicker(false) }}
                   className="flex items-center gap-3 w-full px-4 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-surface-overlay transition-colors"
                 >
-                  <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                     <span className="w-4 h-4 flex items-center justify-center shrink-0">
                     {audioOutput === d.deviceId && <Check size={12} className="text-accent" />}
                   </span>
                   <span className="truncate">{d.label || `Output ${d.deviceId.slice(0, 8)}`}</span>
