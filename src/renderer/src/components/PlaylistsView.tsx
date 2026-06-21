@@ -451,10 +451,8 @@ export default function PlaylistsView(): JSX.Element {
           await userApi.uploadPlaylistCover(newPl.id, file)
         } catch { /* skip cover on CORS/network failure */ }
       }
-      // 4. Add all tracks sequentially
-      for (const item of detail.items) {
-        await userApi.addToPlaylist(newPl.id, item.song.id).catch(() => {})
-      }
+      // 4. Add all tracks in parallel
+      await Promise.all(detail.items.map(item => userApi.addToPlaylist(newPl.id, item.song.id).catch(() => {})))
       await refreshPlaylists()
       setImportState('done')
       setTimeout(() => setImportState('idle'), 2500)
