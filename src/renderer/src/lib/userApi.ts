@@ -266,6 +266,13 @@ export async function removePlaylistCover(id: number): Promise<void> {
   })
 }
 
+export async function setPlaylistCoverBase64(id: number, b64: string): Promise<void> {
+  await request(`${LIBRARY_BASE}/playlists/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ cover_image: b64 }),
+  })
+}
+
 export async function reorderPlaylist(id: number, songIds: number[]): Promise<PlaylistDetail> {
   return request(`${LIBRARY_BASE}/playlists/${id}/`, {
     method: 'PATCH',

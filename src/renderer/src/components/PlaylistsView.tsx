@@ -156,6 +156,7 @@ export default function PlaylistsView(): JSX.Element {
   const [shareCopied, setShareCopied] = useState(false)
   const [addingAll, setAddingAll] = useState(false)
   const [isSharedView, setIsSharedView] = useState(false)
+  const [importState, setImportState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
 
   // Song info modal
   const [infoSong, setInfoSong] = useState<JWApiSong | null>(null)
@@ -427,6 +428,42 @@ export default function PlaylistsView(): JSX.Element {
     await refreshPlaylists()
   }, [refreshPlaylists])
 
+  const handleImportPlaylist = useCallback(async () => {
+    if (!detail) return
+    setImportState('loading')
+    try {
+      // 1. Create new playlist with same name
+      const newPl = await userApi.createPlaylist(detail.name)
+      // 2. Copy description if present
+      if (detail.description) {
+        await userApi.updatePlaylist(newPl.id, { description: detail.description })
+      }
+      // 3. Copy cover
+      const b64 = coverData?.cover_image
+      const url = coverData?.cover_image_url
+      if (b64) {
+        await userApi.setPlaylistCoverBase64(newPl.id, b64)
+      } else if (url) {
+        try {
+          const res = await fetch(url)
+          const blob = await res.blob()
+          const file = new File([blob], 'cover.jpg', { type: blob.type || 'image/jpeg' })
+          await userApi.uploadPlaylistCover(newPl.id, file)
+        } catch { /* skip cover on CORS/network failure */ }
+      }
+      // 4. Add all tracks sequentially
+      for (const item of detail.items) {
+        await userApi.addToPlaylist(newPl.id, item.song.id).catch(() => {})
+      }
+      await refreshPlaylists()
+      setImportState('done')
+      setTimeout(() => setImportState('idle'), 2500)
+    } catch {
+      setImportState('error')
+      setTimeout(() => setImportState('idle'), 2500)
+    }
+  }, [detail, coverData, refreshPlaylists])
+
   // ── Liked Songs ────────────────────────────────────────────────────────────
 
   if (showLiked) {
@@ -617,7 +654,7 @@ export default function PlaylistsView(): JSX.Element {
                   className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${shareCopied ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
                   {shareCopied ? <Check size={16} /> : <Share2 size={16} />}
                 </button>
-                {account && otherPlaylists.length > 0 && tracks.length > 0 && detail && (
+                {!isSharedView && otherPlaylists.length > 0 && tracks.length > 0 && detail && (
                   <div className="relative" ref={addAllMenuRef} onClick={e => e.stopPropagation()}>
                     <button onClick={() => setShowAddAllMenu(v => !v)} title="Add all to playlist" disabled={addingAll}
                       className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${addingAll ? 'text-accent' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
@@ -634,6 +671,23 @@ export default function PlaylistsView(): JSX.Element {
                       </div>
                     )}
                   </div>
+                )}
+                {isSharedView && account && tracks.length > 0 && detail && (
+                  <button
+                    onClick={handleImportPlaylist}
+                    disabled={importState === 'loading' || importState === 'done'}
+                    title={importState === 'done' ? 'Saved to library!' : importState === 'error' ? 'Import failed' : 'Save to my library'}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors disabled:opacity-60 ${
+                      importState === 'done' ? 'text-accent bg-accent/10' :
+                      importState === 'error' ? 'text-red-400 bg-red-400/10' :
+                      'text-text-primary bg-surface-raised hover:bg-surface-overlay'
+                    }`}
+                  >
+                    {importState === 'loading' ? <Loader2 size={14} className="animate-spin" /> :
+                     importState === 'done' ? <Check size={14} /> :
+                     <FolderInput size={14} />}
+                    {importState === 'loading' ? 'Saving…' : importState === 'done' ? 'Saved!' : importState === 'error' ? 'Failed' : 'Save to library'}
+                  </button>
                 )}
                 {!isSharedView && !renaming && detail && (
                   <button onClick={() => { setRenameValue(detail.name); setRenaming(true) }} className="p-2.5 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-overlay text-sm transition-colors">
