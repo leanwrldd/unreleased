@@ -153,9 +153,9 @@ export default function PlaylistsView(): JSX.Element {
 
   // Zip / share / bulk-add
   const [zipState, setZipState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
-  const [sharing, setSharing] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
   const [addingAll, setAddingAll] = useState(false)
+  const [isSharedView, setIsSharedView] = useState(false)
 
   // Song info modal
   const [infoSong, setInfoSong] = useState<JWApiSong | null>(null)
@@ -213,9 +213,18 @@ export default function PlaylistsView(): JSX.Element {
 
   // Listen for sidebar "Playlists" re-click → go back to library
   useEffect(() => {
-    const h = () => { setSelectedId(null); setRenaming(false); setSearch(''); setSort({ field: 'default', dir: 'asc' }) }
+    const h = () => { setSelectedId(null); setRenaming(false); setSearch(''); setSort({ field: 'default', dir: 'asc' }); setIsSharedView(false) }
     window.addEventListener('playlists:back', h)
     return () => window.removeEventListener('playlists:back', h)
+  }, [])
+
+  // Auto-open playlist from URL params (e.g. /playlists?id=123&view=shared)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const id = params.get('id')
+    const view = params.get('view')
+    if (id) { setSelectedId(Number(id)) }
+    if (view === 'shared') { setIsSharedView(true) }
   }, [])
 
   // Close menus on outside click
@@ -380,33 +389,14 @@ export default function PlaylistsView(): JSX.Element {
     setTimeout(() => setZipState('idle'), 3000)
   }, [zipState])
 
-  const handleShare = useCallback(async (trackList: Track[]) => {
-    if (sharing) return
-    // Extract numeric song IDs from track ids of the form "jw-{id}"
-    const song_ids = trackList
-      .map(t => { const m = t.id.match(/^jw-(\d+)$/); return m ? Number(m[1]) : null })
-      .filter((id): id is number => id !== null)
-    const paths = trackList.map(t => t.path).filter(Boolean)
-    if (!song_ids.length && !paths.length) return
-    setSharing(true)
+  const handleShare = useCallback(async () => {
+    if (!selectedId) return
     try {
-      const res = await fetch(`${JWAPI_BASE}/playlists/share/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ song_ids, paths }),
-      })
-      if (!res.ok) throw new Error()
-      const data = await res.json() as { share_id?: string; id?: string }
-      const share_id = data.share_id ?? data.id
-      if (share_id) {
-        await navigator.clipboard.writeText(`${window.location.origin}/shared/${share_id}`)
-        setShareCopied(true)
-        setTimeout(() => setShareCopied(false), 2500)
-      }
-    } catch {
-      try { await navigator.clipboard.writeText(window.location.href) } catch {}
-    } finally { setSharing(false) }
-  }, [sharing])
+      await navigator.clipboard.writeText(`${window.location.origin}/playlists?id=${selectedId}&view=shared`)
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 2500)
+    } catch {}
+  }, [selectedId])
 
   const handleAddAllTo = useCallback(async (targetId: number, srcDetail: PlaylistDetail) => {
     setAddingAll(true)
@@ -463,7 +453,10 @@ export default function PlaylistsView(): JSX.Element {
       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden" onClick={() => { setTrackMenu(null); setShowAddAllMenu(false) }}>
         {/* Back */}
         <div className="px-6 pt-5 shrink-0">
-          <button onClick={() => { setSelectedId(null); setRenaming(false) }} className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-sm transition-colors mb-4">
+          <button onClick={() => {
+            setSelectedId(null); setRenaming(false)
+            if (isSharedView) { setIsSharedView(false); window.history.pushState({}, '', '/playlists') }
+          }} className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-sm transition-colors mb-4">
             <ArrowLeft size={15} /> Playlists
           </button>
         </div>
@@ -484,8 +477,8 @@ export default function PlaylistsView(): JSX.Element {
           />
 
           <div className="relative z-10 flex gap-6 items-end">
-            {/* Cover image — clickable to upload */}
-            <div className="shrink-0 group/cover relative rounded-xl shadow-2xl overflow-hidden cursor-pointer" style={{ width: 180, height: 180 }} onClick={() => coverInputRef.current?.click()}>
+            {/* Cover image — clickable to upload (owner only) */}
+            <div className={`shrink-0 group/cover relative rounded-xl shadow-2xl overflow-hidden ${isSharedView ? "cursor-default" : "cursor-pointer"}`} style={{ width: 180, height: 180 }} onClick={() => !isSharedView && coverInputRef.current?.click()}>
               {loadingDetail && tracks.length === 0 ? (
                 <div className="w-full h-full bg-surface-overlay animate-pulse" />
               ) : playlistCoverUrl(detail ?? {}) ? (
@@ -493,8 +486,8 @@ export default function PlaylistsView(): JSX.Element {
               ) : (
                 <PlaylistMosaic tracks={tracks} className="w-full h-full" />
               )}
-              {/* Upload overlay */}
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/cover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+              {/* Upload overlay (owner only) */}
+              <div className={`absolute inset-0 bg-black/50 transition-opacity flex flex-col items-center justify-center gap-2 ${isSharedView ? "opacity-0 pointer-events-none" : "opacity-0 group-hover/cover:opacity-100"}`}>
                 {coverUploading ? (
                   <Loader2 size={24} className="text-white animate-spin" />
                 ) : (
@@ -504,8 +497,8 @@ export default function PlaylistsView(): JSX.Element {
                   </>
                 )}
               </div>
-              {/* Remove cover button */}
-              {(detail?.cover_image_url || detail?.cover_image) && (
+              {/* Remove cover button (owner only) */}
+              {!isSharedView && (detail?.cover_image_url || detail?.cover_image) && (
                 <button
                   className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/60 text-white opacity-0 group-hover/cover:opacity-100 transition-opacity hover:bg-red-500/80"
                   onClick={e => { e.stopPropagation(); handleRemoveCover() }}
@@ -558,6 +551,10 @@ export default function PlaylistsView(): JSX.Element {
                     <button onClick={() => setEditingDesc(false)} className="p-1.5 rounded-lg text-text-muted hover:text-text-primary"><X size={14} /></button>
                   </div>
                 </div>
+              ) : isSharedView ? (
+                detail?.description ? (
+                  <p className="text-text-muted text-sm line-clamp-2 mb-3">{detail.description}</p>
+                ) : null
               ) : (
                 <button
                   className="text-left mb-3 group/desc flex items-start gap-1.5"
@@ -591,12 +588,12 @@ export default function PlaylistsView(): JSX.Element {
                   className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${zipState === 'done' ? 'text-accent bg-accent/10' : zipState === 'error' ? 'text-red-400 bg-red-400/10' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
                   {zipState === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <Archive size={16} />}
                 </button>
-                <button onClick={() => handleShare(tracks)} disabled={sharing || tracks.length === 0}
+                <button onClick={() => handleShare()} disabled={tracks.length === 0}
                   title={shareCopied ? 'Link copied!' : 'Copy share link'}
                   className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${shareCopied ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
-                  {sharing ? <Loader2 size={16} className="animate-spin" /> : shareCopied ? <Check size={16} /> : <Share2 size={16} />}
+                  {shareCopied ? <Check size={16} /> : <Share2 size={16} />}
                 </button>
-                {otherPlaylists.length > 0 && tracks.length > 0 && detail && (
+                {!isSharedView && otherPlaylists.length > 0 && tracks.length > 0 && detail && (
                   <div className="relative" ref={addAllMenuRef} onClick={e => e.stopPropagation()}>
                     <button onClick={() => setShowAddAllMenu(v => !v)} title="Add all to playlist" disabled={addingAll}
                       className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${addingAll ? 'text-accent' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
@@ -614,14 +611,16 @@ export default function PlaylistsView(): JSX.Element {
                     )}
                   </div>
                 )}
-                {!renaming && detail && (
+                {!isSharedView && !renaming && detail && (
                   <button onClick={() => { setRenameValue(detail.name); setRenaming(true) }} className="p-2.5 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-overlay text-sm transition-colors">
                     <Pencil size={15} />
                   </button>
                 )}
-                <button onClick={deleteSelected} className="p-2.5 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 text-sm transition-colors">
-                  <Trash2 size={15} />
-                </button>
+                {!isSharedView && (
+                  <button onClick={deleteSelected} className="p-2.5 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 text-sm transition-colors">
+                    <Trash2 size={15} />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -683,18 +682,18 @@ export default function PlaylistsView(): JSX.Element {
               return (
                 <div
                   key={track.id}
-                  draggable={dragEnabled}
-                  onDragStart={() => dragEnabled && setDragIdx(originalIdx)}
+                  draggable={!isSharedView && dragEnabled}
+                  onDragStart={() => !isSharedView && dragEnabled && setDragIdx(originalIdx)}
                   onDragOver={e => { if (!dragEnabled) return; e.preventDefault(); setDropIdx(displayIdx) }}
                   onDragEnd={() => { setDragIdx(null); setDropIdx(null) }}
                   onDrop={() => dragEnabled && handleDrop(displayIdx)}
-                  onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setTrackMenu({ track, songId, i: originalIdx, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                  onContextMenu={e => { if (isSharedView) return; e.preventDefault(); e.stopPropagation(); setTrackMenu({ track, songId, i: originalIdx, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
                   className={`group grid items-center gap-3 px-4 py-2 rounded-lg transition-colors cursor-default select-none ${
                     isDragging ? 'opacity-40 bg-surface-raised' : isDropTarget ? 'border-t-2 border-accent bg-surface-overlay' : 'hover:bg-surface-raised'
                   }`}
                   style={{ gridTemplateColumns: '16px 28px 40px 1fr 56px 36px' }}
                 >
-                  <span className={`flex items-center justify-center text-text-muted ${dragEnabled ? 'opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing' : 'opacity-0'}`}>
+                  <span className={`flex items-center justify-center text-text-muted ${!isSharedView && dragEnabled ? 'opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing' : 'opacity-0 pointer-events-none'}`}>
                     <GripVertical size={14} />
                   </span>
                   <span className="text-center text-xs text-text-muted tabular-nums group-hover:hidden">{displayIdx + 1}</span>
@@ -710,13 +709,17 @@ export default function PlaylistsView(): JSX.Element {
                     {track.duration ? formatDuration(track.duration) : '--:--'}
                   </span>
                   <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={e => { e.stopPropagation(); setTrackMenu({ track, songId, i: originalIdx, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
-                      className="p-1.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-surface-overlay transition-colors hidden md:flex" title="More options">
-                      <MoreHorizontal size={13} />
-                    </button>
-                    <button onClick={() => removeTrack(songId)} className="p-1.5 text-text-muted hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors" title="Remove">
-                      <X size={13} />
-                    </button>
+                    {!isSharedView && (
+                      <>
+                        <button onClick={e => { e.stopPropagation(); setTrackMenu({ track, songId, i: originalIdx, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                          className="p-1.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-surface-overlay transition-colors hidden md:flex" title="More options">
+                          <MoreHorizontal size={13} />
+                        </button>
+                        <button onClick={() => removeTrack(songId)} className="p-1.5 text-text-muted hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors" title="Remove">
+                          <X size={13} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               )
