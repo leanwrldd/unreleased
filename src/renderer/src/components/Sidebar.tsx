@@ -1,8 +1,25 @@
 import { useState } from 'react'
-import { SearchCode, HardDrive, Settings, Archive, ShieldCheck, ListMusic, LogIn, LogOut, ChevronLeft, ChevronRight, ArrowLeft, Radio, Sparkles } from 'lucide-react'
+import { SearchCode, HardDrive, Settings, Archive, ShieldCheck, ListMusic, LogIn, LogOut, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
+
+function JuiceBoxIcon({ size = 18 }: { size?: number }): JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {/* Main body */}
+      <rect x="4" y="8" width="16" height="13" rx="1.5" />
+      {/* Top panel */}
+      <path d="M4 8 L6 5 L18 5 L20 8" />
+      {/* Straw hole + straw */}
+      <circle cx="15" cy="6.5" r="0.8" fill="currentColor" stroke="none" />
+      <line x1="15" y1="5.7" x2="18.5" y2="1.5" />
+      {/* Label lines */}
+      <line x1="7" y1="13" x2="17" y2="13" />
+      <line x1="7" y1="16" x2="14" y2="16" />
+    </svg>
+  )
+}
 
 const LS_COLLAPSED = 'sidebar:collapsed'
 
@@ -22,11 +39,10 @@ export default function Sidebar(): JSX.Element {
 
   const items: { icon: React.ReactNode; label: string; view: ViewType }[] = [
     { icon: <SearchCode size={18} />, label: 'Tracker', view: 'api-tracker' },
-    { icon: <Radio size={18} />, label: '999 FM', view: 'radio-fm' },
     { icon: <Archive size={18} />, label: 'Compilation', view: 'compilation' },
     { icon: <HardDrive size={18} />, label: 'Files', view: 'api-files' },
     { icon: <ListMusic size={18} />, label: 'Playlists', view: 'playlists' },
-    { icon: <Sparkles size={18} />, label: 'WRLD', view: 'wrld' },
+    { icon: <JuiceBoxIcon size={18} />, label: 'WRLD', view: 'wrld' },
   ]
 
   return (

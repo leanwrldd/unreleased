@@ -1,11 +1,11 @@
 import { useEffect, useRef, useMemo } from 'react'
-import { Music } from 'lucide-react'
+import { Music, Radio } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
 import { seekAudio } from './Player'
 
 export default function WrldView(): JSX.Element {
-  const { currentTrack, currentTrackFull, currentTime, account } = useStore()
+  const { currentTrack, currentTrackFull, currentTime, account, setActiveView } = useStore()
   const containerRef = useRef<HTMLDivElement>(null)
   const activeRef    = useRef<HTMLDivElement>(null)
 
@@ -31,7 +31,16 @@ export default function WrldView(): JSX.Element {
 
   if (!currentTrack) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-black h-full">
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-black h-full w-full">
+        {/* 999 FM button */}
+        <button
+          onClick={() => setActiveView('radio-fm')}
+          className="absolute top-4 left-4 flex items-center gap-2 text-white/30 hover:text-white/70 transition-colors text-xs font-medium"
+          title="999 FM"
+        >
+          <Radio size={16} />
+          <span>999 FM</span>
+        </button>
         <div className="text-6xl opacity-10">&#9834;</div>
         <p className="text-white/30 text-sm">Play a track to see lyrics</p>
       </div>
@@ -39,7 +48,7 @@ export default function WrldView(): JSX.Element {
   }
 
   return (
-    <div className="relative flex h-full overflow-hidden">
+    <div className="relative flex flex-1 h-full w-full overflow-hidden">
       {/* Full-bleed blurred background */}
       <div className="absolute inset-0 overflow-hidden">
         {artSrc ? (
@@ -52,16 +61,24 @@ export default function WrldView(): JSX.Element {
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-black" />
         )}
-        {/* Top + bottom vignette */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
       </div>
+
+      {/* 999 FM button — top left */}
+      <button
+        onClick={() => setActiveView('radio-fm')}
+        className="absolute top-4 left-4 z-20 flex items-center gap-2 text-white/40 hover:text-white/80 transition-colors text-xs font-medium bg-black/20 hover:bg-black/40 rounded-full px-3 py-1.5"
+        title="Open 999 FM"
+      >
+        <Radio size={14} />
+        <span>999 FM</span>
+      </button>
 
       {/* Left column — art + meta */}
       <div
         className="relative z-10 flex flex-col items-center justify-center shrink-0 px-10 gap-6"
         style={{ width: '38%', minWidth: 240 }}
       >
-        {/* Cover art */}
         <div
           className="rounded-3xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)] w-full"
           style={{ aspectRatio: '1' }}
@@ -75,7 +92,6 @@ export default function WrldView(): JSX.Element {
           )}
         </div>
 
-        {/* Track info */}
         <div className="text-center w-full px-2">
           <p className="text-white font-bold text-xl leading-tight">{currentTrack.title}</p>
           <p className="text-white/50 text-sm mt-1">{currentTrack.artist}</p>
