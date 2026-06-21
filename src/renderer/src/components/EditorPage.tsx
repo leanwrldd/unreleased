@@ -139,16 +139,28 @@ function extractGeniusLyrics(html: string): string {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const containers = Array.from(doc.querySelectorAll('[data-lyrics-container="true"]'))
   if (!containers.length) throw new Error('No lyrics containers found')
-  return containers
+
+  const raw = containers
     .map(c => {
       const clone = c.cloneNode(true) as Element
       clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'))
-      return clone.textContent?.trim() ?? ''
+      return clone.textContent ?? ''
     })
-    .filter(Boolean)
     .join('\n\n')
+
+  // The page injects contributor counts, translations, and a song description
+  // before the actual lyrics. Trim everything up to the first [Section] tag.
+  // Fall back to trimming after "Read More" (end of song description) if no tags.
+  let start = raw.indexOf('[')
+  if (start < 0) {
+    const rm = raw.lastIndexOf('Read More')
+    start = rm >= 0 ? rm + 9 : 0
+  }
+
+  return raw
+    .slice(start)
     .replace(/^\[.*?\]\n?/gm, '')   // strip section tags
-    .replace(/\n{2,}/g, '\n\n')     // collapse blanks
+    .replace(/\n{2,}/g, '\n\n')
     .trim()
 }
 
