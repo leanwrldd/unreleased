@@ -233,7 +233,7 @@ export async function compressImageFile(file: File, maxDim = 400, maxKB = 200): 
 
 // Single request — tracks + cover in one response
 export async function getPlaylist(id: number): Promise<PlaylistDetail> {
-  return request(`${LIBRARY_BASE}/playlists/${id}/`)
+  return request(`${LIBRARY_BASE}/playlists/${id}/?omit_cover_image=true`)
 }
 
 export async function renamePlaylist(id: number, name: string): Promise<PlaylistDetail> {

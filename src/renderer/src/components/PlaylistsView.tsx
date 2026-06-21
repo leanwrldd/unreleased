@@ -275,15 +275,14 @@ export default function PlaylistsView(): JSX.Element {
     try {
       const result = await userApi.getPlaylist(id)
       if (gen !== loadGen.current) return
-      // Show tracks immediately — cover follows in next tick so UI isn't held up
-      const { cover_image, cover_image_url, ...rest } = result
-      setDetail({ ...rest, cover_image: null, cover_image_url: null } as typeof result)
+      setDetail(result)
       setLoadingDetail(false)
-      setTimeout(() => {
+      // Load cover separately so tracks render immediately
+      userApi.getPlaylistCover(id).then(c => {
         if (gen !== loadGen.current) return
         setCoverImgError(false)
-        setCoverData({ cover_image, cover_image_url })
-      }, 0)
+        setCoverData({ cover_image: c.cover_image, cover_image_url: c.cover_image_url })
+      }).catch(() => undefined)
     } catch {
       if (gen === loadGen.current) setDetail(null)
     } finally {
@@ -388,8 +387,8 @@ export default function PlaylistsView(): JSX.Element {
       await refreshPlaylists()
     } catch {
       // restore on failure by re-fetching
-      const result = await userApi.getPlaylist(selectedId).catch(() => null)
-      if (result) setCoverData({ cover_image: result.cover_image, cover_image_url: result.cover_image_url })
+      const c = await userApi.getPlaylistCover(selectedId).catch(() => null)
+      if (c) setCoverData({ cover_image: c.cover_image, cover_image_url: c.cover_image_url })
     }
   }, [selectedId, refreshPlaylists])
 
