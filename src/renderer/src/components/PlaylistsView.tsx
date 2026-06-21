@@ -321,12 +321,13 @@ export default function PlaylistsView(): JSX.Element {
     if (!selectedId || coverUploading) return
     setCoverUploading(true)
     try {
-      const updated = await userApi.uploadPlaylistCover(selectedId, file)
-      setDetail(updated)
+      await userApi.uploadPlaylistCover(selectedId, file)
+      // Re-fetch the full detail — PATCH response may not echo the new cover_image_url
+      await loadDetail(selectedId)
       await refreshPlaylists()
     } catch {}
     setCoverUploading(false)
-  }, [selectedId, coverUploading, refreshPlaylists])
+  }, [selectedId, coverUploading, loadDetail, refreshPlaylists])
 
   const handleRemoveCover = useCallback(async () => {
     if (!selectedId) return
