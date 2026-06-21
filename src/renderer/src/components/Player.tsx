@@ -762,11 +762,11 @@ export default function Player(): JSX.Element {
                 type="range" min={0} max={1} step={0.001}
                 value={radioFmActive ? 0 : (seekDrag !== null ? seekDrag : progress)}
                 onMouseDown={radioFmActive ? undefined : handleSeekMouseDown}
-                onChange={radioFmActive ? undefined : handleSeekChange}
+                onChange={handleSeekChange}
                 onMouseUp={radioFmActive ? undefined : handleSeekCommit}
                 onTouchEnd={radioFmActive ? undefined : handleSeekCommit}
                 disabled={!currentTrack || radioFmActive} className="w-full"
-                style={{ '--val': `${radioFmActive ? 0 : (seekDrag !== null ? seekDrag : progress) * 100}%`, ...(radioFmActive ? { opacity: 0.35, cursor: 'default' } : {}) } as React.CSSProperties}
+                style={{ '--val': `${radioFmActive ? 0 : (seekDrag !== null ? seekDrag : progress) * 100}%`, ...(radioFmActive ? { opacity: 0.4, pointerEvents: 'none' } : {}) } as React.CSSProperties}
               />
             </div>
             <span className="text-text-muted text-xs w-10 tabular-nums">
