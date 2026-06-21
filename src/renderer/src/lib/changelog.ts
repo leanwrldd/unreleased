@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.6.0',
+    date: '2026-06-21',
+    changes: [
+      { type: 'new', text: 'Editor page redesigned — blurred album art header, two-column field grid, category pill buttons, accent left-border change indicators' },
+      { type: 'fix', text: 'Radio mode restored — shuffle now correctly activates radio when playing from the Tracker regardless of sort mode or result count' },
+      { type: 'fix', text: 'Crossfade in radio mode no longer repeats the same song — now fades into the pre-fetched next radio track' },
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-06-18',
     changes: [

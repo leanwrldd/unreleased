@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  Loader2, Check, AlertCircle, LogIn, Clock, X, ChevronUp,
-  ChevronDown, Award, Music2,
+  Loader2, Check, AlertCircle, LogIn, Clock, X, ChevronDown,
+  ChevronUp, Award, Music2, FileText,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { apiFetch, JWApiSong, JWApiEra, buildImageUrl, CATEGORY_LABELS } from '../lib/juicewrldApi'
@@ -15,14 +15,21 @@ const CATEGORIES = [
   { value: 'released',          label: 'Released' },
   { value: 'unreleased',        label: 'Unreleased' },
   { value: 'unsurfaced',        label: 'Unsurfaced' },
-  { value: 'recording_session', label: 'Recording Session' },
+  { value: 'recording_session', label: 'Session' },
 ]
 
-const CAT_DOT: Record<string, string> = {
-  released:          'bg-emerald-400',
-  unreleased:        'bg-accent',
-  unsurfaced:        'bg-yellow-400',
-  recording_session: 'bg-text-muted',
+const CAT_PILL: Record<string, string> = {
+  released:          'bg-emerald-500 text-white',
+  unreleased:        'bg-accent text-white',
+  unsurfaced:        'bg-yellow-500 text-black',
+  recording_session: 'bg-zinc-500 text-white',
+}
+
+const CAT_BADGE: Record<string, string> = {
+  released:          'bg-emerald-500/20 text-emerald-400',
+  unreleased:        'bg-accent/20 text-accent',
+  unsurfaced:        'bg-yellow-500/20 text-yellow-400',
+  recording_session: 'bg-zinc-500/20 text-zinc-400',
 }
 
 function cleanDate(raw: string | null | undefined): string {
@@ -41,28 +48,42 @@ function diff(before: Record<string, unknown>, after: Record<string, unknown>): 
   return patch
 }
 
-/* ── Inline editable row ──────────────────────────────────────────────────── */
-function Row({ label, value, original, onChange, placeholder }: {
+/* ── Section header ─────────────────────────────────────────────────────────── */
+function SectionLabel({ label }: { label: string }): JSX.Element {
+  return (
+    <div className="flex items-center gap-2.5 px-4 pt-5 pb-1.5">
+      <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted/35 shrink-0 select-none">{label}</span>
+      <div className="flex-1 h-px bg-[var(--border)]/50" />
+    </div>
+  )
+}
+
+/* ── Two-column field row ───────────────────────────────────────────────────── */
+function FieldRow({ label, value, original, onChange, placeholder, mono = false }: {
   label: string; value: string; original: string
-  onChange: (v: string) => void; placeholder?: string
+  onChange: (v: string) => void; placeholder?: string; mono?: boolean
 }): JSX.Element {
   const changed = value !== original && !(value === '' && original === '')
   return (
-    <div className={`flex items-start gap-3 px-4 py-2.5 transition-colors ${changed ? 'bg-accent/5' : 'hover:bg-surface-overlay/50'}`}>
-      <span className="w-28 shrink-0 text-[11px] font-semibold text-text-muted/60 uppercase tracking-wider pt-[7px] select-none">{label}</span>
-      <div className="flex-1 relative">
+    <div className={`group grid grid-cols-[84px_1fr] gap-x-3 items-baseline px-4 py-[7px] border-l-2 transition-all
+      ${changed ? 'border-accent/70 bg-accent/[0.025]' : 'border-transparent hover:bg-white/[0.015]'}`}>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted/40 select-none truncate pt-px">
+        {label}
+      </span>
+      <div className="flex items-center gap-2 min-w-0">
         <input
           value={value}
           onChange={e => onChange(e.target.value)}
-          placeholder={placeholder || original || '—'}
-          className={`w-full bg-transparent text-sm focus:outline-none py-1 placeholder:text-text-muted/30 border-b transition-colors ${changed ? 'text-text-primary border-accent/50' : 'text-text-primary border-transparent focus:border-[var(--border)]'}`}
+          placeholder={placeholder ?? (original || '—')}
+          className={`flex-1 bg-transparent text-sm text-text-primary focus:outline-none placeholder:text-text-muted/25 min-w-0 ${mono ? 'font-mono' : ''}`}
         />
-        {changed && <span className="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-accent" />}
+        {changed && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-accent/80" />}
       </div>
     </div>
   )
 }
 
+/* ── Select row ─────────────────────────────────────────────────────────────── */
 function SelectRow({ label, value, original, onChange, options, placeholder }: {
   label: string; value: string; original: string
   onChange: (v: string) => void
@@ -70,18 +91,42 @@ function SelectRow({ label, value, original, onChange, options, placeholder }: {
 }): JSX.Element {
   const changed = value !== original
   return (
-    <div className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${changed ? 'bg-accent/5' : 'hover:bg-surface-overlay/50'}`}>
-      <span className="w-28 shrink-0 text-[11px] font-semibold text-text-muted/60 uppercase tracking-wider select-none">{label}</span>
-      <div className="flex-1 relative">
+    <div className={`group grid grid-cols-[84px_1fr] gap-x-3 items-baseline px-4 py-[7px] border-l-2 transition-all
+      ${changed ? 'border-accent/70 bg-accent/[0.025]' : 'border-transparent hover:bg-white/[0.015]'}`}>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted/40 select-none truncate pt-px">
+        {label}
+      </span>
+      <div className="flex items-center gap-2 min-w-0">
         <select
           value={value} onChange={e => onChange(e.target.value)}
-          className={`w-full bg-transparent text-sm focus:outline-none py-1 border-b transition-colors appearance-none cursor-pointer ${changed ? 'text-text-primary border-accent/50' : 'text-text-muted border-transparent focus:border-[var(--border)]'}`}
+          className="flex-1 bg-transparent text-sm text-text-primary focus:outline-none appearance-none cursor-pointer min-w-0 placeholder:text-text-muted/25"
         >
           <option value="">{placeholder || '—'}</option>
           {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
-        {changed && <span className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-accent pointer-events-none" />}
+        {changed && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-accent/80" />}
       </div>
+    </div>
+  )
+}
+
+/* ── Textarea row ───────────────────────────────────────────────────────────── */
+function TextareaRow({ label, value, original, onChange, rows = 3, placeholder, mono = false }: {
+  label: string; value: string; original: string
+  onChange: (v: string) => void; rows?: number; placeholder?: string; mono?: boolean
+}): JSX.Element {
+  const changed = value !== original && !(value === '' && original === '')
+  return (
+    <div className={`group border-l-2 transition-all px-4 py-2 ${changed ? 'border-accent/70 bg-accent/[0.025]' : 'border-transparent'}`}>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted/40 select-none">{label}</span>
+        {changed && <span className="w-1.5 h-1.5 rounded-full bg-accent/80" />}
+      </div>
+      <textarea
+        rows={rows} value={value} onChange={e => onChange(e.target.value)}
+        placeholder={placeholder || '—'}
+        className={`w-full bg-surface-overlay/40 rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted/25 border transition-colors ${changed ? 'border-accent/20' : 'border-[var(--border)]/60'} ${mono ? 'font-mono' : ''}`}
+      />
     </div>
   )
 }
@@ -103,7 +148,6 @@ export default function EditorPage(): JSX.Element {
   const [loading, setLoading] = useState(false)
   const [eras,    setEras]    = useState<JWApiEra[]>([])
 
-  // form fields
   const [name,     setName]     = useState('')
   const [artists,  setArtists]  = useState('')
   const [album,    setAlbum]    = useState('')
@@ -177,7 +221,6 @@ export default function EditorPage(): JSX.Element {
     } catch {} finally { setLoading(false) }
   }, [populate])
 
-  // load eras
   useEffect(() => {
     if (!isEditor) return
     apiFetch<JWApiEra[] | { results: JWApiEra[] }>('/eras/')
@@ -185,7 +228,6 @@ export default function EditorPage(): JSX.Element {
       .catch(() => undefined)
   }, [isEditor])
 
-  // pending song from context menu → load it
   useEffect(() => {
     if (!pendingEditorSongId || !isEditor) return
     const id = pendingEditorSongId
@@ -193,7 +235,6 @@ export default function EditorPage(): JSX.Element {
     loadSong(id)
   }, [pendingEditorSongId, isEditor, setPendingEditorSongId, loadSong])
 
-  // auto-load from now playing if nothing loaded yet
   useEffect(() => {
     if (!isEditor || song || pendingEditorSongId) return
     if (!currentTrack) return
@@ -201,7 +242,6 @@ export default function EditorPage(): JSX.Element {
     if (id) loadSong(id)
   }, [isEditor, song, currentTrack, pendingEditorSongId, loadSong])
 
-  // application status for non-editors
   useEffect(() => {
     if (!account || isEditor) { setApplication(null); return }
     setAppLoading(true)
@@ -211,7 +251,6 @@ export default function EditorPage(): JSX.Element {
       .finally(() => setAppLoading(false))
   }, [account, isEditor])
 
-  // build current form state
   const current: Record<string, unknown> = {
     name, credited_artists: artists, album, category: cat,
     era_id: eraId ? Number(eraId) : '',
@@ -221,9 +260,9 @@ export default function EditorPage(): JSX.Element {
     lyrics, synced_lyrics: synced,
     additional_information: addInfo, notes,
   }
-  const patch         = diff(baseline(song), current)
-  const changedCount  = Object.keys(patch).length
-  const base          = baseline(song)
+  const patch        = diff(baseline(song), current)
+  const changedCount = Object.keys(patch).length
+  const base         = baseline(song)
 
   const submit = async (): Promise<void> => {
     if (!song || changedCount === 0) return
@@ -246,18 +285,18 @@ export default function EditorPage(): JSX.Element {
     }
   }
 
-  /* ── Guards ─────────────────────────────────────────────────────────────── */
+  /* ── Guards ──────────────────────────────────────────────────────────────── */
   if (!account) return (
     <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center">
-        <LogIn size={24} className="text-accent" />
+      <div className="w-16 h-16 rounded-2xl bg-surface-overlay border border-[var(--border)] flex items-center justify-center">
+        <LogIn size={24} className="text-text-muted" />
       </div>
-      <div>
-        <p className="text-text-primary font-bold text-lg">Log in to contribute</p>
-        <p className="text-text-muted text-sm max-w-xs mt-1.5">Editors propose corrections to song entries.</p>
+      <div className="space-y-1.5">
+        <p className="text-text-primary font-bold text-base">Log in to contribute</p>
+        <p className="text-text-muted text-sm max-w-[220px]">Editors propose corrections to song entries.</p>
       </div>
       <button onClick={() => setShowUserAuth(true)}
-        className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-semibold transition-colors">
+        className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-semibold transition-colors shadow-lg">
         <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.002.022.015.043.03.06a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 13.978 13.978 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
         Continue with Discord
       </button>
@@ -276,127 +315,178 @@ export default function EditorPage(): JSX.Element {
     <div className="flex-1 flex flex-col min-h-0">
 
       {/* Top bar */}
-      <div className="px-4 py-3 shrink-0 flex items-center gap-2 border-b border-[var(--border)]">
-        <span className="text-text-primary font-bold text-sm flex-1">Edit song</span>
-        <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${isAdmin ? 'bg-accent/20 text-accent' : 'bg-emerald-500/20 text-emerald-400'}`}>
+      <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-[var(--border)]">
+        <span className="flex-1 font-bold text-sm text-text-primary">Edit song</span>
+        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${isAdmin ? 'bg-accent/20 text-accent' : 'bg-emerald-500/20 text-emerald-400'}`}>
           {isAdmin ? 'admin' : 'editor'}
         </span>
-        <span className="text-text-muted text-xs">{account.display_name || account.discord_username}</span>
-        <button onClick={() => logoutAccount()} className="text-text-muted/60 hover:text-text-muted text-xs transition-colors">·&nbsp;out</button>
+        <span className="text-text-muted/60 text-xs truncate max-w-[90px]">{account.display_name || account.discord_username}</span>
+        <button onClick={() => logoutAccount()} className="text-text-muted/40 hover:text-text-muted text-xs transition-colors">out</button>
       </div>
 
       {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto flex flex-col pb-36">
+      <div className="flex-1 overflow-y-auto min-h-0">
 
-        {/* Song card / empty state */}
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 size={20} className="animate-spin text-text-muted" />
+          <div className="flex items-center justify-center h-40">
+            <Loader2 size={18} className="animate-spin text-text-muted" />
           </div>
         ) : !song ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16 px-6 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-surface-overlay flex items-center justify-center">
-              <Music2 size={20} className="text-text-muted" />
+          <div className="flex flex-col items-center justify-center gap-3 h-64 px-6 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-surface-overlay border border-[var(--border)] flex items-center justify-center">
+              <FileText size={18} className="text-text-muted/50" />
             </div>
-            <p className="text-text-muted text-sm">Play a song to start editing</p>
-            <p className="text-text-muted/50 text-xs">Or open the edit option from a song's context menu</p>
+            <div className="space-y-1">
+              <p className="text-text-primary text-sm font-medium">No song selected</p>
+              <p className="text-text-muted/50 text-xs leading-relaxed">Play a song to start editing,<br/>or use the context menu.</p>
+            </div>
           </div>
         ) : (
           <>
-            {/* Song header */}
-            <div className="flex items-center gap-3 px-4 py-4 border-b border-[var(--border)]">
-              {song.image_url
-                ? <img src={buildImageUrl(song.image_url)} alt="" className="w-11 h-11 rounded-lg object-cover shrink-0" />
-                : <div className="w-11 h-11 rounded-lg bg-surface-overlay flex items-center justify-center shrink-0"><Music2 size={16} className="text-text-muted" /></div>
-              }
-              <div className="min-w-0 flex-1">
-                <p className="text-text-primary font-semibold text-sm truncate">{song.track_titles?.[0] || song.name}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${CAT_DOT[song.category] || 'bg-text-muted'}`} />
-                  <span className="text-text-muted text-xs">{CATEGORY_LABELS[song.category] || song.category}</span>
-                  {song.era?.name && <><span className="text-text-muted/30">·</span><span className="text-text-muted text-xs">{song.era.name}</span></>}
-                  <span className="text-text-muted/30">·</span>
-                  <span className="text-text-muted/50 text-xs">#{song.id}</span>
+            {/* ── Song header with blurred art ── */}
+            <div className="relative overflow-hidden shrink-0">
+              {song.image_url && (
+                <img
+                  src={buildImageUrl(song.image_url)} alt=""
+                  className="absolute inset-0 w-full h-full object-cover scale-150 blur-3xl opacity-[0.18] pointer-events-none select-none"
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-surface/50 to-surface pointer-events-none" />
+              <div className="relative flex items-end gap-3.5 px-4 pt-7 pb-4">
+                {song.image_url
+                  ? <img src={buildImageUrl(song.image_url)} alt=""
+                      className="w-[60px] h-[60px] rounded-xl object-cover shadow-xl shrink-0 ring-1 ring-white/10" />
+                  : <div className="w-[60px] h-[60px] rounded-xl bg-surface-overlay border border-[var(--border)] flex items-center justify-center shrink-0">
+                      <Music2 size={22} className="text-text-muted" />
+                    </div>
+                }
+                <div className="min-w-0 flex-1 pb-0.5">
+                  <p className="text-text-primary font-bold text-[15px] leading-snug truncate">
+                    {song.track_titles?.[0] || song.name}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${CAT_BADGE[song.category] || 'bg-surface-overlay text-text-muted'}`}>
+                      {CATEGORY_LABELS[song.category] || song.category}
+                    </span>
+                    {song.era?.name && (
+                      <span className="text-text-muted/60 text-[11px] truncate">{song.era.name}</span>
+                    )}
+                    <span className="text-text-muted/25 text-[11px]">#{song.id}</span>
+                  </div>
                 </div>
+                <button
+                  onClick={() => setSong(null)}
+                  className="p-1.5 rounded-lg text-text-muted/30 hover:text-text-muted hover:bg-white/10 transition-colors shrink-0 mb-0.5">
+                  <X size={14} />
+                </button>
               </div>
-              <button onClick={() => { setSong(null) }}
-                className="p-1.5 rounded-lg text-text-muted/40 hover:text-text-muted hover:bg-surface-overlay transition-colors shrink-0">
-                <X size={14} />
-              </button>
             </div>
 
-            {/* Fields */}
-            <div className="divide-y divide-[var(--border)]/40">
-              <Row label="Title"    value={name}    original={String(base.name || '')}    onChange={setName} />
-              <Row label="Artists"  value={artists} original={String(base.credited_artists || '')} onChange={setArtists} />
-              <Row label="Album"    value={album}   original={String(base.album || '')}   onChange={setAlbum} />
-              <SelectRow label="Category" value={cat} original={String(base.category || '')} onChange={setCat} options={CATEGORIES} />
-              <SelectRow label="Era" value={eraId} original={song.era?.id ? String(song.era.id) : ''} onChange={setEraId}
-                options={eras.map(e => ({ value: String(e.id), label: e.name }))}
-                placeholder={song.era?.name || '—'} />
-              <Row label="Producers"  value={prod}    original={String(base.producers || '')}            onChange={setProd} />
-              <Row label="Rec. date"  value={recDate} original={String(base.record_dates || '')}         onChange={setRecDate} placeholder="YYYY-MM-DD" />
-              <Row label="Rel. date"  value={relDate} original={String(base.release_date || '')}         onChange={setRelDate} placeholder="YYYY-MM-DD" />
+            {/* ── Field sections ── */}
+            <div className="pb-4">
 
-              {/* More fields toggle */}
-              <button onClick={() => setShowMore(v => !v)}
-                className="w-full flex items-center gap-2 px-4 py-2 text-[11px] text-text-muted/50 hover:text-text-muted transition-colors">
-                {showMore ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              {/* IDENTITY */}
+              <SectionLabel label="Identity" />
+              <FieldRow label="Title"   value={name}    original={String(base.name || '')}    onChange={setName} />
+              <FieldRow label="Artists" value={artists} original={String(base.credited_artists || '')} onChange={setArtists} />
+              <FieldRow label="Album"   value={album}   original={String(base.album || '')}   onChange={setAlbum} />
+
+              {/* CLASSIFICATION */}
+              <SectionLabel label="Classification" />
+
+              {/* Category pills */}
+              <div className={`border-l-2 transition-all px-4 py-2 ${cat !== String(base.category || '') ? 'border-accent/70 bg-accent/[0.025]' : 'border-transparent'}`}>
+                <div className="grid grid-cols-[84px_1fr] gap-x-3 items-start">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted/40 select-none pt-1">Category</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {CATEGORIES.map(c => (
+                      <button key={c.value} onClick={() => setCat(c.value)}
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all ${
+                          cat === c.value
+                            ? CAT_PILL[c.value] || 'bg-accent text-white'
+                            : 'bg-surface-overlay text-text-muted hover:text-text-primary border border-[var(--border)]'
+                        }`}>
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <SelectRow
+                label="Era" value={eraId} original={song.era?.id ? String(song.era.id) : ''}
+                onChange={setEraId}
+                options={eras.map(e => ({ value: String(e.id), label: e.name }))}
+                placeholder={song.era?.name || '—'}
+              />
+
+              {/* CREDITS */}
+              <SectionLabel label="Credits" />
+              <FieldRow label="Producers" value={prod}    original={String(base.producers || '')} onChange={setProd} />
+
+              {/* DATES */}
+              <SectionLabel label="Dates" />
+              <FieldRow label="Recorded"  value={recDate} original={String(base.record_dates || '')}  onChange={setRecDate} placeholder="YYYY-MM-DD" />
+              <FieldRow label="Released"  value={relDate} original={String(base.release_date || '')}  onChange={setRelDate} placeholder="YYYY-MM-DD" />
+
+              {/* More fields */}
+              <button
+                onClick={() => setShowMore(v => !v)}
+                className="flex items-center gap-1.5 w-full px-4 pt-4 pb-1 text-[11px] text-text-muted/40 hover:text-text-muted/70 transition-colors select-none">
+                {showMore ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                 {showMore ? 'Fewer fields' : 'More fields'}
               </button>
 
               {showMore && (
                 <>
-                  <Row label="Engineers" value={eng}  original={String(base.engineers || '')}             onChange={setEng} />
-                  <Row label="Location"  value={loc}   original={String(base.recording_locations || '')}  onChange={setLoc} placeholder="Studio / city" />
-                  <Row label="Leak type" value={leak}  original={String(base.leak_type || '')}             onChange={setLeak} placeholder="HQ, LQ, snippet…" />
-                  <div className={`px-4 py-2.5 transition-colors ${addInfo !== String(base.additional_information || '') ? 'bg-accent/5' : ''}`}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[11px] font-semibold text-text-muted/60 uppercase tracking-wider">Add. info</span>
-                      {addInfo !== String(base.additional_information || '') && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
-                    </div>
-                    <textarea rows={3} value={addInfo} onChange={e => setAddInfo(e.target.value)}
-                      placeholder="—"
-                      className="w-full bg-transparent text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted/30" />
-                  </div>
-                  <div className={`px-4 py-2.5 transition-colors ${notes !== String(base.notes || '') ? 'bg-accent/5' : ''}`}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[11px] font-semibold text-text-muted/60 uppercase tracking-wider">Notes</span>
-                      {notes !== String(base.notes || '') && <span className="w-1.5 h-1.5 rounded-full bg-accent" />}
-                    </div>
-                    <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)}
-                      placeholder="—"
-                      className="w-full bg-transparent text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted/30" />
+                  <FieldRow label="Engineers" value={eng}    original={String(base.engineers || '')}             onChange={setEng} />
+                  <FieldRow label="Location"  value={loc}    original={String(base.recording_locations || '')}   onChange={setLoc} placeholder="Studio / city" />
+                  <FieldRow label="Leak type" value={leak}   original={String(base.leak_type || '')}             onChange={setLeak} placeholder="HQ, LQ, snippet…" />
+                  <div className="pt-2 space-y-2">
+                    <TextareaRow label="Add. info" value={addInfo} original={String(base.additional_information || '')} onChange={setAddInfo} rows={3} />
+                    <TextareaRow label="Notes"     value={notes}   original={String(base.notes || '')}                  onChange={setNotes}   rows={2} />
                   </div>
                 </>
               )}
-            </div>
 
-            {/* Lyrics section */}
-            <div className="mt-2 border-t border-[var(--border)]">
-              {/* Tab toggle */}
-              <div className="flex items-center gap-1 px-4 pt-3 pb-2">
-                {(['lyrics', 'synced'] as LyricsTab[]).map(tab => (
-                  <button key={tab} onClick={() => setLyricsTab(tab)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${lyricsTab === tab ? 'bg-surface-overlay text-text-primary' : 'text-text-muted hover:text-text-primary'}`}>
-                    {tab === 'lyrics' ? 'Lyrics' : 'Synced lyrics'}
-                    {tab === 'lyrics' && lyrics !== String(base.lyrics || '') && <span className="ml-1.5 w-1 h-1 rounded-full bg-accent inline-block" />}
-                    {tab === 'synced' && synced && <span className="ml-1.5 w-1 h-1 rounded-full bg-accent inline-block" />}
-                  </button>
-                ))}
+              {/* LYRICS */}
+              <SectionLabel label="Lyrics" />
+
+              {/* Tab pills */}
+              <div className="flex items-center gap-1 px-4 pb-2">
+                {(['lyrics', 'synced'] as LyricsTab[]).map(tab => {
+                  const active = lyricsTab === tab
+                  const dirty = tab === 'lyrics'
+                    ? lyrics !== String(base.lyrics || '')
+                    : !!synced
+                  return (
+                    <button key={tab} onClick={() => setLyricsTab(tab)}
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                        active ? 'bg-surface-overlay text-text-primary' : 'text-text-muted/60 hover:text-text-muted'
+                      }`}>
+                      {tab === 'lyrics' ? 'Lyrics' : 'Synced'}
+                      {dirty && <span className="w-1 h-1 rounded-full bg-accent inline-block" />}
+                    </button>
+                  )
+                })}
               </div>
-              <div className="px-4 pb-4">
+
+              <div className="px-4">
                 {lyricsTab === 'lyrics' ? (
                   <textarea
-                    rows={14} value={lyrics} onChange={e => setLyrics(e.target.value)}
+                    rows={15} value={lyrics} onChange={e => setLyrics(e.target.value)}
                     placeholder="Full lyrics…"
-                    className={`w-full bg-surface-overlay/50 rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted/30 border transition-colors ${lyrics !== String(base.lyrics || '') ? 'border-accent/30' : 'border-[var(--border)]'}`}
+                    className={`w-full bg-surface-overlay/40 rounded-xl px-3.5 py-3 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted/25 border transition-colors leading-relaxed ${
+                      lyrics !== String(base.lyrics || '') ? 'border-accent/30' : 'border-[var(--border)]/60'
+                    }`}
                   />
                 ) : (
                   <textarea
-                    rows={14} value={synced} onChange={e => setSynced(e.target.value)}
+                    rows={15} value={synced} onChange={e => setSynced(e.target.value)}
                     placeholder={"[00:00.00] Line one\n[00:05.20] Line two\n…"}
-                    className={`w-full bg-surface-overlay/50 rounded-xl px-3 py-2.5 text-sm font-mono text-text-primary focus:outline-none resize-none placeholder:text-text-muted/30 border transition-colors ${synced ? 'border-accent/30' : 'border-[var(--border)]'}`}
+                    className={`w-full bg-surface-overlay/40 rounded-xl px-3.5 py-3 text-sm font-mono text-text-primary focus:outline-none resize-none placeholder:text-text-muted/25 border transition-colors ${
+                      synced ? 'border-accent/30' : 'border-[var(--border)]/60'
+                    }`}
                   />
                 )}
               </div>
@@ -405,35 +495,36 @@ export default function EditorPage(): JSX.Element {
         )}
       </div>
 
-      {/* Sticky submit footer */}
+      {/* ── Sticky footer ── */}
       {song && (
-        <div className="absolute bottom-0 left-0 right-0 border-t border-[var(--border)] bg-surface/95 backdrop-blur px-4 py-3 space-y-2.5">
+        <div className="shrink-0 border-t border-[var(--border)] bg-surface/90 backdrop-blur-sm px-4 py-3 space-y-2.5">
           <input
             value={edNotes} onChange={e => setEdNotes(e.target.value)}
-            placeholder="Editor notes for the reviewer…"
-            className="w-full bg-surface-overlay border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-text-primary placeholder:text-text-muted/40 focus:outline-none focus:border-accent/40 transition-colors"
+            placeholder="Editor notes…"
+            className="w-full bg-surface-overlay/60 border border-[var(--border)]/60 rounded-xl px-3 py-2 text-xs text-text-primary placeholder:text-text-muted/30 focus:outline-none focus:border-accent/40 transition-colors"
           />
           {submitError && (
             <div className="flex items-center gap-2 text-red-400 text-xs">
-              <AlertCircle size={12} /> {submitError}
+              <AlertCircle size={12} className="shrink-0" /> {submitError}
             </div>
           )}
           <div className="flex items-center gap-2.5">
-            <span className={`text-xs font-semibold tabular-nums ${changedCount > 0 ? 'text-accent' : 'text-text-muted/40'}`}>
-              {changedCount} change{changedCount !== 1 ? 's' : ''}
+            <span className={`text-xs font-bold tabular-nums min-w-[60px] ${changedCount > 0 ? 'text-accent' : 'text-text-muted/30'}`}>
+              {changedCount} field{changedCount !== 1 ? 's' : ''}
             </span>
-            <button onClick={submit}
+            <button
+              onClick={submit}
               disabled={submitState === 'submitting' || submitState === 'submitted' || changedCount === 0}
-              className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                 submitState === 'submitted' ? 'bg-emerald-500/20 text-emerald-400' :
                 submitState === 'error'     ? 'bg-red-500/20 text-red-400' :
-                changedCount === 0          ? 'bg-surface-overlay text-text-muted cursor-not-allowed' :
-                'bg-accent text-white hover:bg-accent/90'
+                changedCount === 0          ? 'bg-surface-overlay text-text-muted/30 cursor-not-allowed' :
+                'bg-accent text-white hover:bg-accent/90 shadow-lg shadow-accent/20'
               }`}>
-              {submitState === 'submitting' && <Loader2 size={13} className="animate-spin" />}
-              {submitState === 'submitted'  && <Check size={13} />}
-              {submitState === 'error'      && <AlertCircle size={13} />}
-              {submitState === 'idle' && 'Submit proposal'}
+              {submitState === 'submitting' && <Loader2 size={12} className="animate-spin" />}
+              {submitState === 'submitted'  && <Check size={12} />}
+              {submitState === 'error'      && <AlertCircle size={12} />}
+              {submitState === 'idle'       && 'Submit proposal'}
               {submitState === 'submitting' && 'Submitting…'}
               {submitState === 'submitted'  && 'Submitted!'}
               {submitState === 'error'      && 'Try again'}
@@ -473,45 +564,44 @@ function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
 
   if (application?.status === 'pending') return (
     <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
-      <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
-        <Clock size={20} className="text-yellow-400" />
+      <div className="w-14 h-14 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
+        <Clock size={22} className="text-yellow-400" />
       </div>
-      <div>
+      <div className="space-y-1.5">
         <p className="text-text-primary font-bold">Application pending</p>
-        <p className="text-text-muted text-sm mt-1 max-w-xs">Your application is under review. You'll be notified on Discord.</p>
+        <p className="text-text-muted text-sm max-w-[220px] leading-relaxed">Your application is under review. You'll be notified on Discord.</p>
       </div>
-      <button onClick={onSignOut} className="text-xs text-text-muted hover:text-text-primary transition-colors">Sign out</button>
+      <button onClick={onSignOut} className="text-xs text-text-muted/50 hover:text-text-muted transition-colors mt-1">Sign out</button>
     </div>
   )
 
   if (application?.status === 'rejected') return (
     <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
-      <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-        <X size={20} className="text-red-400" />
+      <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+        <X size={22} className="text-red-400" />
       </div>
-      <div>
+      <div className="space-y-1.5">
         <p className="text-text-primary font-bold">Not approved</p>
-        {application.review_notes && <p className="text-text-muted text-sm mt-1.5 max-w-xs italic">"{application.review_notes}"</p>}
+        {application.review_notes && <p className="text-text-muted text-sm max-w-[220px] italic leading-relaxed">"{application.review_notes}"</p>}
       </div>
-      <button onClick={onSignOut} className="text-xs text-text-muted hover:text-text-primary transition-colors">Sign out</button>
+      <button onClick={onSignOut} className="text-xs text-text-muted/50 hover:text-text-muted transition-colors mt-1">Sign out</button>
     </div>
   )
 
-  // Application form
-  const Field = ({ label, value, onChange, rows, placeholder, hint }: {
+  const AppField = ({ label, value, onChange, rows, placeholder, hint }: {
     label: string; value: string; onChange: (v: string) => void
     rows?: number; placeholder?: string; hint?: string
   }): JSX.Element => (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <label className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{label}</label>
-        {hint && <span className="text-[10px] text-text-muted/50">{hint}</span>}
+        <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted/50">{label}</label>
+        {hint && <span className="text-[10px] text-text-muted/35">{hint}</span>}
       </div>
       {(rows ?? 1) > 1
         ? <textarea rows={rows} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-            className="w-full bg-surface-overlay border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/50 resize-none placeholder:text-text-muted/40 transition-colors" />
+            className="w-full bg-surface-overlay/60 border border-[var(--border)]/60 rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/40 resize-none placeholder:text-text-muted/30 transition-colors" />
         : <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-            className="w-full bg-surface-overlay border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/50 placeholder:text-text-muted/40 transition-colors" />
+            className="w-full bg-surface-overlay/60 border border-[var(--border)]/60 rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/40 placeholder:text-text-muted/30 transition-colors" />
       }
     </div>
   )
@@ -519,22 +609,21 @@ function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       <div className="px-4 pt-5 pb-4 shrink-0 border-b border-[var(--border)] flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0">
-          <Award size={16} className="text-accent" />
+        <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center shrink-0">
+          <Award size={18} className="text-accent" />
         </div>
         <div>
           <p className="text-text-primary font-bold text-sm">Become an editor</p>
-          <p className="text-text-muted text-xs mt-0.5">Propose corrections. Admins review and apply them.</p>
+          <p className="text-text-muted/60 text-xs mt-0.5">Propose corrections. Admins review and apply them.</p>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
-        <Field label="Display name" value={displayName} onChange={setDisplayName} placeholder="How you want to be credited" />
-        <Field label="Contact" value={contact} onChange={setContact} placeholder="Discord, email…" />
-        <Field label="Areas of focus" value={areas} onChange={setAreas} placeholder="Lyrics, sessions, recording dates…" />
-        <Field label="Relevant experience" value={experience} onChange={setExperience} rows={3}
+        <AppField label="Display name"      value={displayName} onChange={setDisplayName} placeholder="How you want to be credited" />
+        <AppField label="Contact"           value={contact}     onChange={setContact}     placeholder="Discord, email…" />
+        <AppField label="Areas of focus"    value={areas}       onChange={setAreas}       placeholder="Lyrics, sessions, recording dates…" />
+        <AppField label="Experience"        value={experience}  onChange={setExperience}  rows={3}
           placeholder="Other databases you've contributed to, sources you have access to…" />
-        <Field label="Motivation" value={motivation} onChange={setMotivation} rows={4}
-          hint="min. 20 chars"
+        <AppField label="Motivation"        value={motivation}  onChange={setMotivation}  rows={4} hint="min. 20 chars"
           placeholder="Why do you want to be an editor and what can you contribute?" />
         {error && (
           <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
@@ -542,11 +631,11 @@ function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
           </div>
         )}
         <button onClick={submit} disabled={submitting}
-          className="w-full py-2.5 rounded-xl bg-accent text-white hover:bg-accent/90 text-sm font-bold transition-colors flex items-center justify-center gap-2">
+          className="w-full py-2.5 rounded-xl bg-accent text-white hover:bg-accent/90 text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-accent/20">
           {submitting && <Loader2 size={14} className="animate-spin" />}
           Submit application
         </button>
-        <button onClick={onSignOut} className="w-full text-xs text-text-muted hover:text-text-primary transition-colors py-1">Sign out</button>
+        <button onClick={onSignOut} className="w-full text-xs text-text-muted/40 hover:text-text-muted transition-colors py-1">Sign out</button>
       </div>
     </div>
   )
