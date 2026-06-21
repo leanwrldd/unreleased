@@ -275,7 +275,7 @@ export default function AdminPage(): JSX.Element {
               className={`relative flex items-center gap-1.5 px-4 py-3 text-[12px] font-medium transition-colors border-b-2 ${
                 tab === n.id
                   ? 'text-accent border-accent'
-                  : 'text-text-muted/60 hover:text-text-muted border-transparent'
+                  : 'text-text-muted hover:text-text-primary border-transparent'
               }`}>
               <span className={tab === n.id ? 'text-accent' : ''}>{n.icon}</span>
               {n.label}
@@ -391,10 +391,10 @@ function ProposalsTab({ proposals, status, setStatus, onChanged }: {
                     </span>
                   )}
                 </div>
-                <p className={`text-[12px] font-semibold truncate leading-snug mb-0.5 ${isActive ? 'text-text-primary' : 'text-text-primary/80'}`}>
+                <p className={`text-[12px] font-semibold truncate leading-snug mb-0.5 text-text-primary`}>
                   {item.title || `Proposal #${item.id}`}
                 </p>
-                <p className="text-[10px] text-text-muted/50 truncate">
+                <p className="text-[10px] text-text-muted truncate">
                   {item.editor_username} · {relativeTime(item.created_at)}
                 </p>
               </button>
@@ -531,11 +531,11 @@ function ApplicationsTab({ applications, onChanged }: { applications: EditorAppl
           {applications.length === 0 && <Empty label="No applications" />}
           {pending.map(item => (
             <button key={item.id} onClick={() => setSelected(item)}
-              className={`w-full text-left px-3 py-3 border-b border-[var(--border)] border-l-2 border-l-amber-500/60 transition-colors ${selected?.id === item.id ? 'bg-accent/8' : 'hover:bg-surface-raised/40'}`}>
+              className={`w-full text-left px-3 py-3 border-b border-[var(--border)] border-l-2 border-l-amber-500/60 transition-colors text-text-primary ${selected?.id === item.id ? 'bg-accent/8' : 'hover:bg-surface-raised/40'}`}>
               <div className="flex items-center gap-2.5">
                 <Avatar src={item.discord_avatar} name={item.display_name || item.username} size={8} />
                 <div className="min-w-0 flex-1">
-                  <p className="text-text-primary/90 text-xs font-semibold truncate">{item.display_name || item.username}</p>
+                  <p className="text-text-primary text-xs font-semibold truncate">{item.display_name || item.username}</p>
                   <p className="text-text-muted/50 text-[10px] truncate">{item.discord_username} · {relativeTime(item.created_at)}</p>
                 </div>
               </div>
@@ -549,11 +549,11 @@ function ApplicationsTab({ applications, onChanged }: { applications: EditorAppl
           )}
           {reviewed.map(item => (
             <button key={item.id} onClick={() => setSelected(item)}
-              className={`w-full text-left px-3 py-3 border-b border-[var(--border)] border-l-2 ${STATUS_STYLE[item.status]?.border ?? 'border-l-transparent'} transition-colors opacity-60 ${selected?.id === item.id ? 'bg-accent/8 opacity-100' : 'hover:bg-surface-raised/40'}`}>
+              className={`w-full text-left px-3 py-3 border-b border-[var(--border)] border-l-2 ${STATUS_STYLE[item.status]?.border ?? 'border-l-transparent'} transition-colors text-text-primary opacity-60 ${selected?.id === item.id ? 'bg-accent/8 opacity-100' : 'hover:bg-surface-raised/40'}`}>
               <div className="flex items-center gap-2.5">
                 <Avatar src={item.discord_avatar} name={item.display_name || item.username} size={7} />
                 <div className="min-w-0 flex-1">
-                  <p className="text-text-primary/80 text-xs font-medium truncate">{item.display_name || item.username}</p>
+                  <p className="text-text-primary text-xs font-medium truncate">{item.display_name || item.username}</p>
                   <p className="text-text-muted/40 text-[10px]">{item.status} · {shortDate(item.reviewed_at)}</p>
                 </div>
               </div>
