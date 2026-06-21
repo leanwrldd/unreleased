@@ -209,7 +209,7 @@ export default function SyncedLyricsPage(): JSX.Element {
         {!syncedLyricsSongId && (
           <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-surface-overlay border border-[var(--border)] text-text-muted text-sm">
             <Music2 size={15} className="shrink-0 opacity-60" />
-            Open a song in the Editor first, then click <strong className="text-text-primary">＋ New</strong> in the Synced tab.
+            Open a song in the Editor first, then click <strong className="text-text-primary">+ New</strong> in the Synced tab.
           </div>
         )}
 
