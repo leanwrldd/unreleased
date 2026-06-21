@@ -947,7 +947,7 @@ export default function PlaylistsView(): JSX.Element {
                 {covers[p.id] === undefined ? (
                   <div className="w-full h-full bg-surface-raised animate-pulse" />
                 ) : covers[p.id] ? (
-                  <img src={covers[p.id]!} alt={p.name} className="w-full h-full object-cover" />
+                  <img src={covers[p.id]!} alt={p.name} className="w-full h-full object-cover" onError={() => setCovers(prev => ({ ...prev, [p.id]: null }))} />
                 ) : (() => {
                   const imgs = mosaicImages[p.id] ?? []
                   if (imgs.length >= 4) return (
