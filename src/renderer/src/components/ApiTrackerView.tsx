@@ -558,7 +558,7 @@ export default function ApiTrackerView(): JSX.Element {
     playTrack, addToQueue, account,
     apiTrackerCategory, setApiTrackerCategory,
     apiTrackerEra, setApiTrackerEra,
-    setActiveView, setApiFilesPath,
+    setActiveView, setApiFilesPath, setPendingEditorSongId,
   } = useStore()
 
   const canEdit = !!(account?.is_editor || account?.is_administrator)
@@ -1003,7 +1003,7 @@ export default function ApiTrackerView(): JSX.Element {
           onInfo={() => handleInfo(contextMenu.song)}
           onQueue={() => handleQueue(songToTrack(contextMenu.song))}
           onShowInFiles={() => handleShowInFiles(contextMenu.song)}
-          onEdit={() => setActiveView('editor')}
+          onEdit={() => { setPendingEditorSongId(contextMenu.song.id); setActiveView('editor') }}
           canEdit={canEdit}
           onTogglePlaylists={() => setContextMenu((prev) => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null)}
         />

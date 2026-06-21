@@ -3,7 +3,7 @@ import {
   ListMusic, Play, Loader2, Plus, Trash2, Pencil, ArrowLeft,
   X, Check, Heart, Shuffle, Music2, Clock, GripVertical,
   ListPlus, Download, Share2, Archive, Info, FolderInput, MoreHorizontal,
-  Search, ChevronUp, ChevronDown, ImageOff,
+  Search, ChevronUp, ChevronDown, ImageOff, Globe, Lock,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
@@ -154,6 +154,7 @@ export default function PlaylistsView(): JSX.Element {
   // Zip / share / bulk-add
   const [zipState, setZipState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [shareCopied, setShareCopied] = useState(false)
+  const [togglingPublic, setTogglingPublic] = useState(false)
   const [addingAll, setAddingAll] = useState(false)
   const [isSharedView, setIsSharedView] = useState(false)
   const [importState, setImportState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
@@ -271,18 +272,19 @@ export default function PlaylistsView(): JSX.Element {
   }, [trackMenu, libMenu, showAddAllMenu])
 
 
-  const loadDetail = useCallback(async (id: number) => {
+  const loadDetail = useCallback(async (id: number, shared = false) => {
     const gen = ++loadGen.current
     setLoadingDetail(true)
     setCoverData(null)
     setCoverLoading(true)
     try {
-      const result = await userApi.getPlaylist(id)
+      const result = shared ? await userApi.getPublicPlaylist(id) : await userApi.getPlaylist(id)
       if (gen !== loadGen.current) return
       setDetail(result)
       setLoadingDetail(false)
       // Load cover separately so tracks render immediately
-      userApi.getPlaylistCover(id).then(c => {
+      const coverFetch = shared ? userApi.getPublicPlaylistCover(id) : userApi.getPlaylistCover(id)
+      coverFetch.then(c => {
         if (gen !== loadGen.current) return
         setCoverImgError(false)
         setCoverData({ cover_image: c.cover_image, cover_image_url: c.cover_image_url })
@@ -296,9 +298,9 @@ export default function PlaylistsView(): JSX.Element {
   }, [])
 
   useEffect(() => {
-    if (selectedId != null) loadDetail(selectedId)
+    if (selectedId != null) loadDetail(selectedId, isSharedView)
     else setDetail(null)
-  }, [selectedId, loadDetail])
+  }, [selectedId, loadDetail, isSharedView])
 
   // Reset sort/search/infoSong/editing when switching playlists
   useEffect(() => {
@@ -440,14 +442,29 @@ export default function PlaylistsView(): JSX.Element {
     setTimeout(() => setZipState('idle'), 3000)
   }, [zipState])
 
-  const handleShare = useCallback(async () => {
-    if (!selectedId) return
+  const handleTogglePublic = useCallback(async () => {
+    if (!selectedId || !detail) return
+    setTogglingPublic(true)
     try {
+      const updated = await userApi.updatePlaylist(selectedId, { is_public: !detail.is_public })
+      setDetail(updated)
+    } catch (e) { console.error('toggle public failed', e) }
+    finally { setTogglingPublic(false) }
+  }, [selectedId, detail])
+
+  const handleShare = useCallback(async () => {
+    if (!selectedId || !detail) return
+    try {
+      // Ensure playlist is public before sharing
+      if (!detail.is_public) {
+        const updated = await userApi.updatePlaylist(selectedId, { is_public: true })
+        setDetail(updated)
+      }
       await navigator.clipboard.writeText(`${window.location.origin}/playlists?id=${selectedId}&view=shared`)
       setShareCopied(true)
       setTimeout(() => setShareCopied(false), 2500)
     } catch {}
-  }, [selectedId])
+  }, [selectedId, detail])
 
   const handleAddAllTo = useCallback(async (targetId: number, srcDetail: PlaylistDetail) => {
     setAddingAll(true)
@@ -685,11 +702,18 @@ export default function PlaylistsView(): JSX.Element {
                   className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${zipState === 'done' ? 'text-accent bg-accent/10' : zipState === 'error' ? 'text-red-400 bg-red-400/10' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
                   {zipState === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <Archive size={16} />}
                 </button>
-                <button onClick={() => handleShare()} disabled={tracks.length === 0}
+                <button onClick={() => handleShare()} disabled={tracks.length === 0 || isSharedView}
                   title={shareCopied ? 'Link copied!' : 'Copy share link'}
                   className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${shareCopied ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
                   {shareCopied ? <Check size={16} /> : <Share2 size={16} />}
                 </button>
+                {!isSharedView && (
+                  <button onClick={handleTogglePublic} disabled={togglingPublic}
+                    title={detail?.is_public ? 'Public — click to make private' : 'Private — click to make public'}
+                    className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${detail?.is_public ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
+                    {togglingPublic ? <Loader2 size={16} className="animate-spin" /> : detail?.is_public ? <Globe size={16} /> : <Lock size={16} />}
+                  </button>
+                )}
                 {!isSharedView && otherPlaylists.length > 0 && tracks.length > 0 && detail && (
                   <div className="relative" ref={addAllMenuRef} onClick={e => e.stopPropagation()}>
                     <button onClick={() => setShowAddAllMenu(v => !v)} title="Add all to playlist" disabled={addingAll}

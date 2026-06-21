@@ -40,6 +40,7 @@ export interface PlaylistSummary {
   name: string
   description: string | null
   track_count: number
+  is_public: boolean
   cover_image_url?: string | null
   cover_image?: string | null
   created_at: string
@@ -57,6 +58,7 @@ export interface PlaylistDetail {
   id: number
   name: string
   description: string | null
+  is_public: boolean
   cover_image_url?: string | null
   cover_image?: string | null
   items: PlaylistItemEntry[]
@@ -244,11 +246,23 @@ export async function renamePlaylist(id: number, name: string): Promise<Playlist
   })
 }
 
-export async function updatePlaylist(id: number, data: { name?: string; description?: string }): Promise<PlaylistDetail> {
+export async function updatePlaylist(id: number, data: { name?: string; description?: string; is_public?: boolean }): Promise<PlaylistDetail> {
   return request(`${LIBRARY_BASE}/playlists/${id}/`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
+}
+
+/** Fetch a public playlist without authentication. */
+export async function getPublicPlaylist(id: number): Promise<PlaylistDetail> {
+  return request<PlaylistDetail>(`${LIBRARY_BASE}/playlists/public/${id}/`)
+}
+
+/** Fetch cover of a public playlist without authentication. */
+export async function getPublicPlaylistCover(id: number): Promise<{ cover_image_url?: string | null; cover_image?: string | null; trackImages: string[] }> {
+  const d = await request<PlaylistDetail>(`${LIBRARY_BASE}/playlists/public/${id}/`)
+  const trackImages = (d.items ?? []).slice(0, 4).map(it => it.song.image_url).filter((u): u is string => !!u)
+  return { cover_image_url: d.cover_image_url, cover_image: d.cover_image, trackImages }
 }
 
 export async function uploadPlaylistCover(id: number, file: File): Promise<PlaylistDetail> {
