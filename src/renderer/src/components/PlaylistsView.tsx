@@ -163,6 +163,9 @@ export default function PlaylistsView(): JSX.Element {
   // Cover upload
   const coverInputRef = useRef<HTMLInputElement>(null)
   const [coverUploading, setCoverUploading] = useState(false)
+  // Cover is fetched separately so tracks render without waiting for it
+  type CoverData = { cover_image?: string | null; cover_image_url?: string | null }
+  const [coverData, setCoverData] = useState<CoverData | null>(null)
   const [coverImgError, setCoverImgError] = useState(false)
 
   // Description editing
@@ -240,10 +243,20 @@ export default function PlaylistsView(): JSX.Element {
   const loadDetail = useCallback(async (id: number) => {
     const gen = ++loadGen.current
     setLoadingDetail(true)
+    setCoverData(null)
     try {
       const result = await userApi.getPlaylist(id)
-      if (gen !== loadGen.current) return   // stale — a newer load is in flight
-      setDetail(result)
+      if (gen !== loadGen.current) return
+      // Set tracks/metadata immediately — strip cover so it doesn't block render
+      const { cover_image, cover_image_url, ...trackData } = result
+      setDetail({ ...trackData, cover_image: null, cover_image_url: null } as typeof result)
+      setLoadingDetail(false)
+      // Load cover in a separate render so the tracklist is already visible
+      setTimeout(() => {
+        if (gen !== loadGen.current) return
+        setCoverImgError(false)
+        setCoverData({ cover_image, cover_image_url })
+      }, 0)
     } catch {
       if (gen === loadGen.current) setDetail(null)
     } finally {
@@ -264,6 +277,7 @@ export default function PlaylistsView(): JSX.Element {
     setEditingDesc(false)
     setDescValue('')
     setCoverImgError(false)
+    setCoverData(null)
   }, [selectedId])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -331,24 +345,27 @@ export default function PlaylistsView(): JSX.Element {
     if (!selectedId || coverUploading) return
     setCoverUploading(true)
     try {
-      await userApi.uploadPlaylistCover(selectedId, file)
-      // Re-fetch the full detail — PATCH response may not echo the new cover_image_url
-      await loadDetail(selectedId)
+      const result = await userApi.uploadPlaylistCover(selectedId, file)
+      // Update cover separately; tracks stay visible
+      setCoverImgError(false)
+      setCoverData({ cover_image: result.cover_image, cover_image_url: result.cover_image_url })
       await refreshPlaylists()
     } catch {}
     setCoverUploading(false)
-  }, [selectedId, coverUploading, loadDetail, refreshPlaylists])
+  }, [selectedId, coverUploading, refreshPlaylists])
 
   const handleRemoveCover = useCallback(async () => {
     if (!selectedId) return
-    // Optimistically clear cover so UI updates immediately
-    setDetail(prev => prev ? { ...prev, cover_image: null, cover_image_url: null } : null)
+    setCoverData(null) // optimistic clear
     try {
       await userApi.removePlaylistCover(selectedId)
-      await loadDetail(selectedId)
       await refreshPlaylists()
-    } catch { await loadDetail(selectedId) }
-  }, [selectedId, loadDetail, refreshPlaylists])
+    } catch {
+      // restore on failure by re-fetching
+      const result = await userApi.getPlaylist(selectedId).catch(() => null)
+      if (result) setCoverData({ cover_image: result.cover_image, cover_image_url: result.cover_image_url })
+    }
+  }, [selectedId, refreshPlaylists])
 
   const saveDescription = useCallback(async () => {
     if (!selectedId) return
@@ -467,8 +484,8 @@ export default function PlaylistsView(): JSX.Element {
 
         {/* ── Hero (shown immediately using summary data) ── */}
         <div className="relative px-6 pb-6 shrink-0">
-          {(playlistCoverUrl(detail ?? {}) ?? tracks[0]?.imageUrl) && (
-            <div className="absolute inset-0 opacity-20 blur-3xl scale-110 pointer-events-none" style={{ background: `url(${playlistCoverUrl(detail ?? {}) ?? tracks[0]?.imageUrl}) center/cover`, zIndex: 0 }} />
+          {(playlistCoverUrl(coverData ?? {}) ?? tracks[0]?.imageUrl) && (
+            <div className="absolute inset-0 opacity-20 blur-3xl scale-110 pointer-events-none" style={{ background: `url(${playlistCoverUrl(coverData ?? {}) ?? tracks[0]?.imageUrl}) center/cover`, zIndex: 0 }} />
           )}
 
           {/* Hidden file input */}
@@ -485,9 +502,9 @@ export default function PlaylistsView(): JSX.Element {
             <div className={`shrink-0 group/cover relative rounded-xl shadow-2xl overflow-hidden ${isSharedView ? "cursor-default" : "cursor-pointer"}`} style={{ width: 180, height: 180 }} onClick={() => !isSharedView && coverInputRef.current?.click()}>
               {loadingDetail && tracks.length === 0 ? (
                 <div className="w-full h-full bg-surface-overlay animate-pulse" />
-              ) : playlistCoverUrl(detail ?? {}) && !coverImgError ? (
+              ) : playlistCoverUrl(coverData ?? {}) && !coverImgError ? (
                 <img
-                  src={playlistCoverUrl(detail ?? {})}
+                  src={playlistCoverUrl(coverData ?? {})}
                   alt=""
                   className="w-full h-full object-cover"
                   onError={() => setCoverImgError(true)}
@@ -507,7 +524,7 @@ export default function PlaylistsView(): JSX.Element {
                 )}
               </div>
               {/* Remove cover button (owner only) */}
-              {!isSharedView && (detail?.cover_image_url || detail?.cover_image) && !coverImgError && (
+              {!isSharedView && (coverData?.cover_image_url || coverData?.cover_image) && !coverImgError && (
                 <button
                   className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/60 text-white opacity-0 group-hover/cover:opacity-100 transition-opacity hover:bg-red-500/80"
                   onClick={e => { e.stopPropagation(); handleRemoveCover() }}
