@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useStore } from './store/useStore'
+import { setToken, getToken } from './lib/userApi'
 import { ViewType } from './types'
 
 function getViewFromPath(pathname: string): ViewType {
@@ -48,6 +49,12 @@ function lightenHex(hex: string, amount: number): string {
 
 export default function App(): JSX.Element {
   const { showNowPlaying, showQueue, showSettings, activeView, theme, accentColor, loadAccount, completeDiscordLogin, showUserAuth, setShowUserAuth } = useStore()
+  // Seed auth token from env in local dev
+  useEffect(() => {
+    const devToken = import.meta.env.VITE_AUTH_TOKEN as string | undefined
+    if (devToken && !getToken()) setToken(devToken)
+  }, [])
+
   // Sync view from URL on mount + handle back/forward
   useEffect(() => {
     const syncFromPath = (): void => {
