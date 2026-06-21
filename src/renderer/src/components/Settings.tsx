@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle, PenLine } from 'lucide-react'
+import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle, PenLine, BookOpen } from 'lucide-react'
 import { useStore } from '../store/useStore'
 
 const ACCENT_PRESETS = [
@@ -252,6 +252,13 @@ export default function Settings(): JSX.Element {
                 Become an Editor
               </button>
             )}
+            <button
+              onClick={() => { setShowSettings(false); setActiveView('docs') }}
+              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] border border-[var(--border)] text-text-secondary text-sm font-medium transition-colors mt-2"
+            >
+              <BookOpen size={15} />
+              API Docs
+            </button>
           </section>
         </div>
       </div>
