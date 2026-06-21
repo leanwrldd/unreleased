@@ -473,6 +473,30 @@ export async function getBadgeCatalog(): Promise<Array<{
   return request(`${ACCOUNT_BASE}/badges/`, { method: 'GET' })
 }
 
+
+/** Fetch the approved synced_lyrics for a song from the proposals system.
+ *  Works for admins (all proposals) and editors (own proposals).
+ *  Returns the string if found, null otherwise.
+ */
+export async function getApprovedSyncedLyrics(songId: number, isAdmin: boolean): Promise<string | null> {
+  try {
+    const base = isAdmin ? `${ACCOUNT_BASE}/admin/proposals/` : `${ACCOUNT_BASE}/editor/proposals/`
+    const url = new URL(base)
+    url.searchParams.set('song', String(songId))
+    url.searchParams.set('status', 'approved')
+    const proposals: SongEditProposal[] = await request(url.toString(), { method: 'GET' })
+    if (!Array.isArray(proposals)) return null
+    // Find the most recent approved proposal that has synced_lyrics in applied_data
+    const sorted = proposals
+      .filter(p => p.status === 'approved' && p.applied_data && 'synced_lyrics' in p.applied_data)
+      .sort((a, b) => new Date(b.reviewed_at || 0).getTime() - new Date(a.reviewed_at || 0).getTime())
+    if (sorted.length === 0) return null
+    const val = sorted[0].applied_data['synced_lyrics']
+    return (typeof val === 'string' && val.length > 0) ? val : null
+  } catch {
+    return null
+  }
+}
 export async function adminListProposals(statusFilter?: ProposalStatus): Promise<SongEditProposal[]> {
   const url = new URL(`${ACCOUNT_BASE}/admin/proposals/`)
   if (statusFilter) url.searchParams.set('status', statusFilter)

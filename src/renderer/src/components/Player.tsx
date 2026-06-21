@@ -24,7 +24,7 @@ import {
 import { useStore } from '../store/useStore'
 import { formatDuration } from '../lib/lyrics'
 import { apiFetch, JWApiSong } from '../lib/juicewrldApi'
-import { trackIdToSongId } from '../lib/userApi'
+import { trackIdToSongId, getApprovedSyncedLyrics} from '../lib/userApi'
 import { FullTrack } from '../types'
 import AddToPlaylistMenu from './AddToPlaylistMenu'
 import SongInfoModal from './SongInfoModal'
@@ -68,8 +68,7 @@ export default function Player(): JSX.Element {
     likedTrackIds,
     toggleLike,
     setActiveView,
-    playNext,
-  } = useStore()
+    playNext, account} = useStore()
 
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false)
@@ -201,12 +200,20 @@ export default function Player(): JSX.Element {
     // Fetch lyrics from API if this is a tracker song (id = "jw-{n}")
     const match = currentTrack.id.match(/^jw-(\d+)$/)
     if (match) {
-      apiFetch<JWApiSong>(`/songs/${match[1]}/`)
-        .then((song) => {
+      const songId = Number(match[1])
+      const isEditor = account?.is_editor || account?.is_administrator
+      const isAdmin = !!account?.is_administrator
+      apiFetch<JWApiSong>(`/songs/${songId}/`)
+        .then(async (song) => {
+          let syncedLyrics = song.synced_lyrics || null
+          // Public API never populates synced_lyrics — fall back to approved proposals
+          if (!syncedLyrics && isEditor) {
+            syncedLyrics = await getApprovedSyncedLyrics(songId, isAdmin)
+          }
           setCurrentTrackFull({
             ...synthetic,
             lyrics: song.lyrics || null,
-            syncedLyrics: song.synced_lyrics || null,
+            syncedLyrics,
           })
         })
         .catch(() => {/* no lyrics — that's fine */})
