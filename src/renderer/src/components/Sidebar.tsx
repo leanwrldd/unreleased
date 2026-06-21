@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { SearchCode, HardDrive, Settings, Archive, ShieldCheck, ListMusic, LogIn, LogOut, ChevronLeft, ChevronRight, ArrowLeft, Radio } from 'lucide-react'
+import { SearchCode, HardDrive, Settings, Archive, ShieldCheck, ListMusic, LogIn, LogOut, ChevronLeft, ChevronRight, ArrowLeft, Radio, Sparkles } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
@@ -26,6 +26,7 @@ export default function Sidebar(): JSX.Element {
     { icon: <Archive size={18} />, label: 'Compilation', view: 'compilation' },
     { icon: <HardDrive size={18} />, label: 'Files', view: 'api-files' },
     { icon: <ListMusic size={18} />, label: 'Playlists', view: 'playlists' },
+    { icon: <Sparkles size={18} />, label: 'WRLD', view: 'wrld' },
   ]
 
   return (
