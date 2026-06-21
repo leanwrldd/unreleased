@@ -49,10 +49,10 @@ function lightenHex(hex: string, amount: number): string {
 
 export default function App(): JSX.Element {
   const { showNowPlaying, showQueue, showSettings, activeView, theme, accentColor, loadAccount, completeDiscordLogin, showUserAuth, setShowUserAuth } = useStore()
-  // Seed auth token from env in local dev
+  // Seed auth token from env in local dev — always override so the token stays fresh
   useEffect(() => {
     const devToken = import.meta.env.VITE_AUTH_TOKEN as string | undefined
-    if (devToken && !getToken()) setToken(devToken)
+    if (devToken) { setToken(devToken); loadAccount() }
   }, [])
 
   // Sync view from URL on mount + handle back/forward
