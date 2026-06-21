@@ -1,4 +1,4 @@
-import { SearchCode, HardDrive, Settings, Archive, ShieldCheck, ListMusic } from 'lucide-react'
+import { SearchCode, HardDrive, Settings, Archive, ShieldCheck, ListMusic, ArrowLeft, Radio } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
 
@@ -8,6 +8,7 @@ export default function BottomNav(): JSX.Element {
 
   const items: { icon: React.ReactNode; label: string; view: ViewType }[] = [
     { icon: <SearchCode size={24} />, label: 'Tracker', view: 'api-tracker' },
+    { icon: <Radio size={24} />, label: '999 FM', view: 'radio-fm' },
     { icon: <ListMusic size={24} />, label: 'Playlists', view: 'playlists' },
     { icon: <Archive size={24} />, label: 'Compilation', view: 'compilation' },
     { icon: <HardDrive size={24} />, label: 'Files', view: 'api-files' },
@@ -15,6 +16,13 @@ export default function BottomNav(): JSX.Element {
 
   return (
     <nav className="md:hidden flex items-stretch bg-sidebar shrink-0" style={{ borderTop: '1px solid var(--border)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <a
+        href="https://juicewrldapi.com"
+        className="flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-text-muted transition-colors overflow-hidden"
+      >
+        <ArrowLeft size={24} />
+        <span className="text-[10px] font-semibold leading-none w-full text-center truncate px-0.5">Return to API</span>
+      </a>
       {items.map(({ icon, label, view }) => {
         const active = activeView === view
         return (

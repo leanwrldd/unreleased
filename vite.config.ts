@@ -11,7 +11,15 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    port: 5173,
-    allowedHosts: ['player.juicewrldapi.com', 'localhost', '127.0.0.1'],
+    port: 3018,
+    strictPort: true,
+    host: true,
+    allowedHosts: ['.juicewrldapi.com', 'player.juicewrldapi.com', 'localhost', '127.0.0.1'],
+  },
+  preview: {
+    port: 3018,
+    strictPort: true,
+    host: true,
+    allowedHosts: ['.juicewrldapi.com', 'player.juicewrldapi.com', 'localhost', '127.0.0.1'],
   },
 })

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle, PenLine, BookOpen, Copy, Eye, EyeOff, KeyRound } from 'lucide-react'
+import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle, PenLine, BookOpen, Copy, Eye, EyeOff, KeyRound, Globe } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { getToken } from '../lib/userApi'
 
@@ -227,7 +227,7 @@ export default function Settings(): JSX.Element {
                 GitHub
               </a>
               <a
-                href="https://discord.gg/qq7DMNkBJ4"
+                href="https://discord.gg/jwa"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors px-2.5 py-1.5 rounded-lg bg-surface-overlay hover:bg-surface-raised border border-[var(--border)]"
@@ -236,13 +236,13 @@ export default function Settings(): JSX.Element {
                 Discord
               </a>
               <a
-                href="https://unreleased-juicewrldapi.vercel.app"
+                href="https://juicewrldapi.com"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors px-2.5 py-1.5 rounded-lg bg-surface-overlay hover:bg-surface-raised border border-[var(--border)]"
               >
-                <span className="w-3 h-3 flex items-center justify-center">▲</span>
-                Vercel
+                <Globe size={13} />
+                API
               </a>
             </div>
 
