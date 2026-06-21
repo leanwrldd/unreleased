@@ -3,7 +3,7 @@ import {
   ChevronLeft, Users, Clock, CheckCircle, XCircle, ShieldCheck, BarChart2,
   Loader2, RefreshCw, FileEdit, KeyRound, Check, AlertCircle, RotateCcw,
   ChevronDown, ChevronUp, Shield, TrendingUp, MessageSquare, Calendar,
-  Hash, Minus, Plus, UserCheck, FileCheck, Activity,
+  Hash, Minus, Plus, UserCheck, FileCheck, Activity, Pencil, X as XIcon, ChevronDown as ChevronDownIcon,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
@@ -312,6 +312,187 @@ export default function AdminPage(): JSX.Element {
   )
 }
 
+
+// ── Revise Panel ──────────────────────────────────────────────────────────────
+
+const TEXTAREA_FIELDS = new Set(['lyrics', 'synced_lyrics', 'notes', 'additional_information', 'description'])
+const ALL_SONG_FIELDS = [
+  'name','track_titles','credited_artists','producers','engineers',
+  'recording_locations','record_dates','length','bitrate','additional_information',
+  'file_names','instrumentals','instrumental_names','preview_date','release_date',
+  'dates','session_titles','session_tracking','lyrics','synced_lyrics',
+  'album','date_leaked','leak_type',
+]
+
+function RevisePanel({ proposal, onClose, onDone }: {
+  proposal: SongEditProposal
+  onClose: () => void
+  onDone:  () => void
+}): JSX.Element {
+  const [fields,  setFields]  = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {}
+    Object.entries(proposal.proposed_data || {}).forEach(([k, v]) => {
+      init[k] = Array.isArray(v) ? v.join('\n') : (typeof v === 'string' ? v : JSON.stringify(v))
+    })
+    return init
+  })
+  const [reviewNote, setReviewNote] = useState('')
+  const [addKey,     setAddKey]     = useState('')
+  const [saving,     setSaving]     = useState(false)
+  const [err,        setErr]        = useState<string | null>(null)
+
+  // Fields that are available to add (in snapshot but not already in the working set)
+  const snap = proposal.original_snapshot || {}
+  const available = ALL_SONG_FIELDS.filter(k => !(k in fields))
+
+  const addField = (key: string) => {
+    if (!key) return
+    const snapVal = snap[key]
+    const init = Array.isArray(snapVal) ? (snapVal as string[]).join('\n')
+                : typeof snapVal === 'string' ? snapVal : ''
+    setFields(f => ({ ...f, [key]: init }))
+    setAddKey('')
+  }
+
+  const removeField = (key: string) => {
+    setFields(f => { const n = { ...f }; delete n[key]; return n })
+  }
+
+  const submit = async () => {
+    setSaving(true); setErr(null)
+    try {
+      // Convert back — track_titles is array
+      const revised_data: Record<string, unknown> = {}
+      Object.entries(fields).forEach(([k, v]) => {
+        if (k === 'track_titles') {
+          revised_data[k] = v.split('\n').map(s => s.trim()).filter(Boolean)
+        } else {
+          revised_data[k] = v
+        }
+      })
+      await userApi.adminReviewProposal(proposal.id, {
+        action: 'revise',
+        review_notes: reviewNote,
+        revised_data,
+      })
+      onDone()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed to revise')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden border-l-2 border-accent/30 bg-[var(--surface)]">
+      {/* Panel header */}
+      <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-raised)]">
+        <Pencil size={13} className="text-accent" />
+        <span className="text-text-primary text-xs font-semibold flex-1">Revise proposal</span>
+        <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-text-primary transition-colors">
+          <XIcon size={14} />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Field editors */}
+        {Object.entries(fields).map(([key, val]) => (
+          <div key={key} className="rounded-xl border border-[var(--border)] overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--surface-raised)] border-b border-[var(--border)]">
+              <span className="font-mono text-[10px] text-text-muted flex-1">{key.replace(/_/g, ' ')}</span>
+              <button onClick={() => removeField(key)} className="text-[10px] text-red-400 hover:text-red-300 transition-colors">
+                remove
+              </button>
+            </div>
+            {TEXTAREA_FIELDS.has(key) ? (
+              <textarea
+                value={val}
+                onChange={e => setFields(f => ({ ...f, [key]: e.target.value }))}
+                rows={key === 'lyrics' || key === 'synced_lyrics' ? 10 : 4}
+                className="w-full bg-[var(--surface)] text-text-primary text-xs font-mono px-3 py-2.5 resize-none focus:outline-none focus:bg-[var(--surface-raised)] transition-colors"
+              />
+            ) : (
+              <input
+                type="text"
+                value={val}
+                onChange={e => setFields(f => ({ ...f, [key]: e.target.value }))}
+                className="w-full bg-[var(--surface)] text-text-primary text-xs px-3 py-2.5 focus:outline-none focus:bg-[var(--surface-raised)] transition-colors"
+              />
+            )}
+          </div>
+        ))}
+
+        {/* Add field */}
+        <div className="rounded-xl border border-dashed border-[var(--border)] overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--surface-raised)] border-b border-[var(--border)]">
+            <Plus size={11} className="text-text-muted" />
+            <span className="text-[10px] text-text-muted font-semibold">Add field</span>
+          </div>
+          <div className="flex gap-2 p-2">
+            <select
+              value={addKey}
+              onChange={e => setAddKey(e.target.value)}
+              className="flex-1 bg-[var(--surface)] text-text-primary text-xs px-2 py-1.5 rounded-lg border border-[var(--border)] focus:outline-none focus:border-accent/40"
+            >
+              <option value="">Choose a field…</option>
+              {available.map(k => (
+                <option key={k} value={k}>{k.replace(/_/g, ' ')}</option>
+              ))}
+              {/* Also allow snapshot fields not in the predefined list */}
+              {Object.keys(snap).filter(k => !ALL_SONG_FIELDS.includes(k) && !(k in fields)).map(k => (
+                <option key={k} value={k}>{k.replace(/_/g, ' ')}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => addField(addKey)}
+              disabled={!addKey}
+              className="px-3 py-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent text-xs font-semibold disabled:opacity-40 transition-colors"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+
+        {/* Review note */}
+        <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--surface-raised)] border-b border-[var(--border)]">
+            <MessageSquare size={11} className="text-text-muted" />
+            <span className="text-[10px] text-text-muted font-semibold">Review note (optional)</span>
+          </div>
+          <input
+            type="text"
+            value={reviewNote}
+            onChange={e => setReviewNote(e.target.value)}
+            placeholder="Explain what you changed…"
+            className="w-full bg-[var(--surface)] text-text-primary text-xs px-3 py-2.5 focus:outline-none"
+          />
+        </div>
+
+        {err && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs border border-red-500/20">
+            <AlertCircle size={12} />{err}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-t border-[var(--border)] bg-[var(--surface-raised)]">
+        <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-xs text-text-muted hover:text-text-primary transition-colors">
+          Cancel
+        </button>
+        <button
+          onClick={submit}
+          disabled={saving || Object.keys(fields).length === 0}
+          className="flex-1 px-3 py-1.5 rounded-lg bg-accent hover:bg-accent/90 text-[var(--bg)] text-xs font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+        >
+          {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+          Save revision
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Proposals (master-detail) ─────────────────────────────────────────────────
 
 function ProposalsTab({ proposals, status, setStatus, onChanged }: {
@@ -323,10 +504,12 @@ function ProposalsTab({ proposals, status, setStatus, onChanged }: {
   const [actionId,    setActionId]    = useState<number | null>(null)
   const [notes,       setNotes]       = useState<Record<number, string>>({})
   const [selected,    setSelected]    = useState<SongEditProposal | null>(null)
+  const [revising,    setRevising]    = useState(false)
 
   // Auto-select first item
   useEffect(() => {
     setSelected(proposals[0] ?? null)
+    setRevising(false)
   }, [proposals])
 
   const doReview = async (id: number, action: 'approve' | 'reject') => {
@@ -404,11 +587,17 @@ function ProposalsTab({ proposals, status, setStatus, onChanged }: {
       </div>
 
       {/* Right: detail */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex overflow-hidden">
         {!p ? (
           <Empty label="Select a proposal" />
+        ) : revising ? (
+          <RevisePanel
+            proposal={p}
+            onClose={() => setRevising(false)}
+            onDone={() => { setRevising(false); onChanged() }}
+          />
         ) : (
-          <>
+          <div className="flex-1 flex flex-col overflow-hidden">
             {/* Detail header */}
             <div className="shrink-0 px-6 py-4 border-b border-[var(--border)] bg-surface-raised">
               <div className="flex items-start gap-3">
@@ -436,6 +625,10 @@ function ProposalsTab({ proposals, status, setStatus, onChanged }: {
                   <div className="flex items-center gap-2 shrink-0">
                     {actionId === p.id ? <Loader2 size={14} className="animate-spin text-text-muted" /> : (
                       <>
+                        <button onClick={() => setRevising(true)}
+                          className="px-3 py-1.5 rounded-lg bg-[var(--surface-overlay)] hover:bg-[var(--surface-raised)] text-text-secondary text-xs font-semibold transition-colors flex items-center gap-1.5 border border-[var(--border)]">
+                          <Pencil size={13} /> Revise
+                        </button>
                         <button onClick={() => doReview(p.id, 'reject')}
                           className="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold transition-colors flex items-center gap-1.5">
                           <XCircle size={13} /> Reject
@@ -492,7 +685,7 @@ function ProposalsTab({ proposals, status, setStatus, onChanged }: {
             <div className="flex-1 overflow-y-auto">
               <ProposalDiff proposal={p} />
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
