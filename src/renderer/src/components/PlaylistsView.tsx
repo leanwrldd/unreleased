@@ -245,23 +245,22 @@ export default function PlaylistsView(): JSX.Element {
     setLoadingDetail(true)
     setCoverData(null)
     try {
-      // First call: tracks only — small response, renders fast
       const result = await userApi.getPlaylist(id)
       if (gen !== loadGen.current) return
-      setDetail(result)
+      // Show tracks immediately — cover follows in next tick so UI isn't held up
+      const { cover_image, cover_image_url, ...rest } = result
+      setDetail({ ...rest, cover_image: null, cover_image_url: null } as typeof result)
       setLoadingDetail(false)
+      setTimeout(() => {
+        if (gen !== loadGen.current) return
+        setCoverImgError(false)
+        setCoverData({ cover_image, cover_image_url })
+      }, 0)
     } catch {
       if (gen === loadGen.current) setDetail(null)
     } finally {
       if (gen === loadGen.current) setLoadingDetail(false)
     }
-    // Second call: cover only — runs after tracks are already visible
-    try {
-      const cover = await userApi.getPlaylistCover(id)
-      if (gen !== loadGen.current) return
-      setCoverImgError(false)
-      setCoverData(cover)
-    } catch { /* cover failing doesn't affect the tracklist */ }
   }, [])
 
   useEffect(() => {
@@ -346,7 +345,6 @@ export default function PlaylistsView(): JSX.Element {
     setCoverUploading(true)
     try {
       const result = await userApi.uploadPlaylistCover(selectedId, file)
-      // Update cover separately; tracks stay visible
       setCoverImgError(false)
       setCoverData({ cover_image: result.cover_image, cover_image_url: result.cover_image_url })
       await refreshPlaylists()

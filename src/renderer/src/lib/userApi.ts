@@ -195,19 +195,6 @@ export async function createPlaylist(name: string): Promise<PlaylistDetail> {
   })
 }
 
-// ── Cover cache (sessionStorage) ────────────────────────────────────────────
-type CoverCache = { cover_image?: string | null; cover_image_url?: string | null }
-const coverCacheKey = (id: number) => `pl_cover:${id}`
-function readCoverCache(id: number): CoverCache | null {
-  try { return JSON.parse(sessionStorage.getItem(coverCacheKey(id)) ?? 'null') } catch { return null }
-}
-function writeCoverCache(id: number, data: CoverCache): void {
-  try { sessionStorage.setItem(coverCacheKey(id), JSON.stringify(data)) } catch {}
-}
-export function evictCoverCache(id: number): void {
-  try { sessionStorage.removeItem(coverCacheKey(id)) } catch {}
-}
-
 // ── Image compression (canvas → JPEG, max 400px / ~200 KB) ─────────────────
 export async function compressImageFile(file: File, maxDim = 400, maxKB = 200): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -235,22 +222,9 @@ export async function compressImageFile(file: File, maxDim = 400, maxKB = 200): 
   })
 }
 
-// Full playlist fetch — caches cover on the way through so getPlaylistCover is instant
+// Single request — tracks + cover in one response
 export async function getPlaylist(id: number): Promise<PlaylistDetail> {
-  const result = await request<PlaylistDetail>(`${LIBRARY_BASE}/playlists/${id}/`)
-  writeCoverCache(id, { cover_image: result.cover_image, cover_image_url: result.cover_image_url })
-  return result
-}
-
-// Returns cover immediately from sessionStorage cache (no HTTP call after first load)
-export async function getPlaylistCover(id: number): Promise<CoverCache> {
-  const cached = readCoverCache(id)
-  if (cached !== null) return cached
-  // Cache miss (first load before getPlaylist finished) — fetch full detail
-  const result = await request<PlaylistDetail>(`${LIBRARY_BASE}/playlists/${id}/`)
-  const cover = { cover_image: result.cover_image, cover_image_url: result.cover_image_url }
-  writeCoverCache(id, cover)
-  return cover
+  return request(`${LIBRARY_BASE}/playlists/${id}/`)
 }
 
 export async function renamePlaylist(id: number, name: string): Promise<PlaylistDetail> {
@@ -286,7 +260,6 @@ export async function uploadPlaylistCover(id: number, file: File): Promise<Playl
 }
 
 export async function removePlaylistCover(id: number): Promise<void> {
-  evictCoverCache(id)
   await request(`${LIBRARY_BASE}/playlists/${id}/`, {
     method: 'PATCH',
     body: JSON.stringify({ cover_image: '', cover_image_url: '' }),
