@@ -6,7 +6,7 @@ import { SyncedLyricLine } from '../types'
  */
 export function parseLrc(lrc: string): SyncedLyricLine[] {
   const lines: SyncedLyricLine[] = []
-  const timeRegex = /\[(\d{2}):(\d{2})[.:](\d{2,3})\]/g
+  const timeRegex = /\[(\d{1,2}):(\d{2})[.:](\d{2,3})\]/g
 
   for (const rawLine of lrc.split(/\r?\n/)) {
     const matches = [...rawLine.matchAll(timeRegex)]
@@ -29,7 +29,7 @@ export function parseLrc(lrc: string): SyncedLyricLine[] {
  * Check if a string contains LRC timestamps
  */
 export function isLrcFormat(text: string): boolean {
-  return /\[\d{2}:\d{2}[.:]\d{2}/.test(text)
+  return /\[\d{1,2}:\d{2}[.:]\d{2}/.test(text)
 }
 
 /**
