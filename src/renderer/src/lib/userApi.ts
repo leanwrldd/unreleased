@@ -185,7 +185,7 @@ export async function removeFavorite(songId: number): Promise<void> {
 }
 
 export async function getPlaylists(): Promise<PlaylistSummary[]> {
-  return request(`${LIBRARY_BASE}/playlists/?omit=cover_image,cover_image_url`, { method: 'GET' })
+  return request(`${LIBRARY_BASE}/playlists/?omit_cover_image=true`, { method: 'GET' })
 }
 
 /** Fetch just the cover fields for a single playlist. */
