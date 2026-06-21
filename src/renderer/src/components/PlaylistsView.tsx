@@ -124,7 +124,8 @@ function SortHeader({ label, field, sort, onSort }: {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function PlaylistsView(): JSX.Element {
-  const { account, playlists, refreshPlaylists, playTrack, addToQueue, setShowUserAuth, likedTrackIds } = useStore()
+  const { account, playlists, refreshPlaylists, playTrack, addToQueue, setShowUserAuth, likedTrackIds, setActiveView, setPendingEditorSongId } = useStore()
+  const canEdit = !!(account?.is_editor || account?.is_administrator)
 
   const [showLiked, setShowLiked] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -873,6 +874,9 @@ export default function PlaylistsView(): JSX.Element {
             <MenuItem icon={Play} label="Play" onClick={() => { playTrack(trackMenu.track, displayTracks); setTrackMenu(null) }} />
             <MenuItem icon={ListPlus} label="Add to queue" onClick={() => { addToQueue(trackMenu.track); setTrackMenu(null) }} />
             <MenuItem icon={Info} label="Song info" onClick={() => { openSongInfo(trackMenu.songId); setTrackMenu(null) }} disabled={trackMenu.songId < 0} />
+            {canEdit && trackMenu.songId > 0 && (
+              <MenuItem icon={Pencil} label="Edit" onClick={() => { setPendingEditorSongId(trackMenu.songId); setActiveView('editor'); setTrackMenu(null) }} />
+            )}
             <div className="border-t border-[var(--border)] my-1" />
             {!['recording_session', 'unsurfaced'].includes(trackMenu.track.genre) && (
               <>

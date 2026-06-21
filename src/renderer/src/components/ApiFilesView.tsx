@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Folder, Music2, ChevronRight, ArrowLeft, Home, Play, Loader2,
   FolderOpen, HardDrive, LayoutList, LayoutGrid, ImageIcon, Video,
-  Download, ArrowUpDown, ArrowUp, ArrowDown, Link, Check, Info, ListPlus, MoreHorizontal, X,
+  Download, ArrowUpDown, ArrowUp, ArrowDown, Link, Check, Info, ListPlus, MoreHorizontal, X, Pencil,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import {
@@ -136,7 +136,8 @@ function urlToPath(pathname: string): string {
 }
 
 export default function ApiFilesView(): JSX.Element {
-  const { playTrack, addToQueue, apiFilesPath, setApiFilesPath } = useStore()
+  const { playTrack, addToQueue, apiFilesPath, setApiFilesPath, account, setActiveView, setPendingEditorSongId } = useStore()
+  const canEdit = !!(account?.is_editor || account?.is_administrator)
 
   const [currentPath, setCurrentPath] = useState('')
   const [entries, setEntries] = useState<JWApiFileEntry[]>([])
@@ -626,6 +627,19 @@ export default function ApiFilesView(): JSX.Element {
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
                   <Info size={14} className="text-text-muted" /> Find in Tracker
                 </button>
+                {canEdit && (
+                  <button onClick={async () => {
+                    const title = ctxMenu.entry.name.replace(/\.[^.]+$/, '')
+                    setCtxMenu(null)
+                    try {
+                      const data = await apiFetch<JWApiPaginatedResponse>('/songs/', { search: title, page_size: 1 })
+                      const id = data.results[0]?.id
+                      if (id) { setPendingEditorSongId(id); setActiveView('editor') }
+                    } catch {}
+                  }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
+                    <Pencil size={14} className="text-text-muted" /> Edit
+                  </button>
+                )}
                 <div className="border-t border-[var(--border)] my-1" />
               </>
             )}

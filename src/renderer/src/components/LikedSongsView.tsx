@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Heart, Play, Loader2, MoreHorizontal, PlayCircle, ListPlus, Info } from 'lucide-react'
+import { Heart, Play, Loader2, MoreHorizontal, PlayCircle, ListPlus, Info, Pencil } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
 import { Track } from '../types'
@@ -15,7 +15,8 @@ function formatDuration(seconds: number): string {
 }
 
 export default function LikedSongsView(): JSX.Element {
-  const { account, playTrack, addToQueue, likedTrackIds, toggleLike, setShowUserAuth, playlists, refreshPlaylists } = useStore()
+  const { account, playTrack, addToQueue, likedTrackIds, toggleLike, setShowUserAuth, playlists, refreshPlaylists, setActiveView, setPendingEditorSongId } = useStore()
+  const canEdit = !!(account?.is_editor || account?.is_administrator)
   const [tracks, setTracks] = useState<Track[]>([])
   const [loading, setLoading] = useState(true)
   type CtxMenu = { track: Track; songId: number; x: number; y: number; showPlaylists: boolean }
@@ -153,6 +154,12 @@ export default function LikedSongsView(): JSX.Element {
           className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
           <Info size={14} className="text-text-muted" /> Song info
         </button>
+        {canEdit && ctxMenu.songId > 0 && (
+          <button onClick={() => { setPendingEditorSongId(ctxMenu.songId); setActiveView('editor'); setCtxMenu(null) }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
+            <Pencil size={14} className="text-text-muted" /> Edit
+          </button>
+        )}
         <div className="border-t border-[var(--border)] my-1" />
         {!['recording_session', 'unsurfaced'].includes(ctxMenu.track.genre) && (
           <button
