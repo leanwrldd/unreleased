@@ -67,7 +67,6 @@ interface AppState {
 
   // Editor
   pendingEditorSongId: number | null
-  syncedLyricsSongId: number | null
   pendingEditProposal: { id: number; songId: number; proposedData: Record<string, unknown>; editorNotes: string } | null
 }
 
@@ -108,7 +107,6 @@ interface AppActions {
   refreshPlaylists: () => Promise<void>
 
   setPendingEditorSongId: (id: number | null) => void
-  setSyncedLyricsSongId: (id: number | null) => void
   setPendingEditProposal: (p: { id: number; songId: number; proposedData: Record<string, unknown>; editorNotes: string } | null) => void
 }
 
@@ -304,9 +302,7 @@ export const useStore = create<AppStore>((set, get, store) => ({
 
   // ── Editor ────────────────────────────────────────────────────────────────
   pendingEditorSongId: null,
-  syncedLyricsSongId: null,
   pendingEditProposal: null,
   setPendingEditorSongId: (pendingEditorSongId) => set({ pendingEditorSongId }),
-  setSyncedLyricsSongId: (syncedLyricsSongId: number | null) => set({ syncedLyricsSongId }),
   setPendingEditProposal: (pendingEditProposal) => set({ pendingEditProposal }),
 }))
