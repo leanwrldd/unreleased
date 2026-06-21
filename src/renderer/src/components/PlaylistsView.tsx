@@ -383,20 +383,27 @@ export default function PlaylistsView(): JSX.Element {
 
   const handleShare = useCallback(async (trackList: Track[]) => {
     if (sharing) return
+    // Extract numeric song IDs from track ids of the form "jw-{id}"
+    const song_ids = trackList
+      .map(t => { const m = t.id.match(/^jw-(\d+)$/); return m ? Number(m[1]) : null })
+      .filter((id): id is number => id !== null)
     const paths = trackList.map(t => t.path).filter(Boolean)
-    if (!paths.length) return
+    if (!song_ids.length && !paths.length) return
     setSharing(true)
     try {
       const res = await fetch(`${JWAPI_BASE}/playlists/share/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paths }),
+        body: JSON.stringify({ song_ids, paths }),
       })
       if (!res.ok) throw new Error()
-      const { share_id } = await res.json() as { share_id: string }
-      await navigator.clipboard.writeText(`${window.location.origin}/shared/${share_id}`)
-      setShareCopied(true)
-      setTimeout(() => setShareCopied(false), 2500)
+      const data = await res.json() as { share_id?: string; id?: string }
+      const share_id = data.share_id ?? data.id
+      if (share_id) {
+        await navigator.clipboard.writeText(`${window.location.origin}/shared/${share_id}`)
+        setShareCopied(true)
+        setTimeout(() => setShareCopied(false), 2500)
+      }
     } catch {
       try { await navigator.clipboard.writeText(window.location.href) } catch {}
     } finally { setSharing(false) }
