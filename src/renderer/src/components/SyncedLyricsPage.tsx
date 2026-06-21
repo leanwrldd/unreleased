@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { ArrowLeft, Wand2, Copy, Check, Save, Loader2, Music2, AlertCircle, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Wand2, Copy, Check, Save, Loader2, Music2, AlertCircle } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { apiFetch, buildStreamUrl, JWApiSong } from '../lib/juicewrldApi'
 import * as userApi from '../lib/userApi'
@@ -94,8 +94,6 @@ export default function SyncedLyricsPage(): JSX.Element {
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [showLangMenu, setShowLangMenu] = useState(false)
-  const [language, setLanguage] = useState('english')
 
   const workerRef = useRef<Worker | null>(null)
   const workerReadyRef = useRef(false)
@@ -164,19 +162,12 @@ export default function SyncedLyricsPage(): JSX.Element {
       setStatusMsg('Fetching audio…')
       const audio = await fetchAndDecodeAudio(buildStreamUrl(song.path))
       setStage('transcribing')
-      worker.postMessage({ type: 'transcribe', audio, language }, [audio.buffer])
+      worker.postMessage({ type: 'transcribe', audio }, [audio.buffer])
     } catch (err) {
       setError(String(err))
       setStage('error')
     }
-  }, [song, lyrics, language])
-
-  // If model finishes loading while we have audio ready, auto-run transcription
-  useEffect(() => {
-    if (stage === 'idle' && workerReadyRef.current && lrc === '' && song?.path && lyrics.trim()) {
-      // Don't auto-run — user should click Generate
-    }
-  }, [stage, lrc, song, lyrics])
+  }, [song, lyrics])
 
   const handleCopy = () => {
     navigator.clipboard.writeText(lrc).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
@@ -198,8 +189,6 @@ export default function SyncedLyricsPage(): JSX.Element {
   }
 
   const busy = stage === 'loading-model' || stage === 'fetching-audio' || stage === 'transcribing'
-
-  const LANGUAGES = ['english', 'spanish', 'french', 'german', 'japanese', 'korean', 'portuguese', 'italian', 'dutch', 'russian']
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -237,30 +226,8 @@ export default function SyncedLyricsPage(): JSX.Element {
           />
         </div>
 
-        {/* Language + Generate */}
+        {/* Generate */}
         <div className="flex items-center gap-2">
-          {/* Language picker */}
-          <div className="relative">
-            <button
-              onClick={() => setShowLangMenu(v => !v)}
-              disabled={busy}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface-overlay border border-[var(--border)] text-text-muted text-sm hover:text-text-primary transition-colors disabled:opacity-40"
-            >
-              {language.charAt(0).toUpperCase() + language.slice(1)}
-              <ChevronDown size={13} />
-            </button>
-            {showLangMenu && (
-              <div className="absolute top-full mt-1 left-0 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 z-50 min-w-[140px] max-h-56 overflow-y-auto">
-                {LANGUAGES.map(lang => (
-                  <button key={lang} onClick={() => { setLanguage(lang); setShowLangMenu(false) }}
-                    className={`w-full text-left px-3.5 py-2 text-sm transition-colors hover:bg-surface-overlay ${language === lang ? 'text-accent' : 'text-text-primary'}`}>
-                    {lang.charAt(0).toUpperCase() + lang.slice(1)}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
           <button
             onClick={handleGenerate}
             disabled={busy || !lyrics.trim() || !song?.path}
