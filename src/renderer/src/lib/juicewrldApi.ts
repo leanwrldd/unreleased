@@ -40,6 +40,7 @@ export interface JWApiSong {
   image_url: string | null           // relative, e.g. "/assets/youtube.webp"
   category: 'released' | 'unreleased' | 'unsurfaced' | 'recording_session'
   lyrics: string | null
+  synced_lyrics: string | null
   leak_type: string | null
   date_leaked: string | null
 }
