@@ -154,14 +154,16 @@ export default function LikedSongsView(): JSX.Element {
           <Info size={14} className="text-text-muted" /> Song info
         </button>
         <div className="border-t border-[var(--border)] my-1" />
-        <button
-          onClick={e => { e.stopPropagation(); setCtxMenu(prev => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null) }}
-          className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
-        >
-          <span className="flex items-center gap-2.5"><ListPlus size={14} className="text-text-muted" /> Add to playlist</span>
-          <span className="text-text-muted text-xs">›</span>
-        </button>
-        {ctxMenu.showPlaylists && (
+        {!['recording_session', 'unsurfaced'].includes(ctxMenu.track.genre) && (
+          <button
+            onClick={e => { e.stopPropagation(); setCtxMenu(prev => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null) }}
+            className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
+          >
+            <span className="flex items-center gap-2.5"><ListPlus size={14} className="text-text-muted" /> Add to playlist</span>
+            <span className="text-text-muted text-xs">›</span>
+          </button>
+        )}
+        {ctxMenu.showPlaylists && !['recording_session', 'unsurfaced'].includes(ctxMenu.track.genre) && (
           <div className="border-t border-[var(--border)] max-h-40 overflow-y-auto">
             {playlists.length === 0 ? (
               <p className="px-3.5 py-2 text-xs text-text-muted">No playlists</p>

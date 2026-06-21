@@ -420,7 +420,7 @@ export default function PlaylistsView(): JSX.Element {
 
   const handleAddAllTo = useCallback(async (targetId: number, srcDetail: PlaylistDetail) => {
     setAddingAll(true)
-    await Promise.all(srcDetail.items.map(item => userApi.addToPlaylist(targetId, item.song.id).catch(() => {})))
+    await Promise.all(srcDetail.items.filter(item => !['recording_session', 'unsurfaced'].includes(item.song.category)).map(item => userApi.addToPlaylist(targetId, item.song.id).catch(() => {})))
     const targetSet = membershipCache.current.get(targetId) ?? new Set<number>()
     srcDetail.items.forEach(i => targetSet.add(i.song.id))
     membershipCache.current.set(targetId, targetSet)
@@ -452,7 +452,7 @@ export default function PlaylistsView(): JSX.Element {
         } catch { /* skip cover on CORS/network failure */ }
       }
       // 4. Add all tracks in parallel
-      await Promise.all(detail.items.map(item => userApi.addToPlaylist(newPl.id, item.song.id).catch(() => {})))
+      await Promise.all(detail.items.filter(item => !['recording_session', 'unsurfaced'].includes(item.song.category)).map(item => userApi.addToPlaylist(newPl.id, item.song.id).catch(() => {})))
       await refreshPlaylists()
       setImportState('done')
       setTimeout(() => setImportState('idle'), 2500)
@@ -812,14 +812,18 @@ export default function PlaylistsView(): JSX.Element {
             <MenuItem icon={ListPlus} label="Add to queue" onClick={() => { addToQueue(trackMenu.track); setTrackMenu(null) }} />
             <MenuItem icon={Info} label="Song info" onClick={() => { openSongInfo(trackMenu.songId); setTrackMenu(null) }} disabled={trackMenu.songId < 0} />
             <div className="border-t border-[var(--border)] my-1" />
-            <button
-              className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-sm text-text-primary transition-colors hover:bg-surface-overlay"
-              onClick={e => { e.stopPropagation(); setTrackMenu(prev => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null) }}
-            >
-              <span className="flex items-center gap-2.5"><FolderInput size={14} className="text-text-muted" />Add to playlist</span>
-              <span className="text-text-muted text-xs">›</span>
-            </button>
-            {trackMenu.showPlaylists && (
+            {!['recording_session', 'unsurfaced'].includes(trackMenu.track.genre) && (
+              <>
+                <button
+                  className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-sm text-text-primary transition-colors hover:bg-surface-overlay"
+                  onClick={e => { e.stopPropagation(); setTrackMenu(prev => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null) }}
+                >
+                  <span className="flex items-center gap-2.5"><FolderInput size={14} className="text-text-muted" />Add to playlist</span>
+                  <span className="text-text-muted text-xs">›</span>
+                </button>
+              </>
+            )}
+            {trackMenu.showPlaylists && !['recording_session', 'unsurfaced'].includes(trackMenu.track.genre) && (
               <div className="border-t border-[var(--border)] max-h-48 overflow-y-auto">
                 {otherPlaylists.length === 0 ? (
                   <p className="px-3.5 py-2 text-xs text-text-muted">No other playlists</p>
