@@ -39,6 +39,9 @@ interface AppState {
   radioFmActive: boolean
   radioFmIsLive: boolean | null  // null = unknown (not yet checked)
   radioFmNowPlaying: import('../lib/radioLive').RadioTrack | null
+  radioFmVote: import('../lib/radioLive').RadioVote | null
+  radioFmUpNext: import('../lib/radioLive').RadioTrack | null
+  radioFmQueuePreview: string[]
   viewMode: 'list' | 'grid'
   theme: 'dark' | 'light'
   searchQuery: string
@@ -83,6 +86,9 @@ interface AppActions {
   setRadioFmActive: (active: boolean) => void
   setRadioFmIsLive: (live: boolean | null) => void
   setRadioFmNowPlaying: (track: import('../lib/radioLive').RadioTrack | null) => void
+  setRadioFmVote: (vote: import('../lib/radioLive').RadioVote | null) => void
+  setRadioFmUpNext: (track: import('../lib/radioLive').RadioTrack | null) => void
+  setRadioFmQueuePreview: (preview: string[]) => void
   setShowSettings: (show: boolean) => void
   setShowQueue: (show: boolean) => void
   setViewMode: (mode: 'list' | 'grid') => void
@@ -145,6 +151,9 @@ export const useStore = create<AppStore>((set, get, store) => ({
   radioFmActive: false,
   radioFmIsLive: null,
   radioFmNowPlaying: null,
+  radioFmVote: null,
+  radioFmUpNext: null,
+  radioFmQueuePreview: [],
   viewMode: ls.get<'list' | 'grid'>('viewMode') ?? 'list',
   theme: ls.get<'dark' | 'light'>('theme') ?? 'dark',
   searchQuery: '',
@@ -168,6 +177,9 @@ export const useStore = create<AppStore>((set, get, store) => ({
   setRadioFmActive: (radioFmActive) => set({ radioFmActive }),
   setRadioFmIsLive: (radioFmIsLive) => set({ radioFmIsLive }),
   setRadioFmNowPlaying: (radioFmNowPlaying) => set({ radioFmNowPlaying }),
+  setRadioFmVote: (radioFmVote) => set({ radioFmVote }),
+  setRadioFmUpNext: (radioFmUpNext) => set({ radioFmUpNext }),
+  setRadioFmQueuePreview: (radioFmQueuePreview) => set({ radioFmQueuePreview }),
   setShowSettings: (showSettings) => set({ showSettings }),
   setShowQueue: (showQueue) => set({ showQueue }),
   setViewMode: (viewMode) => { set({ viewMode }); ls.set('viewMode', viewMode) },

@@ -259,3 +259,8 @@ export class RadioStreamClient {
     }
   }
 }
+
+// Module-level singleton so non-React code can call client methods
+let _activeRadioClient: RadioStreamClient | null = null
+export function getActiveRadioClient(): RadioStreamClient | null { return _activeRadioClient }
+export function setActiveRadioClient(c: RadioStreamClient | null): void { _activeRadioClient = c }

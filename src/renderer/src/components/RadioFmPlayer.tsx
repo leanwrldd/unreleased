@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { useStore } from '../store/useStore'
-import { RadioStreamClient } from '../lib/radioSocketService'
+import { RadioStreamClient, setActiveRadioClient } from '../lib/radioSocketService'
 import { fetchRadioLive } from '../lib/radioLive'
 
 export default function RadioFmPlayer(): JSX.Element {
   const {
     radioFmActive, setRadioFmActive,
     setRadioFmIsLive, setRadioFmNowPlaying,
+    setRadioFmVote, setRadioFmUpNext, setRadioFmQueuePreview,
     setIsPlaying,
     volume,
   } = useStore()
@@ -19,21 +20,29 @@ export default function RadioFmPlayer(): JSX.Element {
       onMeta: (data) => {
         setRadioFmIsLive(data.is_live)
         setRadioFmNowPlaying(data.now_playing)
+        setRadioFmVote(data.vote ?? null)
+        setRadioFmUpNext(data.up_next)
+        setRadioFmQueuePreview(data.queue_preview ?? [])
       },
     })
     if (audioRef.current) client.attach(audioRef.current)
     client.connect()
     clientRef.current = client
+    setActiveRadioClient(client)
 
     fetchRadioLive()
       .then((data) => {
         setRadioFmIsLive(data.is_live)
         setRadioFmNowPlaying(data.now_playing)
+        setRadioFmVote(data.vote ?? null)
+        setRadioFmUpNext(data.up_next)
+        setRadioFmQueuePreview(data.queue_preview ?? [])
       })
       .catch(() => setRadioFmIsLive(false))
 
     return () => {
       client.disconnect()
+      setActiveRadioClient(null)
       clientRef.current = null
     }
   }, [])
