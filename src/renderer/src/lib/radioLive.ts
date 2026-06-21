@@ -7,6 +7,8 @@ export interface RadioTrack {
   display?: string
   elapsed_ms?: number
   duration_ms?: number
+  image_url?: string
+  song_id?: number
 }
 
 export interface RadioVote {

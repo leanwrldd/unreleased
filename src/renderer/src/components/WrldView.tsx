@@ -3,20 +3,33 @@ import { Music, Radio } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
 import { seekAudio } from './Player'
+import { JWAPI_BASE } from '../lib/juicewrldApi'
 
 export default function WrldView(): JSX.Element {
   const {
     currentTrack, currentTrackFull, currentTime, account,
-    radioFmActive, setRadioFmActive, radioFmIsLive,
+    radioFmActive, setRadioFmActive, radioFmIsLive, radioFmNowPlaying,
   } = useStore()
 
   const containerRef = useRef<HTMLDivElement>(null)
   const activeRef    = useRef<HTMLDivElement>(null)
 
-  const artSrc       = currentTrackFull?.albumArt ?? currentTrack?.imageUrl
+  // When 999 FM is active, use FM metadata; otherwise use normal track
+  const displayTitle  = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.title  : currentTrack?.title
+  const displayArtist = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.artist : currentTrack?.artist
+  const displayAlbum  = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.album  : currentTrack?.album
+  const fmArtUrl      = radioFmActive && radioFmNowPlaying?.image_url
+    ? (radioFmNowPlaying.image_url.startsWith('http')
+        ? radioFmNowPlaying.image_url
+        : `${JWAPI_BASE}${radioFmNowPlaying.image_url}`)
+    : null
+  const artSrc = radioFmActive
+    ? (fmArtUrl ?? null)
+    : (currentTrackFull?.albumArt ?? currentTrack?.imageUrl ?? null)
+
   const lyrics       = currentTrackFull?.lyrics
   const syncedLyrics = currentTrackFull?.syncedLyrics
-  const rawLyrics    = syncedLyrics || lyrics
+  const rawLyrics    = !radioFmActive ? (syncedLyrics || lyrics) : null
   const isSynced     = rawLyrics ? isLrcFormat(rawLyrics) : false
   const isEditor     = account?.is_editor || account?.is_administrator
 
@@ -33,27 +46,25 @@ export default function WrldView(): JSX.Element {
     }
   }, [currentLineIdx])
 
-  // Button label based on state
   const fmLabel = radioFmActive
     ? (radioFmIsLive ? '999 FM · LIVE' : '999 FM · OFFLINE')
-    : radioFmIsLive === false
-    ? '999 FM · OFFLINE'
-    : '999 FM'
-
+    : radioFmIsLive === false ? '999 FM · OFFLINE' : '999 FM'
   const fmDisabled = radioFmIsLive === false && !radioFmActive
+
+  const hasContent = radioFmActive ? (!!radioFmNowPlaying || radioFmIsLive) : !!currentTrack
 
   return (
     <div className="relative flex flex-1 h-full w-full overflow-hidden">
 
-      {/* ── 999 FM toggle — always top-left ───────────────────────────────── */}
+      {/* 999 FM toggle */}
       <button
         onClick={() => setRadioFmActive(!radioFmActive)}
         disabled={fmDisabled}
         className={`absolute top-4 left-4 z-30 flex items-center gap-2 text-xs font-medium rounded-full px-3 py-1.5 transition-all disabled:opacity-40 ${
-          radioFmActive
-            ? radioFmIsLive
-              ? 'bg-red-600/80 text-white backdrop-blur-sm ring-1 ring-red-400/50'
-              : 'bg-white/10 text-white/50 backdrop-blur-sm'
+          radioFmActive && radioFmIsLive
+            ? 'bg-red-600/80 text-white backdrop-blur-sm ring-1 ring-red-400/50'
+            : radioFmActive
+            ? 'bg-white/10 text-white/50 backdrop-blur-sm'
             : 'bg-black/25 text-white/50 hover:text-white/90 hover:bg-black/50 backdrop-blur-sm'
         }`}
         title={radioFmActive ? 'Turn off 999 FM' : 'Turn on 999 FM'}
@@ -62,10 +73,12 @@ export default function WrldView(): JSX.Element {
         <span>{fmLabel}</span>
       </button>
 
-      {!currentTrack ? (
+      {!hasContent ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-black">
           <div className="text-6xl opacity-10">&#9834;</div>
-          <p className="text-white/30 text-sm">Play a track to see lyrics</p>
+          <p className="text-white/30 text-sm">
+            {radioFmActive ? 'Waiting for stream…' : 'Play a track to see lyrics'}
+          </p>
         </div>
       ) : (
         <>
@@ -95,6 +108,12 @@ export default function WrldView(): JSX.Element {
             >
               {artSrc ? (
                 <img src={artSrc} alt="Album art" className="w-full h-full object-cover" />
+              ) : radioFmActive ? (
+                /* 999 FM placeholder art */
+                <div className="w-full h-full bg-gradient-to-br from-red-900/60 to-black flex flex-col items-center justify-center gap-3">
+                  <Radio className="text-red-400 w-16 h-16 opacity-70" />
+                  <span className="text-red-300/70 text-2xl font-bold tracking-widest">999 FM</span>
+                </div>
               ) : (
                 <div className="w-full h-full bg-white/8 flex items-center justify-center">
                   <Music className="text-white/20 w-16 h-16" />
@@ -103,10 +122,17 @@ export default function WrldView(): JSX.Element {
             </div>
 
             <div className="text-center w-full px-2">
-              <p className="text-white font-bold text-xl leading-tight">{currentTrack.title}</p>
-              <p className="text-white/50 text-sm mt-1">{currentTrack.artist}</p>
-              {currentTrack.album && (
-                <p className="text-white/30 text-xs mt-0.5">{currentTrack.album}</p>
+              {displayTitle && (
+                <p className="text-white font-bold text-xl leading-tight">{displayTitle}</p>
+              )}
+              {displayArtist && (
+                <p className="text-white/50 text-sm mt-1">{displayArtist}</p>
+              )}
+              {displayAlbum && (
+                <p className="text-white/30 text-xs mt-0.5">{displayAlbum}</p>
+              )}
+              {radioFmActive && !radioFmNowPlaying && (
+                <p className="text-white/30 text-sm mt-1">Tuning in…</p>
               )}
             </div>
           </div>
@@ -114,9 +140,21 @@ export default function WrldView(): JSX.Element {
           {/* Vertical divider */}
           <div className="relative z-10 w-px bg-white/8 shrink-0 my-10" />
 
-          {/* Right column — lyrics */}
+          {/* Right column — lyrics (only in normal mode) */}
           <div className="relative z-10 flex-1 overflow-hidden flex flex-col">
-            {!rawLyrics ? (
+            {radioFmActive ? (
+              /* 999 FM: no lyrics from stream, show live info */
+              <div className="flex-1 flex flex-col items-center justify-center gap-4 px-12">
+                <div className="flex items-center gap-2 text-red-400">
+                  <Radio size={20} className="animate-pulse" />
+                  <span className="text-lg font-bold tracking-widest">999 FM</span>
+                </div>
+                <p className="text-white/25 text-sm text-center">Live radio — no lyrics</p>
+                {radioFmNowPlaying?.album && (
+                  <p className="text-white/40 text-xs text-center mt-2">{radioFmNowPlaying.album}</p>
+                )}
+              </div>
+            ) : !rawLyrics ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-3 px-12">
                 <div className="text-5xl opacity-10">&#9834;</div>
                 <p className="text-white/30 text-sm text-center">No lyrics available</p>
@@ -148,11 +186,9 @@ export default function WrldView(): JSX.Element {
                           fontSize:   isActive ? '2rem' : '1.25rem',
                           fontWeight: isActive ? 800 : 500,
                           lineHeight: isActive ? 1.2 : 1.35,
-                          color:      isActive
-                            ? 'rgba(255,255,255,1)'
-                            : isPast
-                            ? 'rgba(255,255,255,0.28)'
-                            : 'rgba(255,255,255,0.18)',
+                          color:      isActive ? 'rgba(255,255,255,1)'
+                                    : isPast   ? 'rgba(255,255,255,0.28)'
+                                    :            'rgba(255,255,255,0.18)',
                           textShadow: isActive ? '0 0 40px rgba(255,255,255,0.2)' : 'none',
                           transform:  isActive ? 'translateX(6px)' : 'none',
                         }}

@@ -77,6 +77,7 @@ export default function Player(): JSX.Element {
   const contextMenuBtnRef = useRef<HTMLButtonElement>(null)
   const currentSongId = currentTrack ? trackIdToSongId(currentTrack.id) : null
   const { radioMode, radioNext } = useStore()
+  const { radioFmActive, radioFmNowPlaying } = useStore()
 
   const openSongInfo = (): void => {
     setShowContextMenu(false)
@@ -568,9 +569,15 @@ export default function Player(): JSX.Element {
           </button>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-text-primary truncate">
-              {currentTrack?.title || 'Not playing'}
+              {radioFmActive && radioFmNowPlaying
+                ? radioFmNowPlaying.title
+                : (currentTrack?.title || 'Not playing')}
             </p>
-            <p className="text-xs text-text-muted truncate">{currentTrack?.artist || ''}</p>
+            <p className="text-xs text-text-muted truncate">
+              {radioFmActive && radioFmNowPlaying
+                ? radioFmNowPlaying.artist
+                : (currentTrack?.artist || '')}
+            </p>
           </div>
           <div className="flex items-center gap-0.5 shrink-0">
             <button onClick={handlePrev} className="p-2 text-text-secondary hover:text-text-primary transition-colors">
@@ -686,9 +693,9 @@ export default function Player(): JSX.Element {
             {/* Artist + radio badge */}
             <div className="flex items-center gap-1.5">
               <p className="text-text-muted text-xs truncate">{currentTrack?.artist || ''}</p>
-              {radioMode && (
-                <span className="flex items-center gap-0.5 text-accent text-[9px] font-semibold uppercase tracking-widest shrink-0">
-                  <Radio size={9} /> Radio
+              {(radioMode || radioFmActive) && (
+                <span className={`flex items-center gap-0.5 text-[9px] font-semibold uppercase tracking-widest shrink-0 ${radioFmActive ? 'text-red-400' : 'text-accent'}`}>
+                  <Radio size={9} /> {radioFmActive ? '999 FM' : 'Radio'}
                 </span>
               )}
             </div>

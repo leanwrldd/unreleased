@@ -38,6 +38,7 @@ interface AppState {
   showQueue: boolean
   radioFmActive: boolean
   radioFmIsLive: boolean | null  // null = unknown (not yet checked)
+  radioFmNowPlaying: import('../lib/radioLive').RadioTrack | null
   viewMode: 'list' | 'grid'
   theme: 'dark' | 'light'
   searchQuery: string
@@ -81,6 +82,7 @@ interface AppActions {
   setShowNowPlaying: (show: boolean) => void
   setRadioFmActive: (active: boolean) => void
   setRadioFmIsLive: (live: boolean | null) => void
+  setRadioFmNowPlaying: (track: import('../lib/radioLive').RadioTrack | null) => void
   setShowSettings: (show: boolean) => void
   setShowQueue: (show: boolean) => void
   setViewMode: (mode: 'list' | 'grid') => void
@@ -142,6 +144,7 @@ export const useStore = create<AppStore>((set, get, store) => ({
   showQueue: false,
   radioFmActive: false,
   radioFmIsLive: null,
+  radioFmNowPlaying: null,
   viewMode: ls.get<'list' | 'grid'>('viewMode') ?? 'list',
   theme: ls.get<'dark' | 'light'>('theme') ?? 'dark',
   searchQuery: '',
@@ -164,6 +167,7 @@ export const useStore = create<AppStore>((set, get, store) => ({
   setShowNowPlaying: (showNowPlaying) => set({ showNowPlaying }),
   setRadioFmActive: (radioFmActive) => set({ radioFmActive }),
   setRadioFmIsLive: (radioFmIsLive) => set({ radioFmIsLive }),
+  setRadioFmNowPlaying: (radioFmNowPlaying) => set({ radioFmNowPlaying }),
   setShowSettings: (showSettings) => set({ showSettings }),
   setShowQueue: (showQueue) => set({ showQueue }),
   setViewMode: (viewMode) => { set({ viewMode }); ls.set('viewMode', viewMode) },

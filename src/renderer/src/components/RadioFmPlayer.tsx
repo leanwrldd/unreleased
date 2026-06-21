@@ -3,36 +3,32 @@ import { useStore } from '../store/useStore'
 import { RadioStreamClient } from '../lib/radioSocketService'
 import { fetchRadioLive } from '../lib/radioLive'
 
-/**
- * Invisible component always mounted in App.tsx.
- * Manages the 999 FM WebSocket stream lifecycle.
- * When radioFmActive turns ON → connect + start listening (+ pause main player).
- * When radioFmActive turns OFF → stop listening + disconnect.
- */
 export default function RadioFmPlayer(): JSX.Element {
-  const { radioFmActive, setRadioFmActive, setRadioFmIsLive, setIsPlaying } = useStore()
+  const {
+    radioFmActive, setRadioFmActive,
+    setRadioFmIsLive, setRadioFmNowPlaying,
+    setIsPlaying,
+  } = useStore()
+
   const audioRef  = useRef<HTMLAudioElement>(null)
   const clientRef = useRef<RadioStreamClient | null>(null)
 
-  // One-time: create client, attach audio, connect WebSocket for metadata
   useEffect(() => {
     const client = new RadioStreamClient({
       onMeta: (data) => {
         setRadioFmIsLive(data.is_live)
-        // If the stream went offline while we were listening, reflect that
-        if (!data.is_live && useStore.getState().radioFmActive) {
-          // keep radioFmActive true so user can see offline badge; stream stops naturally
-        }
+        setRadioFmNowPlaying(data.now_playing)
       },
-      onClose: () => { /* reconnect handled internally */ },
     })
     if (audioRef.current) client.attach(audioRef.current)
     client.connect()
     clientRef.current = client
 
-    // Initial live check
     fetchRadioLive()
-      .then((data) => setRadioFmIsLive(data.is_live))
+      .then((data) => {
+        setRadioFmIsLive(data.is_live)
+        setRadioFmNowPlaying(data.now_playing)
+      })
       .catch(() => setRadioFmIsLive(false))
 
     return () => {
@@ -41,18 +37,12 @@ export default function RadioFmPlayer(): JSX.Element {
     }
   }, [])
 
-  // React to radioFmActive toggle
   useEffect(() => {
     const client = clientRef.current
     if (!client) return
-
     if (radioFmActive) {
-      // Pause main player so both don't play at once
       setIsPlaying(false)
-      client.startListening().catch(() => {
-        // Stream failed — turn off FM mode
-        setRadioFmActive(false)
-      })
+      client.startListening().catch(() => setRadioFmActive(false))
     } else {
       client.stopListening()
     }
