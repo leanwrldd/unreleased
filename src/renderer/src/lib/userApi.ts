@@ -115,7 +115,7 @@ async function request<T>(url: string, options: RequestInit = {}, auth = true): 
 
 /** Fetch a full song object with auth token — ensures synced_lyrics is returned. */
 export async function fetchSong(songId: number): Promise<JWApiSong> {
-  return request<JWApiSong>(`https://juicewrldapi.com/api/songs/${songId}/`, { method: 'GET' })
+  return request<JWApiSong>(`${JWAPI_BASE}/songs/${songId}/`, { method: 'GET' })
 }
 
 
