@@ -77,7 +77,7 @@ export default function Player(): JSX.Element {
   const [songInfoData, setSongInfoData] = useState<JWApiSong | null>(null)
   const contextMenuBtnRef = useRef<HTMLButtonElement>(null)
   const currentSongId = currentTrack ? trackIdToSongId(currentTrack.id) : null
-  const { radioMode } = useStore()
+  const { radioMode, radioNext } = useStore()
 
   const openSongInfo = (): void => {
     setShowContextMenu(false)
@@ -104,6 +104,7 @@ export default function Player(): JSX.Element {
   // Crossfade state (all refs — no re-renders needed)
   const cfActive     = useRef(false)
   const cfTargetIdx  = useRef(-1)
+  const cfIsRadio    = useRef(false)
   const cfOutRaf     = useRef<number | null>(null)
   const cfInRaf      = useRef<number | null>(null)
   const skipNextLoad = useRef(false)
@@ -125,6 +126,7 @@ export default function Player(): JSX.Element {
       if (na) { na.pause(); na.src = ''; na.volume = 0 }
       cfActive.current = false
       cfTargetIdx.current = -1
+      cfIsRadio.current = false
     }
     // Restore current audio to proper volume
     const a = getActive()
@@ -286,48 +288,51 @@ export default function Player(): JSX.Element {
       const remaining = audio.duration - audio.currentTime
 
       if (remaining > 0 && remaining <= crossfadeDuration) {
-        const nextIdx = computeNextIdx()
-        if (nextIdx >= 0 && nextIdx < queue.length) {
-          const nextTrackData = queue[nextIdx]
-          const na = getNext()
+        // In radio mode use radioNext; otherwise compute from queue
+        const isRadio = useStore.getState().radioMode
+        const nextTrackData = isRadio
+          ? useStore.getState().radioNext
+          : (() => { const i = computeNextIdx(); return (i >= 0 && i < queue.length) ? queue[i] : null })()
+        const nextIdx = isRadio ? -1 : computeNextIdx()
+        const na = getNext()
 
-          if (na && nextTrackData) {
-            cfActive.current = true
-            cfTargetIdx.current = nextIdx
+        if (na && nextTrackData) {
+          cfActive.current = true
+          cfIsRadio.current = isRadio
+          cfTargetIdx.current = nextIdx
 
-            const url = nextTrackData.streamUrl ?? `file:///${nextTrackData.path.replace(/\\/g, '/')}`
-            // Only reassign src if not already preloaded
-            if (na.src !== url) na.src = url
-            na.volume = 0
-            na.play().catch(console.error)
+          const url = nextTrackData.streamUrl ?? `file:///${nextTrackData.path.replace(/\\/g, '/')}`
+          // Only reassign src if not already preloaded
+          if (na.src !== url) na.src = url
+          na.volume = 0
+          na.play().catch(console.error)
 
-            // Fade OUT active audio
-            const startVol  = audio.volume
-            const startTime = performance.now()
-            const fadeDur   = remaining * 1000
+          // Fade OUT active audio
+          const startVol  = audio.volume
+          const startTime = performance.now()
+          const fadeDur   = remaining * 1000
 
-            const tickOut = (): void => {
-              const a = getActive()
-              if (!a) return
-              const t = Math.min((performance.now() - startTime) / fadeDur, 1)
-              a.volume = startVol * (1 - t)
-              if (t < 1) cfOutRaf.current = requestAnimationFrame(tickOut)
-              else { a.volume = 0; cfOutRaf.current = null }
-            }
-            cfOutRaf.current = requestAnimationFrame(tickOut)
-
-            // Fade IN next audio
-            const targetVol = volumeRef.current
-            const tickIn = (): void => {
-              const n = getNext()
-              if (!n) return
-              const t = Math.min((performance.now() - startTime) / fadeDur, 1)
-              n.volume = targetVol * t
-              if (t < 1) cfInRaf.current = requestAnimationFrame(tickIn)
-              else { n.volume = targetVol; cfInRaf.current = null }
-            }
-            cfInRaf.current = requestAnimationFrame(tickIn)
+          const tickOut = (): void => {
+            const a = getActive()
+            if (!a) return
+            const t = Math.min((performance.now() - startTime) / fadeDur, 1)
+            a.volume = startVol * (1 - t)
+            if (t < 1) cfOutRaf.current = requestAnimationFrame(tickOut)
+            else { a.volume = 0; cfOutRaf.current = null }
           }
+          cfOutRaf.current = requestAnimationFrame(tickOut)
+
+          // Fade IN next audio
+          const targetVol = volumeRef.current
+          const tickIn = (): void => {
+            const n = getNext()
+            if (!n) return
+            const t = Math.min((performance.now() - startTime) / fadeDur, 1)
+            n.volume = targetVol * t
+            if (t < 1) cfInRaf.current = requestAnimationFrame(tickIn)
+            else { n.volume = targetVol; cfInRaf.current = null }
+          }
+          cfInRaf.current = requestAnimationFrame(tickIn)
         }
       }
     }
@@ -349,7 +354,9 @@ export default function Player(): JSX.Element {
       cfActive.current = false
 
       const targetIdx = cfTargetIdx.current
+      const wasRadio  = cfIsRadio.current
       cfTargetIdx.current = -1
+      cfIsRadio.current   = false
 
       // Ensure incoming track is at full volume
       const na = getNext()
@@ -361,8 +368,11 @@ export default function Player(): JSX.Element {
       // Tell the load useEffect to skip (audio already playing)
       skipNextLoad.current = true
 
-      // Advance the store to the next track
-      if (targetIdx >= 0 && targetIdx < queue.length) {
+      if (wasRadio) {
+        // Radio: delegate to nextTrack() which handles queue history + prefetch
+        nextTrack()
+      } else if (targetIdx >= 0 && targetIdx < queue.length) {
+        // Normal queue: advance store to the crossfaded-into track
         const track = queue[targetIdx]
         const isSameTrack = targetIdx === queueIndex
         useStore.setState({
