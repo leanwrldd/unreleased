@@ -108,8 +108,10 @@ export function buildCoverArtUrl(path: string): string {
 
 export function buildImageUrl(imageUrl: string | null | undefined): string | undefined {
   if (!imageUrl) return undefined
-  if (imageUrl.startsWith('http') || imageUrl.startsWith('data:')) return imageUrl
-  return `https://juicewrldapi.com${imageUrl}`
+  if (imageUrl.startsWith('http') || imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) return imageUrl
+  // Relative path — ensure single leading slash
+  const rel = imageUrl.startsWith('/') ? imageUrl : '/' + imageUrl
+  return `https://juicewrldapi.com${rel}`
 }
 
 // ─── Duration parse ───────────────────────────────────────────────────────────

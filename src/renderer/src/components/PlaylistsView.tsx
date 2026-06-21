@@ -226,7 +226,6 @@ export default function PlaylistsView(): JSX.Element {
     return () => window.removeEventListener('click', h)
   }, [trackMenu, libMenu, showAddAllMenu])
 
-  useEffect(() => { if (account) refreshPlaylists() }, [account, refreshPlaylists])
 
   const loadDetail = useCallback(async (id: number) => {
     const gen = ++loadGen.current

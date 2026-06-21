@@ -112,6 +112,9 @@ export type AppStore = QueueSlice & AppState & AppActions
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
+// Dedup flag: prevents concurrent /playlists/ fetches
+let _playlistsInFlight = false
+
 export const useStore = create<AppStore>((set, get, store) => ({
   // ── Queue slice (all queue + playback logic) ───────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -285,10 +288,13 @@ export const useStore = create<AppStore>((set, get, store) => ({
 
   refreshPlaylists: async () => {
     if (!get().account) return
+    if (_playlistsInFlight) return
+    _playlistsInFlight = true
     try {
       const playlists = await userApi.getPlaylists()
       set({ playlists })
     } catch {}
+    finally { _playlistsInFlight = false }
   },
 
   // ── Editor ────────────────────────────────────────────────────────────────
