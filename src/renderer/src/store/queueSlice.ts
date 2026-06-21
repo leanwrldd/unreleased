@@ -52,6 +52,8 @@ export interface QueueSlice {
   queueFilter: QueueFilter | null
   /** True while a background page fetch is in flight. */
   queueLoadingMore: boolean
+  /** Where the current queue came from — used to activate radio on shuffle. */
+  queueSource: 'tracker' | 'playlist' | null
 
   /**
    * Radio mode: enabled when the user clicks a track from the Tracker with
@@ -71,7 +73,7 @@ export interface QueueSlice {
    * `filter` enables lazy loading beyond the initial context.
    * Does NOT activate radio mode — use `startRadio` for that.
    */
-  playTrack: (track: Track, context?: Track[], filter?: QueueFilter | null) => void
+  playTrack: (track: Track, context?: Track[], filter?: QueueFilter | null, source?: 'tracker' | 'playlist' | null) => void
 
   /**
    * Start radio mode. The queue is seeded with `track` only;
@@ -145,6 +147,7 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
   repeat: 'none',
   queueFilter: null,
   queueLoadingMore: false,
+  queueSource: null,
   radioMode: false,
   radioNext: null,
   _radioWaiting: false,
@@ -155,7 +158,7 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
   setCurrentTime: (currentTime) => set({ currentTime }),
 
   // ── playTrack ──────────────────────────────────────────────────────────────
-  playTrack: (track, context?, filter = null) => {
+  playTrack: (track, context?, filter = null, source = null) => {
     const tracks: Track[] = context ?? (get().queue as Track[])
     const idx = tracks.findIndex((t: Track) => t.id === track.id)
     set({
@@ -165,6 +168,7 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       currentTrackFull: null,
       isPlaying: true,
       queueFilter: filter,
+      queueSource: source,
       radioMode: false,
       radioNext: null,
       _radioWaiting: false,
@@ -281,7 +285,7 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
 
   // ── toggleShuffle ──────────────────────────────────────────────────────────
   toggleShuffle: () => {
-    const { shuffle, queue, queueIndex, queueFilter, radioMode, currentTrack } = get()
+    const { shuffle, queue, queueIndex, queueFilter, radioMode, currentTrack, queueSource } = get()
     const newShuffle = !shuffle
 
     if (!newShuffle) {
@@ -295,17 +299,14 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       return
     }
 
-    // Turning ON: if there's a tracker queueFilter OR it's a lone tracker song → radio mode
-    // queueFilter is set when playing from the tracker with lazy loading (infinite scroll context)
-    const isTrackerSong = currentTrack?.id?.startsWith('jw-') && !currentTrack?.id?.startsWith('jw-file-')
-    const isTrackerContext = !!queueFilter || (isTrackerSong && queue.length <= 1)
-    if (isTrackerContext && currentTrack) {
+    // Turning ON: tracker context → radio mode; otherwise shuffle the queue
+    if (queueSource === 'tracker' && currentTrack) {
       set({ shuffle: true })
       get().startRadio(currentTrack)
       return
     }
 
-    // Turning ON (playlist/non-tracker): shuffle the upcoming portion
+    // Turning ON (playlist/files/non-tracker): shuffle the upcoming portion
     const played = queue.slice(0, queueIndex + 1)
     const upcoming = fisherYates(queue.slice(queueIndex + 1))
     set({ shuffle: true, queue: [...played, ...upcoming] })

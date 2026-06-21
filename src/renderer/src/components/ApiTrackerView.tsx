@@ -770,7 +770,7 @@ export default function ApiTrackerView(): JSX.Element {
     playTrack(track, context.length > 0 ? context : [track], needsLazy ? {
       category, era, search: debouncedSearch,
       page: page + 1, hasMore: true, total: count,
-    } : null)
+    } : null, 'tracker')
   }, [playTrack, sortedSongs, category, era, debouncedSearch, count, hasMore, orderField, page])
 
   const handleInfo = useCallback((song: JWApiSong) => { setSelectedSong(song) }, [])
