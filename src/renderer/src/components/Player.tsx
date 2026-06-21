@@ -632,7 +632,7 @@ export default function Player(): JSX.Element {
                         >
                           <ListEnd size={14} /> Play Next
                         </button>
-                        {currentSongId != null && (
+                        {currentSongId != null && !['recording_session', 'unsurfaced'].includes(currentTrack?.genre ?? '') && (
                           <button
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
                             onClick={() => { setShowAddToPlaylist(true); setShowContextMenu(false) }}

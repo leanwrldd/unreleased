@@ -314,7 +314,9 @@ function SongContextMenu({
           {state.song.path && (
             <MenuItem icon={<ListPlus size={14} />} label="Add to queue" onClick={() => { onQueue(); onClose() }} />
           )}
-          <MenuItem icon={<Plus size={14} />} label="Add to playlist" onClick={onTogglePlaylists} />
+          {!['recording_session', 'unsurfaced'].includes(state.song.category) && (
+            <MenuItem icon={<Plus size={14} />} label="Add to playlist" onClick={onTogglePlaylists} />
+          )}
           {state.song.path && (
             <MenuItem icon={<Folder size={14} />} label="Show in Files" onClick={() => { onShowInFiles(); onClose() }} />
           )}
