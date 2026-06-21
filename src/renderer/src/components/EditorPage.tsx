@@ -168,7 +168,7 @@ function extractGeniusLyrics(html: string): string {
 export default function EditorPage(): JSX.Element {
   const {
     account, currentTrack,
-    pendingEditorSongId, setPendingEditorSongId, setActiveView,
+    pendingEditorSongId, setPendingEditorSongId, setActiveView, setSyncedLyricsSongId,
     pendingEditProposal, setPendingEditProposal,
     setShowUserAuth, logoutAccount,
   } = useStore()
@@ -590,7 +590,7 @@ export default function EditorPage(): JSX.Element {
                 })}
                 {lyricsTab === 'synced' && (
                   <button
-                    onClick={() => setActiveView('synced-lyrics')}
+                    onClick={() => { if (song) setSyncedLyricsSongId(song.id); setActiveView('synced-lyrics') }}
                     title="Make new synced lyrics"
                     className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-text-muted hover:text-text-primary hover:bg-surface-overlay transition-all"
                   >
