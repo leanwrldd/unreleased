@@ -608,7 +608,11 @@ export default function Player(): JSX.Element {
             onClick={() => setShowNowPlaying(!showNowPlaying)}
             title="Now Playing"
           >
-            {(!coverArtError && (currentTrackFull?.albumArt ?? currentTrack?.imageUrl)) ? (
+            {radioFmActive ? (
+              <div className="w-full h-full bg-gradient-to-br from-red-900/70 to-black flex items-center justify-center">
+                <Radio size={22} className="text-red-400 opacity-80" />
+              </div>
+            ) : (!coverArtError && (currentTrackFull?.albumArt ?? currentTrack?.imageUrl)) ? (
               <img src={currentTrackFull?.albumArt ?? currentTrack?.imageUrl} alt="Album art" className="w-full h-full object-cover" onError={() => setCoverArtError(true)} />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-text-muted">
@@ -623,7 +627,9 @@ export default function Player(): JSX.Element {
             {/* Title + heart + 3-dot inline */}
             <div className="flex items-center gap-1 min-w-0">
               <p className="text-text-primary text-sm font-medium truncate min-w-0">
-                {currentTrack?.title || 'Not playing'}
+                {radioFmActive && radioFmNowPlaying
+                  ? radioFmNowPlaying.title
+                  : (currentTrack?.title || 'Not playing')}
               </p>
               <div className="flex items-center gap-0 shrink-0">
                 {currentSongId != null && (
@@ -692,7 +698,7 @@ export default function Player(): JSX.Element {
 
             {/* Artist + radio badge */}
             <div className="flex items-center gap-1.5">
-              <p className="text-text-muted text-xs truncate">{currentTrack?.artist || ''}</p>
+              <p className="text-text-muted text-xs truncate">{radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.artist : (currentTrack?.artist || '')}</p>
               {(radioMode || radioFmActive) && (
                 <span className={`flex items-center gap-0.5 text-[9px] font-semibold uppercase tracking-widest shrink-0 ${radioFmActive ? 'text-red-400' : 'text-accent'}`}>
                   <Radio size={9} /> {radioFmActive ? '999 FM' : 'Radio'}
@@ -760,6 +766,7 @@ export default function Player(): JSX.Element {
         {/* Right: speed + queue + NP + volume */}
         <div className="flex items-center gap-3 w-56 justify-end">
           {/* Playback speed */}
+          {!radioFmActive && (
           <button
             onClick={cycleSpeed}
             title={`Playback speed: ${speedLabel}`}
@@ -769,6 +776,7 @@ export default function Player(): JSX.Element {
           >
             {speedLabel}
           </button>
+          )}
 
           <button onClick={() => setShowQueue(!showQueue)}
             className={`relative transition-colors ${showQueue ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}

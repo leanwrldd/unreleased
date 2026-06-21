@@ -8,6 +8,7 @@ export default function RadioFmPlayer(): JSX.Element {
     radioFmActive, setRadioFmActive,
     setRadioFmIsLive, setRadioFmNowPlaying,
     setIsPlaying,
+    volume,
   } = useStore()
 
   const audioRef  = useRef<HTMLAudioElement>(null)
@@ -36,6 +37,11 @@ export default function RadioFmPlayer(): JSX.Element {
       clientRef.current = null
     }
   }, [])
+
+  // Sync store volume → FM audio element
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = volume
+  }, [volume])
 
   useEffect(() => {
     const client = clientRef.current

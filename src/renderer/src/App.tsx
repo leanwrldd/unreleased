@@ -128,7 +128,7 @@ export default function App(): JSX.Element {
               : activeView === 'not-found' ? <NotFoundView />
               : <ApiTrackerView />}
           </ErrorBoundary>
-          {showNowPlaying && <ErrorBoundary><NowPlaying /></ErrorBoundary>}
+          {showNowPlaying && activeView !== 'wrld' && <ErrorBoundary><NowPlaying /></ErrorBoundary>}
           {showQueue && <ErrorBoundary><QueuePanel /></ErrorBoundary>}
         </main>
       </div>

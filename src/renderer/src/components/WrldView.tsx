@@ -51,7 +51,7 @@ export default function WrldView(): JSX.Element {
     : radioFmIsLive === false ? '999 FM · OFFLINE' : '999 FM'
   const fmDisabled = radioFmIsLive === false && !radioFmActive
 
-  const hasContent = radioFmActive ? (!!radioFmNowPlaying || radioFmIsLive) : !!currentTrack
+  const hasContent = radioFmActive || !!currentTrack
 
   return (
     <div className="relative flex flex-1 h-full w-full overflow-hidden">
