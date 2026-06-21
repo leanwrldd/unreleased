@@ -78,7 +78,7 @@ function FieldDiff({ fieldKey, before, after }: { fieldKey: string; before: unkn
   const unchanged = beforeStr === afterStr
   const isLong    = LONG_KEYS.has(fieldKey) || beforeStr.length > LONG_THRESHOLD || afterStr.length > LONG_THRESHOLD
   const [exp, setExp] = useState(!isLong)
-  const MAX = 5
+  const MAX = 8
 
   const sliceLong = (s: string) => {
     const lines = s.split('\n')
@@ -89,9 +89,11 @@ function FieldDiff({ fieldKey, before, after }: { fieldKey: string; before: unkn
   const b = sliceLong(beforeStr)
   const a = sliceLong(afterStr)
   const hasBefore = before !== undefined && !unchanged
+  const sideBySide = hasBefore && !unchanged
 
   return (
     <div className="rounded-lg overflow-hidden border border-[var(--border)] text-[11px]">
+      {/* Field header */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-surface-raised/60 border-b border-[var(--border)]">
         <span className="font-mono text-[10px] text-text-muted/60 tracking-tight">{fieldKey.replace(/_/g, ' ')}</span>
         <div className="flex items-center gap-2">
@@ -103,36 +105,64 @@ function FieldDiff({ fieldKey, before, after }: { fieldKey: string; before: unkn
           )}
         </div>
       </div>
-      {hasBefore && (
-        <div className="bg-red-950/25">
-          {b.lines.map((line, i) => (
-            <div key={i} className="flex items-start gap-2 px-3 py-[3px]">
-              <Minus size={9} className="text-red-400/50 mt-[3px] shrink-0" />
-              <pre className="font-mono text-red-300/80 whitespace-pre-wrap break-words flex-1 leading-relaxed">{line}</pre>
+
+      {/* Side-by-side before / after */}
+      {sideBySide && (
+        <div className="grid grid-cols-2 divide-x divide-[var(--border)]">
+          {/* Before */}
+          <div className="bg-red-500/8 min-w-0">
+            <div className="flex items-center gap-1.5 px-3 py-1 border-b border-red-500/15">
+              <Minus size={9} className="text-red-500 shrink-0" />
+              <span className="text-[9px] font-bold uppercase tracking-wide text-red-500">Before</span>
             </div>
-          ))}
-          {'clipped' in b && b.clipped && (
-            <div className="px-3 py-1 text-[9px] text-red-400/30 italic">+{(b as { total?: number }).total! - MAX} more lines</div>
-          )}
+            <div className="px-3 py-2">
+              {b.lines.map((line, i) => (
+                <pre key={i} className="font-mono text-red-700 dark:text-red-400 whitespace-pre-wrap break-words leading-relaxed">{line || ' '}</pre>
+              ))}
+              {'clipped' in b && b.clipped && (
+                <p className="text-[9px] text-red-500/50 italic mt-1">+{(b as { total?: number }).total! - MAX} more lines</p>
+              )}
+            </div>
+          </div>
+
+          {/* After */}
+          <div className="bg-emerald-500/8 min-w-0">
+            <div className="flex items-center gap-1.5 px-3 py-1 border-b border-emerald-500/15">
+              <Plus size={9} className="text-emerald-600 shrink-0" />
+              <span className="text-[9px] font-bold uppercase tracking-wide text-emerald-600">After</span>
+            </div>
+            <div className="px-3 py-2">
+              {a.lines.map((line, i) => (
+                <pre key={i} className="font-mono text-emerald-800 dark:text-emerald-400 whitespace-pre-wrap break-words leading-relaxed">{line || ' '}</pre>
+              ))}
+              {'clipped' in a && a.clipped && (
+                <p className="text-[9px] text-emerald-600/50 italic mt-1">+{(a as { total?: number }).total! - MAX} more lines</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
-      {!unchanged && (
-        <div className="bg-emerald-950/25">
-          {a.lines.map((line, i) => (
-            <div key={i} className="flex items-start gap-2 px-3 py-[3px]">
-              <Plus size={9} className="text-emerald-400/50 mt-[3px] shrink-0" />
-              <pre className="font-mono text-emerald-300/90 whitespace-pre-wrap break-words flex-1 leading-relaxed">{line}</pre>
-            </div>
-          ))}
-          {'clipped' in a && a.clipped && (
-            <div className="px-3 py-1 text-[9px] text-emerald-400/30 italic">+{(a as { total?: number }).total! - MAX} more lines</div>
-          )}
+
+      {/* New value only (no snapshot) */}
+      {!unchanged && !hasBefore && (
+        <div className="bg-emerald-500/8">
+          <div className="flex items-center gap-1.5 px-3 py-1 border-b border-emerald-500/15">
+            <Plus size={9} className="text-emerald-600 shrink-0" />
+            <span className="text-[9px] font-bold uppercase tracking-wide text-emerald-600">Value</span>
+          </div>
+          <div className="px-3 py-2">
+            {a.lines.map((line, i) => (
+              <pre key={i} className="font-mono text-emerald-800 dark:text-emerald-400 whitespace-pre-wrap break-words leading-relaxed">{line || ' '}</pre>
+            ))}
+          </div>
         </div>
       )}
+
+      {/* Unchanged */}
       {unchanged && (
         <div className="px-3 py-2">
-          <pre className="font-mono text-text-muted/40 whitespace-pre-wrap break-words leading-relaxed">
-            {exp ? afterStr : afterStr.slice(0, 100) + (afterStr.length > 100 ? '…' : '')}
+          <pre className="font-mono text-text-muted/50 whitespace-pre-wrap break-words leading-relaxed">
+            {exp ? afterStr : afterStr.slice(0, 120) + (afterStr.length > 120 ? '…' : '')}
           </pre>
         </div>
       )}
