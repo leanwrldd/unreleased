@@ -1,5 +1,5 @@
 import { Track } from '../types'
-import { JWAPI_BASE, buildStreamUrl, buildImageUrl, parseDuration, JWApiSong } from './juicewrldApi'
+import { JWAPI_BASE, buildStreamUrl, buildImageUrl, parseDuration } from './juicewrldApi'
 
 const ACCOUNT_BASE = `${JWAPI_BASE}/accounts`
 const LIBRARY_BASE = `${JWAPI_BASE}/library`
