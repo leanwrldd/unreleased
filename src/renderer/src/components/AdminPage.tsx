@@ -117,7 +117,7 @@ function FieldDiff({ fieldKey, before, after }: { fieldKey: string; before: unkn
             </div>
             <div className="px-3 py-2">
               {b.lines.map((line, i) => (
-                <pre key={i} className="font-mono text-red-700 dark:text-red-400 whitespace-pre-wrap break-words leading-relaxed">{line || ' '}</pre>
+                <pre key={i} className="font-mono text-red-500 whitespace-pre-wrap break-words leading-relaxed">{line || ' '}</pre>
               ))}
               {'clipped' in b && b.clipped && (
                 <p className="text-[9px] text-red-500/50 italic mt-1">+{(b as { total?: number }).total! - MAX} more lines</p>
@@ -133,7 +133,7 @@ function FieldDiff({ fieldKey, before, after }: { fieldKey: string; before: unkn
             </div>
             <div className="px-3 py-2">
               {a.lines.map((line, i) => (
-                <pre key={i} className="font-mono text-emerald-800 dark:text-emerald-400 whitespace-pre-wrap break-words leading-relaxed">{line || ' '}</pre>
+                <pre key={i} className="font-mono text-emerald-600 whitespace-pre-wrap break-words leading-relaxed">{line || ' '}</pre>
               ))}
               {'clipped' in a && a.clipped && (
                 <p className="text-[9px] text-emerald-600/50 italic mt-1">+{(a as { total?: number }).total! - MAX} more lines</p>
@@ -152,7 +152,7 @@ function FieldDiff({ fieldKey, before, after }: { fieldKey: string; before: unkn
           </div>
           <div className="px-3 py-2">
             {a.lines.map((line, i) => (
-              <pre key={i} className="font-mono text-emerald-800 dark:text-emerald-400 whitespace-pre-wrap break-words leading-relaxed">{line || ' '}</pre>
+              <pre key={i} className="font-mono text-emerald-600 whitespace-pre-wrap break-words leading-relaxed">{line || ' '}</pre>
             ))}
           </div>
         </div>
