@@ -172,6 +172,7 @@ export const useStore = create<AppStore>((set, get, store) => ({
       'liked': '/liked',
       'playlists': '/playlists',
       'radio-fm': '/999-fm',
+      'wrld': '/wrld',
     }
     window.history.pushState({ view }, '', paths[view] ?? '/tracker')
     set({ activeView: view })

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Play,
@@ -77,8 +77,24 @@ export default function Player(): JSX.Element {
   const contextMenuBtnRef = useRef<HTMLButtonElement>(null)
   const currentSongId = currentTrack ? trackIdToSongId(currentTrack.id) : null
   const { radioMode, radioNext } = useStore()
-  const { radioFmActive, radioFmNowPlaying } = useStore()
+  const { radioFmActive, radioFmNowPlaying, radioFmMatchedSong } = useStore()
 
+
+  // FM elapsed time — ticks locally between WS updates
+  const [fmElapsedMs, setFmElapsedMs] = useState(0)
+  const fmBaseRef = useRef<{ elapsed: number; at: number }>({ elapsed: 0, at: 0 })
+  useEffect(() => {
+    if (!radioFmActive || !radioFmNowPlaying?.elapsed_ms) { setFmElapsedMs(0); return }
+    fmBaseRef.current = { elapsed: radioFmNowPlaying.elapsed_ms, at: Date.now() }
+    setFmElapsedMs(radioFmNowPlaying.elapsed_ms)
+    const t = setInterval(() => {
+      const { elapsed, at } = fmBaseRef.current
+      setFmElapsedMs(elapsed + (Date.now() - at))
+    }, 500)
+    return () => clearInterval(t)
+  }, [radioFmActive, radioFmNowPlaying])
+  const fmDurationMs = radioFmNowPlaying?.duration_ms ?? 0
+  const fmProgress = fmDurationMs > 0 ? Math.min(fmElapsedMs / fmDurationMs, 1) : 0
   const openSongInfo = (): void => {
     setShowContextMenu(false)
     if (!currentTrack) return
@@ -546,8 +562,8 @@ export default function Player(): JSX.Element {
       <div className="md:hidden bg-surface border-t border-[var(--border)] shrink-0">
         {/* Thin progress bar */}
         {radioFmActive ? (
-          <div className="h-[2px] bg-red-900/60 relative">
-            <div className="h-full bg-red-500 absolute left-0 top-0 animate-pulse" style={{ width: '100%' }} />
+          <div className="h-[2px] bg-red-900/40 relative">
+            <div className="h-full bg-red-400 absolute left-0 top-0 transition-none" style={{ width: `${fmProgress * 100}%` }} />
           </div>
         ) : (
         <div className="h-[2px] bg-surface-overlay relative">
@@ -564,9 +580,9 @@ export default function Player(): JSX.Element {
             onClick={() => setShowNowPlaying(!showNowPlaying)}
           >
             {radioFmActive ? (
-              <div className="w-full h-full bg-gradient-to-br from-red-900/70 to-black flex items-center justify-center">
-                <Radio size={16} className="text-red-400 opacity-80" />
-              </div>
+              radioFmMatchedSong?.imageUrl
+                ? <img src={radioFmMatchedSong.imageUrl} alt="" className="w-full h-full object-cover" />
+                : <div className="w-full h-full bg-gradient-to-br from-red-900/70 to-black flex items-center justify-center"><Radio size={16} className="text-red-400 opacity-80" /></div>
             ) : (!coverArtError && (currentTrackFull?.albumArt ?? currentTrack?.imageUrl)) ? (
               <img src={currentTrackFull?.albumArt ?? currentTrack?.imageUrl} alt="" className="w-full h-full object-cover" onError={() => setCoverArtError(true)} />
             ) : (
@@ -619,9 +635,9 @@ export default function Player(): JSX.Element {
             title="Now Playing"
           >
             {radioFmActive ? (
-              <div className="w-full h-full bg-gradient-to-br from-red-900/70 to-black flex items-center justify-center">
-                <Radio size={22} className="text-red-400 opacity-80" />
-              </div>
+              radioFmMatchedSong?.imageUrl
+                ? <img src={radioFmMatchedSong.imageUrl} alt="" className="w-full h-full object-cover" />
+                : <div className="w-full h-full bg-gradient-to-br from-red-900/70 to-black flex items-center justify-center"><Radio size={22} className="text-red-400 opacity-80" /></div>
             ) : (!coverArtError && (currentTrackFull?.albumArt ?? currentTrack?.imageUrl)) ? (
               <img src={currentTrackFull?.albumArt ?? currentTrack?.imageUrl} alt="Album art" className="w-full h-full object-cover" onError={() => setCoverArtError(true)} />
             ) : (
@@ -754,23 +770,23 @@ export default function Player(): JSX.Element {
           <div className="flex items-center gap-2 w-full max-w-xl">
             <span className="text-text-muted text-xs w-10 text-right tabular-nums">
               {radioFmActive
-                ? <span className="flex items-center gap-1 text-red-400 text-[10px] font-semibold"><span className="w-1 h-1 rounded-full bg-red-400 animate-pulse inline-block" />LIVE</span>
+                ? formatDuration(Math.floor(fmElapsedMs / 1000))
                 : formatDuration(currentTime)}
             </span>
             <div className="flex-1 progress-track">
               <input
                 type="range" min={0} max={1} step={0.001}
-                value={radioFmActive ? 0 : (seekDrag !== null ? seekDrag : progress)}
+                value={radioFmActive ? fmProgress : (seekDrag !== null ? seekDrag : progress)}
                 onMouseDown={radioFmActive ? undefined : handleSeekMouseDown}
                 onChange={handleSeekChange}
                 onMouseUp={radioFmActive ? undefined : handleSeekCommit}
                 onTouchEnd={radioFmActive ? undefined : handleSeekCommit}
                 disabled={!currentTrack} className="w-full"
-                style={{ '--val': `${radioFmActive ? 0 : (seekDrag !== null ? seekDrag : progress) * 100}%`, ...(radioFmActive ? { opacity: 0.4, pointerEvents: 'none' } : {}) } as React.CSSProperties}
+                style={{ '--val': `${(radioFmActive ? fmProgress : (seekDrag !== null ? seekDrag : progress)) * 100}%`, ...(radioFmActive ? { pointerEvents: 'none' as const } : {}) } as React.CSSProperties}
               />
             </div>
             <span className="text-text-muted text-xs w-10 tabular-nums">
-              {radioFmActive ? '' : formatDuration(duration)}
+              {radioFmActive ? formatDuration(Math.floor(fmDurationMs / 1000)) : formatDuration(duration)}
             </span>
           </div>
         </div>
