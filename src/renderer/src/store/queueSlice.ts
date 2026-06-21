@@ -295,9 +295,10 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       return
     }
 
-    // Turning ON: if a tracker song is already playing, switch to radio mode
+    // Turning ON: only switch to radio if it's a lone tracker song (no playlist queue loaded)
+    // Playlist tracks also have jw- IDs, so we check queue.length === 1 to distinguish
     const isTrackerSong = currentTrack?.id?.startsWith('jw-') ?? false
-    if (isTrackerSong && currentTrack) {
+    if (isTrackerSong && currentTrack && queue.length <= 1) {
       set({ shuffle: true })
       get().startRadio(currentTrack)
       return
