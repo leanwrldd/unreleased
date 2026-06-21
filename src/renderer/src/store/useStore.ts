@@ -42,6 +42,7 @@ interface AppState {
   radioFmVote: import('../lib/radioLive').RadioVote | null
   radioFmUpNext: import('../lib/radioLive').RadioTrack | null
   radioFmQueuePreview: string[]
+  radioFmMatchedSong: { imageUrl: string | null; lyrics: string | null } | null
   viewMode: 'list' | 'grid'
   theme: 'dark' | 'light'
   searchQuery: string
@@ -89,6 +90,7 @@ interface AppActions {
   setRadioFmVote: (vote: import('../lib/radioLive').RadioVote | null) => void
   setRadioFmUpNext: (track: import('../lib/radioLive').RadioTrack | null) => void
   setRadioFmQueuePreview: (preview: string[]) => void
+  setRadioFmMatchedSong: (song: { imageUrl: string | null; lyrics: string | null } | null) => void
   setShowSettings: (show: boolean) => void
   setShowQueue: (show: boolean) => void
   setViewMode: (mode: 'list' | 'grid') => void
@@ -154,6 +156,7 @@ export const useStore = create<AppStore>((set, get, store) => ({
   radioFmVote: null,
   radioFmUpNext: null,
   radioFmQueuePreview: [],
+  radioFmMatchedSong: null,
   viewMode: ls.get<'list' | 'grid'>('viewMode') ?? 'list',
   theme: ls.get<'dark' | 'light'>('theme') ?? 'dark',
   searchQuery: '',
@@ -180,6 +183,7 @@ export const useStore = create<AppStore>((set, get, store) => ({
   setRadioFmVote: (radioFmVote) => set({ radioFmVote }),
   setRadioFmUpNext: (radioFmUpNext) => set({ radioFmUpNext }),
   setRadioFmQueuePreview: (radioFmQueuePreview) => set({ radioFmQueuePreview }),
+  setRadioFmMatchedSong: (radioFmMatchedSong) => set({ radioFmMatchedSong }),
   setShowSettings: (showSettings) => set({ showSettings }),
   setShowQueue: (showQueue) => set({ showQueue }),
   setViewMode: (viewMode) => { set({ viewMode }); ls.set('viewMode', viewMode) },

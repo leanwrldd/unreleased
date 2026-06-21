@@ -94,6 +94,10 @@ input[type='range']:hover::-webkit-slider-thumb { opacity: 1; }
 .progress-track input[type='range']::-webkit-slider-runnable-track {
   background: linear-gradient(to right, var(--accent) var(--val, 0%), var(--surface-overlay) var(--val, 0%));
 }
+/* Preserve gradient on disabled range (FM live bar) */
+.progress-track input[type='range']:disabled::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, var(--accent) var(--val, 0%), var(--surface-overlay) var(--val, 0%));
+}
 
 /* Synced lyrics */
 .lyric-active { color: var(--text-primary); font-weight: 700; font-size: 1.25rem; }

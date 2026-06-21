@@ -765,7 +765,7 @@ export default function Player(): JSX.Element {
                 onChange={handleSeekChange}
                 onMouseUp={radioFmActive ? undefined : handleSeekCommit}
                 onTouchEnd={radioFmActive ? undefined : handleSeekCommit}
-                disabled={!currentTrack || radioFmActive} className="w-full"
+                disabled={!currentTrack} className="w-full"
                 style={{ '--val': `${radioFmActive ? 0 : (seekDrag !== null ? seekDrag : progress) * 100}%`, ...(radioFmActive ? { opacity: 0.4, pointerEvents: 'none' } : {}) } as React.CSSProperties}
               />
             </div>

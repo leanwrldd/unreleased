@@ -900,7 +900,7 @@ function RadioPlayer() {
       <Section title="Notes">
         <ul className="space-y-2 text-sm text-text-secondary">
           <li className="flex items-start gap-2"><span className="text-accent mt-0.5">•</span> Calls are not seeded — every request is independent. Repeats are possible but rare given the 2,452-song catalogue.</li>
-          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">•</span> The <Code>song</Code> object is identical to <Code>/songs/{'{id}'}/</Code> — full producers, engineers, lyrics, synced lyrics, and groupbuy info included.</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">•</span> The <Code>song</Code> object is identical to <Code>{`/songs/{id}/`}</Code> — full producers, engineers, lyrics, synced lyrics, and groupbuy info included.</li>
           <li className="flex items-start gap-2"><span className="text-accent mt-0.5">•</span> <Code>image_url</Code> is a relative path (e.g. <Code>/assets/wod.jpg</Code>) — prepend <Code>https://juicewrldapi.com</Code> for use in <Code>&lt;img&gt;</Code> tags.</li>
           <li className="flex items-start gap-2"><span className="text-accent mt-0.5">•</span> The stream endpoint supports HTTP Range requests — the browser <Code>&lt;audio&gt;</Code> element handles seeking automatically.</li>
           <li className="flex items-start gap-2"><span className="text-accent mt-0.5">•</span> No rate limiting on public endpoints, but call once per track end — not on a tight loop.</li>

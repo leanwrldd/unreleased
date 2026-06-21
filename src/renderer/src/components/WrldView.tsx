@@ -12,6 +12,7 @@ export default function WrldView(): JSX.Element {
     currentTrack, currentTrackFull, currentTime, account,
     radioFmActive, setRadioFmActive, radioFmIsLive, radioFmNowPlaying,
     radioFmVote, radioFmUpNext, radioFmQueuePreview,
+    radioFmMatchedSong,
   } = useStore()
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -57,13 +58,15 @@ export default function WrldView(): JSX.Element {
 
   // Art
   const artSrc = radioFmActive
-    ? (buildImageUrl(radioFmNowPlaying?.image_url) ?? null)
+    ? (radioFmMatchedSong?.imageUrl ?? buildImageUrl(radioFmNowPlaying?.image_url) ?? null)
     : (buildImageUrl(currentTrackFull?.albumArt ?? currentTrack?.imageUrl ?? null) ?? null)
 
   useEffect(() => { setArtError(false) }, [artSrc])
 
-  // Lyrics — always derived from currentTrackFull, regardless of FM tab
-  const rawLyrics   = currentTrackFull?.syncedLyrics || currentTrackFull?.lyrics
+  // Lyrics — use FM matched song lyrics in FM mode, otherwise currentTrackFull
+  const rawLyrics   = radioFmActive
+    ? (radioFmMatchedSong?.lyrics ?? null)
+    : (currentTrackFull?.syncedLyrics || currentTrackFull?.lyrics || null)
   const isSynced    = rawLyrics ? isLrcFormat(rawLyrics) : false
   const isEditor    = account?.is_editor || account?.is_administrator
 
