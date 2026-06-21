@@ -169,6 +169,10 @@ export default function PlaylistsView(): JSX.Element {
   const [coverData, setCoverData] = useState<CoverData | null>(null)
   const [coverImgError, setCoverImgError] = useState(false)
 
+  // Async cover thumbnails for the grid (keyed by playlist id)
+  const [covers, setCovers] = useState<Record<number, string | null>>({})
+  const coversLoadedRef = useRef<Set<number>>(new Set())
+
   // Description editing
   const [editingDesc, setEditingDesc] = useState(false)
   const [descValue, setDescValue] = useState('')
@@ -178,6 +182,29 @@ export default function PlaylistsView(): JSX.Element {
 
   // Race-condition guard: each loadDetail call gets a generation ID; stale responses are discarded
   const loadGen = useRef(0)
+
+  // ── Async cover loading for grid ─────────────────────────────────────────
+  useEffect(() => {
+    const unloaded = playlists.filter(p => !coversLoadedRef.current.has(p.id))
+    if (!unloaded.length) return
+    unloaded.forEach(p => coversLoadedRef.current.add(p.id))
+
+    const CONCURRENCY = 4
+    let idx = 0
+    const run = async (): Promise<void> => {
+      while (idx < unloaded.length) {
+        const p = unloaded[idx++]
+        await userApi.getPlaylistCover(p.id)
+          .then(c => {
+            const url = c.cover_image_url ?? c.cover_image ?? null
+            setCovers(prev => ({ ...prev, [p.id]: url }))
+          })
+          .catch(() => setCovers(prev => ({ ...prev, [p.id]: null })))
+      }
+    }
+    const workers = Array.from({ length: Math.min(CONCURRENCY, unloaded.length) }, run)
+    Promise.all(workers).catch(() => undefined)
+  }, [playlists])
 
   // ── Derived data — ALL hooks at top level, no conditionals ────────────────
 
@@ -909,8 +936,10 @@ export default function PlaylistsView(): JSX.Element {
               className="group text-left"
             >
               <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
-                {playlistCoverUrl(p) ? (
-                  <img src={playlistCoverUrl(p)} alt={p.name} className="w-full h-full object-cover" />
+                {covers[p.id] === undefined ? (
+                  <div className="w-full h-full bg-surface-raised animate-pulse" />
+                ) : covers[p.id] ? (
+                  <img src={covers[p.id]!} alt={p.name} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-surface-raised to-surface-overlay flex items-center justify-center">
                     <Music2 size={40} className="text-text-muted opacity-40" />
