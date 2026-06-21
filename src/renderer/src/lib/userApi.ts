@@ -185,12 +185,7 @@ export async function removeFavorite(songId: number): Promise<void> {
 }
 
 export async function getPlaylists(): Promise<PlaylistSummary[]> {
-  const data = await request<PlaylistSummary[]>(`${LIBRARY_BASE}/playlists/`, { method: 'GET' })
-  // Strip cover data from list response — covers load async separately
-  return data.map(({ cover_image, cover_image_url, ...rest }) => {
-    void cover_image; void cover_image_url
-    return rest as PlaylistSummary
-  })
+  return request(`${LIBRARY_BASE}/playlists/?omit=cover_image,cover_image_url`, { method: 'GET' })
 }
 
 /** Fetch just the cover fields for a single playlist. */
@@ -201,7 +196,7 @@ export async function getPlaylistCover(id: number): Promise<{ cover_image_url?: 
 
 export async function createPlaylist(
   name: string,
-  opts?: { description?: string | null; song_ids?: number[]; cover_image?: string | null }
+  opts?: { description?: string | null; song_ids?: number[]; cover_image?: string | null; is_public?: boolean }
 ): Promise<PlaylistDetail> {
   return request(`${LIBRARY_BASE}/playlists/`, {
     method: 'POST',
