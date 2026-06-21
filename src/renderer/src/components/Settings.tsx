@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle, PenLine, BookOpen } from 'lucide-react'
+import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle, PenLine, BookOpen, Copy, Eye, EyeOff, KeyRound } from 'lucide-react'
 import { useStore } from '../store/useStore'
+import { getToken } from '../lib/userApi'
 
 const ACCENT_PRESETS = [
   '#1db954', '#7c3aed', '#2563eb', '#dc2626',
@@ -8,6 +9,8 @@ const ACCENT_PRESETS = [
 ]
 
 export default function Settings(): JSX.Element {
+  const [showToken, setShowToken] = useState(false)
+  const [tokenCopied, setTokenCopied] = useState(false)
   const {
     setShowSettings, setActiveView,
     account,
@@ -251,6 +254,39 @@ export default function Settings(): JSX.Element {
                 <PenLine size={15} />
                 Become an Editor
               </button>
+            )}
+            {account && (
+              <div className="mt-2 rounded-xl border border-[var(--border)] overflow-hidden">
+                <button
+                  onClick={() => setShowToken(v => !v)}
+                  className="flex items-center gap-2 w-full px-3 py-2.5 bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] text-text-secondary text-sm font-medium transition-colors"
+                >
+                  <KeyRound size={15} />
+                  <span className="flex-1 text-left">Auth Token</span>
+                  {showToken ? <EyeOff size={14} className="text-text-muted" /> : <Eye size={14} className="text-text-muted" />}
+                </button>
+                {showToken && (
+                  <button
+                    onClick={() => {
+                      const t = getToken()
+                      if (t) {
+                        navigator.clipboard.writeText(t)
+                        setTokenCopied(true)
+                        setTimeout(() => setTokenCopied(false), 2000)
+                      }
+                    }}
+                    className="flex items-center gap-2 w-full px-3 py-2.5 bg-[var(--surface)] hover:bg-[var(--surface-raised)] transition-colors border-t border-[var(--border)] group"
+                    title="Click to copy"
+                  >
+                    <code className="flex-1 text-left text-[10px] font-mono text-text-muted truncate">
+                      {getToken() ?? '—'}
+                    </code>
+                    <span className={`flex-shrink-0 flex items-center gap-1 text-[10px] font-medium transition-colors ${tokenCopied ? 'text-emerald-500' : 'text-text-muted group-hover:text-text-primary'}`}>
+                      {tokenCopied ? 'Copied!' : <><Copy size={11} /> Copy</>}
+                    </span>
+                  </button>
+                )}
+              </div>
             )}
             <button
               onClick={() => { setShowSettings(false); setActiveView('docs') }}
