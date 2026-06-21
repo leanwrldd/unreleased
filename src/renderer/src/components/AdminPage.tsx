@@ -384,7 +384,7 @@ function RevisePanel({ proposal, onClose, onDone }: {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden border-l-2 border-accent/30 bg-[var(--surface)]">
+    <div className="flex-1 flex flex-col h-full overflow-hidden border-l-2 border-accent/30 bg-[var(--surface)]">
       {/* Panel header */}
       <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-[var(--border)] bg-[var(--surface-raised)]">
         <Pencil size={13} className="text-accent" />
