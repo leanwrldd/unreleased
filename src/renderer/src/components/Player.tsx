@@ -750,36 +750,29 @@ export default function Player(): JSX.Element {
             </button>}
           </div>
 
-          {/* Progress bar / Live indicator */}
-          {radioFmActive ? (
-            <div className="flex items-center justify-center w-full max-w-xl h-4">
-              <span className="flex items-center gap-1.5 text-red-400 text-xs font-semibold tracking-wider">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                LIVE
-              </span>
-            </div>
-          ) : (
+          {/* Progress bar */}
           <div className="flex items-center gap-2 w-full max-w-xl">
             <span className="text-text-muted text-xs w-10 text-right tabular-nums">
-              {formatDuration(currentTime)}
+              {radioFmActive
+                ? <span className="flex items-center gap-1 text-red-400 text-[10px] font-semibold"><span className="w-1 h-1 rounded-full bg-red-400 animate-pulse inline-block" />LIVE</span>
+                : formatDuration(currentTime)}
             </span>
             <div className="flex-1 progress-track">
               <input
                 type="range" min={0} max={1} step={0.001}
-                value={seekDrag !== null ? seekDrag : progress}
-                onMouseDown={handleSeekMouseDown}
-                onChange={handleSeekChange}
-                onMouseUp={handleSeekCommit}
-                onTouchEnd={handleSeekCommit}
-                disabled={!currentTrack} className="w-full"
-                style={{ '--val': `${(seekDrag !== null ? seekDrag : progress) * 100}%` } as React.CSSProperties}
+                value={radioFmActive ? 0 : (seekDrag !== null ? seekDrag : progress)}
+                onMouseDown={radioFmActive ? undefined : handleSeekMouseDown}
+                onChange={radioFmActive ? undefined : handleSeekChange}
+                onMouseUp={radioFmActive ? undefined : handleSeekCommit}
+                onTouchEnd={radioFmActive ? undefined : handleSeekCommit}
+                disabled={!currentTrack || radioFmActive} className="w-full"
+                style={{ '--val': `${radioFmActive ? 0 : (seekDrag !== null ? seekDrag : progress) * 100}%`, ...(radioFmActive ? { opacity: 0.35, cursor: 'default' } : {}) } as React.CSSProperties}
               />
             </div>
             <span className="text-text-muted text-xs w-10 tabular-nums">
-              {formatDuration(duration)}
+              {radioFmActive ? '' : formatDuration(duration)}
             </span>
           </div>
-          )}
         </div>
 
         {/* Right: speed + queue + NP + volume */}
