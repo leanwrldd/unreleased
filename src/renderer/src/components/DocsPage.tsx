@@ -750,11 +750,172 @@ export function useSongs({
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+
+// ─── 999 FM Tab ───────────────────────────────────────────────────────────────
+
+function RadioTab() {
+  return (
+    <div className="space-y-6">
+      <Section title="What is 999 FM?">
+        <p className="text-sm text-text-secondary leading-relaxed">
+          999 FM is the Juice WRLD API radio — a single endpoint that returns a random, fully playable song
+          on every request. Named after Juice WRLD&apos;s 999 brand, it&apos;s designed for discover or continuous
+          playback features: call it, stream the song, call it again for the next one.
+        </p>
+        <p className="text-sm text-text-secondary leading-relaxed mt-2">
+          No authentication required. Returns a full song object plus the direct stream path.
+        </p>
+      </Section>
+
+      <Section title="GET /radio/random/">
+        <p className="text-sm text-text-secondary">Pick a random song from the full catalogue and return its stream path and metadata.</p>
+        <Pre>{`GET https://juicewrldapi.com/juicewrld/radio/random/`}</Pre>
+        <p className="text-xs text-text-muted mt-2">No parameters required. Every call returns a different song.</p>
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">Response</p>
+          <Pre>{`{
+  "id":       "Compilation/2. Unreleased Discography/8. WOD (Sessions)/Maze.mp3",
+  "title":    "Maze",
+  "path":     "Compilation/2. Unreleased Discography/8. WOD (Sessions)/Maze.mp3",
+  "size":     7381244,
+  "modified": "2025-10-18T19:19:53.784271",
+  "hash":     "d199a85e510b32b9ef3c02a29044a41d",
+  "song": {
+    "id": 95001,
+    "public_id": 2232,
+    "name": "Maze",
+    "category": "unreleased",
+    "era": { "id": 109, "name": "WOD", "description": "WRLD On Drugs era" },
+    "path": "Compilation/2. Unreleased Discography/8. WOD (Sessions)/Maze.mp3",
+    "credited_artists": "Juice WRLD",
+    "length": "2:24",
+    "lyrics": "...",
+    "synced_lyrics": "...",
+    "image_url": "/assets/wod.jpg"
+    // ... all standard song fields
+  }
+}`}</Pre>
+        </div>
+        <Table
+          headers={['Field', 'Type', 'Description']}
+          rows={[
+            [<Code>id</Code>, 'string', 'Internal file path (same as path)'],
+            [<Code>title</Code>, 'string', 'Song title'],
+            [<Code>path</Code>, 'string', 'Stream path — pass to /files/download/?path='],
+            [<Code>size</Code>, 'number', 'File size in bytes'],
+            [<Code>modified</Code>, 'string', 'ISO 8601 last-modified timestamp'],
+            [<Code>hash</Code>, 'string', 'MD5 file hash (use for deduplication or cache-busting)'],
+            [<Code>song</Code>, 'object', 'Full song object — same shape as GET /songs/{id}/'],
+          ]}
+        />
+      </Section>
+
+      <Section title="Streaming the result">
+        <p className="text-sm text-text-secondary">
+          The <Code>path</Code> field maps directly to the <Code>/files/download/</Code> endpoint. Pass it as the
+          stream URL for your audio element.
+        </p>
+        <Pre>{`const BASE = 'https://juicewrldapi.com/juicewrld';
+
+async function getRadioSong() {
+  const res = await fetch(\`\${BASE}/radio/random/\`);
+  const data = await res.json();
+  return {
+    title:        data.title,
+    streamUrl:    \`\${BASE}/files/download/?path=\${encodeURIComponent(data.path)}\`,
+    coverUrl:     \`https://juicewrldapi.com\${data.song.image_url}\`,
+    artist:       data.song.credited_artists,
+    era:          data.song.era?.name,
+    lyrics:       data.song.lyrics || null,
+    syncedLyrics: data.song.synced_lyrics || null,
+  };
+}
+
+// Basic usage
+const track = await getRadioSong();
+audioElement.src = track.streamUrl;
+audioElement.play();`}</Pre>
+      </Section>
+
+      <Section title="React hook — useRadio">
+        <Pre>{`import { useState, useCallback } from 'react';
+
+const BASE = 'https://juicewrldapi.com/juicewrld';
+
+export function useRadio() {
+  const [track, setTrack] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const next = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(\`\${BASE}/radio/random/\`);
+      const data = await res.json();
+      setTrack({
+        title:        data.title,
+        streamUrl:    \`\${BASE}/files/download/?path=\${encodeURIComponent(data.path)}\`,
+        coverUrl:     \`https://juicewrldapi.com\${data.song.image_url}\`,
+        artist:       data.song.credited_artists,
+        era:          data.song.era?.name,
+        length:       data.song.length,
+        lyrics:       data.song.lyrics || null,
+        syncedLyrics: data.song.synced_lyrics || null,
+        song:         data.song,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { track, loading, next };
+}
+
+// In your component:
+function RadioPlayer() {
+  const { track, loading, next } = useRadio();
+
+  return (
+    <div>
+      {track ? (
+        <>
+          <img src={track.coverUrl} alt={track.title} />
+          <p>{track.title} — {track.artist}</p>
+          <audio
+            src={track.streamUrl}
+            autoPlay
+            onEnded={next}
+          />
+        </>
+      ) : (
+        <button onClick={next} disabled={loading}>
+          {loading ? 'Loading...' : 'Start 999 FM'}
+        </button>
+      )}
+      <button onClick={next} disabled={loading}>Next</button>
+    </div>
+  );
+}`}</Pre>
+      </Section>
+
+      <Section title="Notes">
+        <ul className="space-y-2 text-sm text-text-secondary">
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">•</span> Calls are not seeded — every request is independent. Repeats are possible but rare given the 2,452-song catalogue.</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">•</span> The <Code>song</Code> object is identical to <Code>/songs/{'{id}'}/</Code> — full producers, engineers, lyrics, synced lyrics, and groupbuy info included.</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">•</span> <Code>image_url</Code> is a relative path (e.g. <Code>/assets/wod.jpg</Code>) — prepend <Code>https://juicewrldapi.com</Code> for use in <Code>&lt;img&gt;</Code> tags.</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">•</span> The stream endpoint supports HTTP Range requests — the browser <Code>&lt;audio&gt;</Code> element handles seeking automatically.</li>
+          <li className="flex items-start gap-2"><span className="text-accent mt-0.5">•</span> No rate limiting on public endpoints, but call once per track end — not on a tight loop.</li>
+        </ul>
+      </Section>
+    </div>
+  )
+}
+
 const TABS = [
   { id: 'overview',  label: 'Overview' },
   { id: 'songs',     label: 'Songs & Search' },
   { id: 'files',     label: 'Files & Stream' },
   { id: 'playlists', label: 'Playlists' },
+  { id: 'radio',     label: '999 FM' },
   { id: 'auth',      label: 'Auth & Accounts' },
   { id: 'patterns',  label: 'Code Patterns' },
 ] as const
@@ -805,6 +966,7 @@ export default function DocsPage(): JSX.Element {
           {activeTab === 'songs'     && <SongsTab />}
           {activeTab === 'files'     && <FilesTab />}
           {activeTab === 'playlists' && <PlaylistsTab />}
+          {activeTab === 'radio'     && <RadioTab />}
           {activeTab === 'auth'      && <AuthTab />}
           {activeTab === 'patterns'  && <FetchPatternTab />}
         </div>
