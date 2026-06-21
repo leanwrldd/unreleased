@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Folder, Music2, ChevronRight, ArrowLeft, Home, Play, Loader2,
   FolderOpen, HardDrive, LayoutList, LayoutGrid, ImageIcon, Video,
-  Download, ArrowUpDown, ArrowUp, ArrowDown, Link, Check, Info, ListPlus,
+  Download, ArrowUpDown, ArrowUp, ArrowDown, Link, Check, Info, ListPlus, MoreHorizontal, X,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import {
@@ -149,6 +149,7 @@ export default function ApiFilesView(): JSX.Element {
   const [lightboxIndex, setLightboxIndex] = useState(-1)
   const [copiedPath, setCopiedPath] = useState<string | null>(null)
   const [infoSong, setInfoSong] = useState<JWApiSong | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ entry: JWApiFileEntry; x: number; y: number } | null>(null)
 
   // Persisted view settings
   const [viewMode, setViewModeState] = useState<ViewMode>(
@@ -413,6 +414,7 @@ export default function ApiFilesView(): JSX.Element {
                     className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-overlay transition-colors cursor-default"
                     onClick={() => { if (isDir) navigate(entry.path); else if (isMedia) openLightbox(entry) }}
                     onDoubleClick={() => { if (mt === 'audio') handlePlay(entry) }}
+                    onContextMenu={e => { e.preventDefault(); setCtxMenu({ entry, x: e.clientX, y: e.clientY }) }}
                   >
                     {/* Icon / thumbnail */}
                     <div className="relative shrink-0 w-9 h-9">
@@ -504,6 +506,7 @@ export default function ApiFilesView(): JSX.Element {
                       else if (isMedia) openLightbox(entry)
                       else if (mt === 'audio') handlePlay(entry)
                     }}
+                    onContextMenu={e => { e.preventDefault(); setCtxMenu({ entry, x: e.clientX, y: e.clientY }) }}
                   >
                     {/* Thumb */}
                     <div className="relative w-full aspect-square bg-surface-raised flex items-center justify-center overflow-hidden">
@@ -601,6 +604,44 @@ export default function ApiFilesView(): JSX.Element {
         />
       )}
 
+      {ctxMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setCtxMenu(null)} />
+          <div
+            className="fixed z-50 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[180px]"
+            style={{ left: Math.min(ctxMenu.x, window.innerWidth - 200), top: Math.min(ctxMenu.y, window.innerHeight - 260) }}
+            onClick={e => e.stopPropagation()}
+          >
+            {getMediaType(ctxMenu.entry.name) === 'audio' && (
+              <>
+                <button onClick={() => { handlePlay(ctxMenu.entry); setCtxMenu(null) }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
+                  <Play size={14} className="text-text-muted" /> Play
+                </button>
+                <button onClick={() => { addToQueue(fileToTrack(ctxMenu.entry)); setCtxMenu(null) }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
+                  <ListPlus size={14} className="text-text-muted" /> Add to queue
+                </button>
+                <button onClick={() => { openSongInfo(ctxMenu.entry); setCtxMenu(null) }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
+                  <Info size={14} className="text-text-muted" /> Find in Tracker
+                </button>
+                <div className="border-t border-[var(--border)] my-1" />
+              </>
+            )}
+            <button onClick={() => { copyLink(ctxMenu.entry); setCtxMenu(null) }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
+              <Link size={14} className="text-text-muted" /> Copy link
+            </button>
+            {ctxMenu.entry.type !== 'directory' && (
+              <button onClick={() => { handleDownload(ctxMenu.entry); setCtxMenu(null) }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
+                <Download size={14} className="text-text-muted" /> Download
+              </button>
+            )}
+          </div>
+        </>
+      )}
       <SongInfoModal song={infoSong} onClose={() => setInfoSong(null)} />
     </>
   )

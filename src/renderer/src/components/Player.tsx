@@ -598,14 +598,15 @@ export default function Player(): JSX.Element {
                 {currentTrack?.title || 'Not playing'}
               </p>
               <div className="flex items-center gap-0 shrink-0">
-                <button
-                  className={`p-1 rounded transition-colors ${currentTrack && likedTrackIds.includes(currentTrack.id) ? 'text-accent' : 'text-text-muted hover:text-accent'}`}
-                  onClick={() => currentTrack && toggleLike(currentTrack.id)}
-                  title="Like"
-                  disabled={!currentTrack}
-                >
-                  <Heart size={13} fill={currentTrack && likedTrackIds.includes(currentTrack.id) ? 'currentColor' : 'none'} />
-                </button>
+                {currentSongId != null && (
+                  <button
+                    className={`p-1 rounded transition-colors ${currentTrack && likedTrackIds.includes(currentTrack.id) ? 'text-accent' : 'text-text-muted hover:text-accent'}`}
+                    onClick={() => currentTrack && toggleLike(currentTrack.id)}
+                    title="Like"
+                  >
+                    <Heart size={13} fill={currentTrack && likedTrackIds.includes(currentTrack.id) ? 'currentColor' : 'none'} />
+                  </button>
+                )}
 
                 <div className="relative">
                   <button
