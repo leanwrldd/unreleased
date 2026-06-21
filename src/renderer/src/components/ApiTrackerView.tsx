@@ -553,7 +553,7 @@ function SongCard({
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function ApiTrackerView(): JSX.Element {
   const {
-    playTrack, startRadio, addToQueue, account,
+    playTrack, addToQueue, account,
     apiTrackerCategory, setApiTrackerCategory,
     apiTrackerEra, setApiTrackerEra,
     setActiveView, setApiFilesPath,
@@ -762,22 +762,14 @@ export default function ApiTrackerView(): JSX.Element {
 
   const handlePlay = useCallback((song: JWApiSong) => {
     const track = songToTrack(song)
-    const { shuffle } = useStore.getState()
     const playable = sortedSongs.filter((s) => !!s.path)
-
-    if (shuffle) {
-      // Radio mode: empty queue, stream one random song at a time via /radio/random/
-      startRadio(track)
-    } else {
-      // Linear: play the visible context, lazy-load if there are more pages.
-      const context = playable.map(songToTrack)
-      const needsLazy = !orderField && hasMore
-      playTrack(track, context.length > 0 ? context : [track], needsLazy ? {
-        category, era, search: debouncedSearch,
-        page: page + 1, hasMore: true, total: count,
-      } : null)
-    }
-  }, [playTrack, startRadio, sortedSongs, category, era, debouncedSearch, count, hasMore, orderField, page])
+    const context = playable.map(songToTrack)
+    const needsLazy = !orderField && hasMore
+    playTrack(track, context.length > 0 ? context : [track], needsLazy ? {
+      category, era, search: debouncedSearch,
+      page: page + 1, hasMore: true, total: count,
+    } : null)
+  }, [playTrack, sortedSongs, category, era, debouncedSearch, count, hasMore, orderField, page])
 
   const handleInfo = useCallback((song: JWApiSong) => { setSelectedSong(song) }, [])
   const handleQueue = useCallback((track: Track) => { addToQueue(track) }, [addToQueue])
