@@ -439,18 +439,18 @@ export default function WrldView(): JSX.Element {
           {account && playlists.length > 0 && currentTrack && (
             <div className="group absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center">
               {/* Expanded panel — width opens first, content fades in behind */}
-              <div className="overflow-hidden max-w-0 group-hover:max-w-[160px] transition-[max-width] duration-200 ease-out">
-                <div className="w-36 opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-75
+              <div className="overflow-hidden max-w-0 group-hover:max-w-[80px] transition-[max-width] duration-200 ease-out">
+                <div className="w-[72px] opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-75
                   bg-black/80 backdrop-blur-xl rounded-l-2xl border-l border-t border-b border-white/[0.08]
                   flex flex-col gap-0 py-2 px-2">
                   {playlists.slice(0, 6).map(pl => (
-                    <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)}
-                      className="flex items-center gap-2 px-2 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/pl">
-                      <div className="w-5 h-5 rounded shrink-0 bg-white/10 overflow-hidden">
-                        {(pl.cover_image_url || pl.cover_image) &&
-                          <img src={pl.cover_image_url ?? pl.cover_image ?? ''} className="w-full h-full object-cover" />}
+                    <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)} title={pl.name}
+                      className="flex items-center justify-center py-3 rounded-lg hover:bg-white/10 transition-colors group/pl">
+                      <div className="w-8 h-8 rounded-md shrink-0 bg-white/10 overflow-hidden group-hover/pl:ring-1 group-hover/pl:ring-white/30 transition-all">
+                        {(pl.cover_image_url || pl.cover_image)
+                          ? <img src={pl.cover_image_url ?? pl.cover_image ?? ''} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full bg-white/[0.07]" />}
                       </div>
-                      <span className="text-white/55 group-hover/pl:text-white/90 text-[11px] font-medium truncate transition-colors">{pl.name}</span>
                     </button>
                   ))}
                 </div>
