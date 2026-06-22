@@ -6,6 +6,22 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.7.3] — 2026-06-22
+
+- **Fix** Mobile lock screen now shows track title, artist, and cover art via Media Session API
+- **Fix** Lock screen / notification shade play, pause, and skip controls now work
+- **Fix** Lock screen seek bar syncs with playback position
+- **Fix** 999 FM mode: lock screen metadata updates to currently playing FM track
+- **Bump** Version to 1.7.3
+
+---
+
+## [1.7.2] — 2026-06-22
+
+- **Fix** Media Session API wired up in Player — metadata and action handlers added
+
+---
+
 ## [1.7.1] — 2026-06-22
 
 - **Remove** RadioFmView (old dedicated 999 FM page) and radioLibrary.ts — FM controls now live in the WRLD view

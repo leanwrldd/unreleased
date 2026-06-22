@@ -6,6 +6,38 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.7.3',
+    date: '2026-06-22',
+    changes: [
+      { type: 'fix', text: 'Mobile lock screen now shows track title, artist, and cover art via Media Session API; play/pause and skip controls work from the lock screen and notification shade' },
+    ],
+  },
+  {
+    version: '1.7.2',
+    date: '2026-06-22',
+    changes: [
+      { type: 'fix', text: 'Mobile lock screen metadata (title, artist, artwork) now populated via Media Session API; lock screen seek bar and playback controls wired up' },
+    ],
+  },
+  {
+    version: '1.7.1',
+    date: '2026-06-22',
+    changes: [
+      { type: 'fix', text: '999 FM page and RadioFmView removed — radio-fm route, nav entry, and all related files cleaned up' },
+    ],
+  },
+  {
+    version: '1.7.0',
+    date: '2026-06-22',
+    changes: [
+      { type: 'new', text: 'WRLD tab redesigned for mobile — stacked layout with cover art, track info, and controls optimised for small screens' },
+      { type: 'new', text: 'Playlist notch — hover to expand a slim side panel showing your first 6 playlists; click any to add the current track' },
+      { type: 'new', text: 'Synced lyrics windowed view — shows ±2 lines around current; auto-follows playback with a Follow button to re-enable after manual scroll' },
+      { type: 'new', text: 'Notch category selector — switch between Released Albums, Mixtapes & Singles, Unreleased, and Playlists from inside the notch panel' },
+      { type: 'fix', text: 'Tracker context menu no longer blinks during playback — Zustand selectors narrowed with useShallow to prevent re-renders from currentTime updates' },
+    ],
+  },
+  {
     version: '1.6.0',
     date: '2026-06-21',
     changes: [
