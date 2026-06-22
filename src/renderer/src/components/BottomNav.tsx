@@ -1,4 +1,5 @@
 import { SearchCode, HardDrive, Settings, Archive, ShieldCheck, ListMusic, ArrowLeft } from 'lucide-react'
+import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
 
@@ -8,6 +9,7 @@ export default function BottomNav(): JSX.Element {
 
   const items: { icon: React.ReactNode; label: string; view: ViewType }[] = [
     { icon: <SearchCode size={24} />, label: 'Tracker', view: 'api-tracker' },
+    { icon: <img src={logo} alt="WRLD" className="w-6 h-6 object-contain" />, label: 'WRLD', view: 'wrld' },
     { icon: <ListMusic size={24} />, label: 'Playlists', view: 'playlists' },
     { icon: <Archive size={24} />, label: 'Compilation', view: 'compilation' },
     { icon: <HardDrive size={24} />, label: 'Files', view: 'api-files' },
