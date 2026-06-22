@@ -351,7 +351,7 @@ export default function WrldView(): JSX.Element {
           </div>
 
           {/* ── Desktop layout ─────────────────────────────────────────────── */}
-          <div className="hidden md:flex flex-1 h-full overflow-hidden">
+          <div className="hidden md:flex relative z-10 flex-1 h-full overflow-hidden">
 
             {/* Left column */}
             <div className="flex flex-col items-center justify-center shrink-0 px-10 gap-6"
