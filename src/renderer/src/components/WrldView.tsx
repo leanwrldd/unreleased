@@ -17,14 +17,8 @@ export default function WrldView(): JSX.Element {
 
   const containerRef = useRef<HTMLDivElement>(null)
   const activeRef    = useRef<HTMLDivElement>(null)
-
-  // Art error
   const [artError, setArtError] = useState(false)
-
-  // FM tab: 'radio' (vote/suggest/queue) or 'lyrics'
   const [fmTab, setFmTab] = useState<'radio' | 'lyrics'>('radio')
-
-  // Suggest song
   const [suggestQuery, setSuggestQuery]     = useState('')
   const [suggestResults, setSuggestResults] = useState<JWApiSong[]>([])
   const [suggestLoading, setSuggestLoading] = useState(false)
@@ -56,19 +50,17 @@ export default function WrldView(): JSX.Element {
     proposeTimer.current = setTimeout(() => setProposed(null), 4000)
   }
 
-  // Art
   const artSrc = radioFmActive
     ? (radioFmMatchedSong?.imageUrl ?? buildImageUrl(radioFmNowPlaying?.image_url) ?? null)
     : (buildImageUrl(currentTrackFull?.albumArt ?? currentTrack?.imageUrl ?? null) ?? null)
 
   useEffect(() => { setArtError(false) }, [artSrc])
 
-  // Lyrics — use FM matched song lyrics in FM mode, otherwise currentTrackFull
-  const rawLyrics   = radioFmActive
+  const rawLyrics = radioFmActive
     ? (radioFmMatchedSong?.syncedLyrics || radioFmMatchedSong?.lyrics || null)
     : (currentTrackFull?.syncedLyrics || currentTrackFull?.lyrics || null)
-  const isSynced    = rawLyrics ? isLrcFormat(rawLyrics) : false
-  const isEditor    = account?.is_editor || account?.is_administrator
+  const isSynced  = rawLyrics ? isLrcFormat(rawLyrics) : false
+  const isEditor  = account?.is_editor || account?.is_administrator
 
   const syncedLines = useMemo(() => {
     if (rawLyrics && isSynced) return parseLrc(rawLyrics)
@@ -84,8 +76,8 @@ export default function WrldView(): JSX.Element {
   }, [currentLineIdx])
 
   const fmLabel    = radioFmActive
-    ? (radioFmIsLive ? '999 FM · LIVE' : '999 FM · OFFLINE')
-    : radioFmIsLive === false ? '999 FM · OFFLINE' : '999 FM'
+    ? (radioFmIsLive ? '999 FM · LIVE' : '999 FM · OFF')
+    : radioFmIsLive === false ? '999 FM · OFF' : '999 FM'
   const fmDisabled = radioFmIsLive === false && !radioFmActive
   const hasContent = radioFmActive || !!currentTrack
 
@@ -93,20 +85,207 @@ export default function WrldView(): JSX.Element {
   const displayArtist = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.artist : currentTrack?.artist
   const displayAlbum  = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.album  : currentTrack?.album
 
-  return (
-    <div className="relative flex flex-1 h-full w-full overflow-hidden">
+  /* ── Shared sub-components ─────────────────────────────────────────────── */
 
-      {/* 999 FM toggle */}
+  const ArtBox = ({ mobile }: { mobile: boolean }) => (
+    <div
+      className={mobile
+        ? 'w-14 h-14 rounded-xl overflow-hidden shrink-0 shadow-lg'
+        : 'rounded-3xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)] w-full'}
+      style={mobile ? {} : { aspectRatio: '1' }}
+    >
+      {artSrc && !artError ? (
+        <img src={artSrc} alt="Album art" className="w-full h-full object-cover" onError={() => setArtError(true)} />
+      ) : radioFmActive ? (
+        <div className="w-full h-full bg-gradient-to-br from-red-900/60 to-black flex flex-col items-center justify-center gap-2">
+          <Radio className={`text-red-400 opacity-70 ${mobile ? 'w-6 h-6' : 'w-16 h-16'}`} />
+          {!mobile && <span className="text-red-300/70 text-2xl font-bold tracking-widest">999 FM</span>}
+        </div>
+      ) : (
+        <div className="w-full h-full bg-white/10 flex items-center justify-center">
+          <Music className={`text-white/20 ${mobile ? 'w-6 h-6' : 'w-16 h-16'}`} />
+        </div>
+      )}
+    </div>
+  )
+
+  const FmRadioPanel = () => (
+    <div className="flex-1 overflow-y-auto pb-8 px-4 md:px-6 flex flex-col gap-4 md:gap-5" style={{ scrollbarWidth: 'none' }}>
+      {/* Vote */}
+      {radioFmVote?.active ? (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <p className="text-white/50 text-[11px] font-semibold uppercase tracking-widest">
+              {radioFmVote.kind === 'skip' ? 'Vote to Skip' : 'Vote to Queue'}
+            </p>
+            {radioFmVote.seconds_left != null && (
+              <span className="text-white/30 text-xs tabular-nums">{radioFmVote.seconds_left}s left</span>
+            )}
+          </div>
+          {radioFmVote.track && <p className="text-white/80 text-sm font-medium">{radioFmVote.track}</p>}
+          <p className="text-white/30 text-xs">
+            {radioFmVote.yes ?? 0} yes · {radioFmVote.no ?? 0} no
+            {radioFmVote.votes_needed != null && <span> · need {radioFmVote.votes_needed}</span>}
+          </p>
+          <div className="flex gap-2">
+            <button onClick={() => getActiveRadioClient()?.castVote('yes')}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-green-600/15 hover:bg-green-600/30 text-green-400 text-sm font-medium transition-colors">
+              <ThumbsUp size={13} /> Yes
+            </button>
+            <button onClick={() => getActiveRadioClient()?.castVote('no')}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-900/15 hover:bg-red-900/30 text-red-400 text-sm font-medium transition-colors">
+              <ThumbsDown size={13} /> No
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => getActiveRadioClient()?.proposeSkip()}
+          className="flex items-center gap-2 text-sm text-white/30 hover:text-white/65 transition-colors self-start">
+          <SkipForward size={14} /> Vote to skip
+        </button>
+      )}
+
+      {/* Suggest */}
+      <div className="flex flex-col gap-2">
+        <p className="text-white/40 text-[11px] font-semibold uppercase tracking-widest">Suggest next song</p>
+        {proposed ? (
+          <div className="flex items-center justify-between bg-green-900/20 border border-green-500/20 rounded-xl px-3 py-2">
+            <div className="flex items-center gap-2 text-green-400 text-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0 animate-pulse" />
+              Proposed: <span className="text-green-300 font-medium">{proposed}</span>
+            </div>
+            <button onClick={() => { setProposed(null); if (proposeTimer.current) clearTimeout(proposeTimer.current) }}
+              className="text-green-500/50 hover:text-green-400 transition-colors ml-2 shrink-0">
+              <X size={13} />
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="relative">
+              <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
+              <input
+                type="text" value={suggestQuery}
+                onChange={(e) => setSuggestQuery(e.target.value)}
+                placeholder="Search songs…"
+                className="w-full bg-white/5 text-white/80 text-sm rounded-xl py-2 pl-8 pr-3 border border-white/10 focus:outline-none focus:border-white/25 transition-colors"
+                style={{ colorScheme: 'dark' }}
+              />
+            </div>
+            {suggestLoading && <p className="text-white/25 text-xs pl-1">Searching…</p>}
+            {suggestResults.length > 0 && (
+              <div className="flex flex-col -mx-1">
+                {suggestResults.map(song => (
+                  <button key={song.id} onClick={() => handlePropose(song)}
+                    className="text-left px-3 py-2 rounded-xl hover:bg-white/10 transition-colors group">
+                    <p className="text-white/70 text-sm truncate group-hover:text-white/90 transition-colors">
+                      {song.track_titles?.[0] || song.name}
+                    </p>
+                    <p className="text-white/35 text-xs truncate">{song.credited_artists}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Up next */}
+      {radioFmUpNext && (
+        <div className="flex flex-col gap-2">
+          <p className="text-white/40 text-[11px] font-semibold uppercase tracking-widest">Up next</p>
+          <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+            <p className="text-white/80 text-sm font-medium truncate">{radioFmUpNext.title}</p>
+            {radioFmUpNext.artist && <p className="text-white/40 text-xs mt-0.5">{radioFmUpNext.artist}</p>}
+          </div>
+        </div>
+      )}
+
+      {/* Queue preview */}
+      {radioFmQueuePreview.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-white/40 text-[11px] font-semibold uppercase tracking-widest">Coming up</p>
+          <div className="flex flex-col">
+            {radioFmQueuePreview.map((title, i) => (
+              <div key={i} className="flex items-center gap-3 px-1 py-1.5 rounded-lg">
+                <span className="text-white/20 text-xs w-4 text-right shrink-0">{i + 1}</span>
+                <p className="text-white/50 text-sm truncate">{title}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  const LyricsPanel = ({ padded }: { padded?: boolean }) => {
+    const noLyricsMsg = radioFmActive
+      ? <p className="text-white/30 text-sm text-center">No lyrics found for this track</p>
+      : <>
+          <div className="text-5xl opacity-10">&#9834;</div>
+          <p className="text-white/30 text-sm text-center">No lyrics available</p>
+          {isEditor && <p className="text-white/20 text-xs text-center mt-1">Open the editor to add lyrics</p>}
+        </>
+
+    if (!rawLyrics) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8">
+          {!radioFmActive && !currentTrack
+            ? <p className="text-white/30 text-sm text-center">No track playing</p>
+            : noLyricsMsg}
+        </div>
+      )
+    }
+    if (isSynced && syncedLines.length > 0) {
+      return (
+        <div ref={containerRef} className={`flex-1 overflow-y-auto ${padded ? 'py-20 pr-16 pl-8' : 'py-4 px-4 md:py-8 md:pr-12 md:pl-6'}`} style={{ scrollbarWidth: 'none' }}>
+          <div>
+            {syncedLines.map((line, i) => {
+              const isActive = i === currentLineIdx
+              const isPast   = i < currentLineIdx
+              if (!line.text) return <div key={i} className="h-4" />
+              return (
+                <div key={i} ref={isActive ? activeRef : undefined}
+                  onClick={() => seekAudio(line.time)}
+                  className="cursor-pointer leading-tight transition-all duration-300 mb-4"
+                  style={{
+                    fontSize:   isActive ? (padded ? '2rem' : '1.5rem') : (padded ? '1.25rem' : '1rem'),
+                    fontWeight: isActive ? 800 : 500,
+                    lineHeight: isActive ? 1.2 : 1.4,
+                    color:      isActive ? 'rgba(255,255,255,1)' : isPast ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.18)',
+                    textShadow: isActive ? '0 0 40px rgba(255,255,255,0.2)' : 'none',
+                    transform:  isActive ? 'translateX(6px)' : 'none',
+                  }}
+                >{line.text}</div>
+              )
+            })}
+            <div className="h-32" />
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div className={`flex-1 overflow-y-auto ${padded ? 'py-16 pr-16 pl-8' : 'py-4 px-4 md:py-8 md:pr-12 md:pl-6'}`} style={{ scrollbarWidth: 'none' }}>
+        <pre className="text-white/50 text-sm md:text-base leading-7 md:leading-8 whitespace-pre-wrap font-sans">{rawLyrics}</pre>
+      </div>
+    )
+  }
+
+  /* ── Render ────────────────────────────────────────────────────────────── */
+
+  return (
+    <div className="relative flex flex-col md:flex-row flex-1 h-full w-full overflow-hidden">
+
+      {/* 999 FM toggle — top-right on mobile, top-left on desktop */}
       <button
         onClick={() => setRadioFmActive(!radioFmActive)}
         disabled={fmDisabled}
-        className={`absolute top-4 left-4 z-30 flex items-center gap-2 text-xs font-medium rounded-full px-3 py-1.5 transition-all disabled:opacity-40 ${
-          radioFmActive && radioFmIsLive
+        className={`absolute z-30 flex items-center gap-2 text-xs font-medium rounded-full px-3 py-1.5 transition-all disabled:opacity-40
+          top-3 right-3 md:top-4 md:left-4 md:right-auto
+          ${radioFmActive && radioFmIsLive
             ? 'bg-red-600/80 text-white backdrop-blur-sm ring-1 ring-red-400/50'
             : radioFmActive
             ? 'bg-white/10 text-white/50 backdrop-blur-sm'
-            : 'bg-black/25 text-white/50 hover:text-white/90 hover:bg-black/50 backdrop-blur-sm'
-        }`}
+            : 'bg-black/25 text-white/50 hover:text-white/90 hover:bg-black/50 backdrop-blur-sm'}`}
         title={radioFmActive ? 'Turn off 999 FM' : 'Turn on 999 FM'}
       >
         <Radio size={13} className={radioFmActive && radioFmIsLive ? 'animate-pulse' : ''} />
@@ -134,265 +313,83 @@ export default function WrldView(): JSX.Element {
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
           </div>
 
-          {/* Left column */}
-          <div
-            className="relative z-10 flex flex-col items-center justify-center shrink-0 px-10 gap-6"
-            style={{ width: '38%', minWidth: 240 }}
-          >
-            <div className="rounded-3xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)] w-full" style={{ aspectRatio: '1' }}>
-              {artSrc && !artError ? (
-                <img src={artSrc} alt="Album art" className="w-full h-full object-cover" onError={() => setArtError(true)} />
-              ) : radioFmActive ? (
-                <div className="w-full h-full bg-gradient-to-br from-red-900/60 to-black flex flex-col items-center justify-center gap-3">
-                  <Radio className="text-red-400 w-16 h-16 opacity-70" />
-                  <span className="text-red-300/70 text-2xl font-bold tracking-widest">999 FM</span>
-                </div>
+          {/* ── Mobile layout ─────────────────────────────────────────────── */}
+          <div className="md:hidden relative z-10 flex flex-col h-full">
+
+            {/* Header: art + title */}
+            <div className="flex items-center gap-3 px-4 pt-12 pb-3 shrink-0">
+              <ArtBox mobile />
+              <div className="flex-1 min-w-0">
+                {displayTitle  && <p className="text-white font-bold text-sm leading-tight truncate">{displayTitle}</p>}
+                {displayArtist && <p className="text-white/50 text-xs mt-0.5 truncate">{displayArtist}</p>}
+                {displayAlbum  && <p className="text-white/30 text-xs mt-0.5 truncate">{displayAlbum}</p>}
+                {radioFmActive && !radioFmNowPlaying && <p className="text-white/30 text-xs mt-0.5">Tuning in…</p>}
+              </div>
+            </div>
+
+            {/* Tab bar (FM mode) or divider line */}
+            {radioFmActive ? (
+              <div className="flex items-center gap-1 px-4 pb-2 shrink-0 border-b border-white/5">
+                {(['radio', 'lyrics'] as const).map(tab => (
+                  <button key={tab} onClick={() => setFmTab(tab)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
+                      fmTab === tab ? 'bg-white/10 text-white/90' : 'text-white/35 hover:text-white/65 hover:bg-white/5'
+                    }`}>
+                    {tab === 'radio' ? 'Radio' : 'Lyrics'}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mx-4 h-px bg-white/10 shrink-0" />
+            )}
+
+            {/* Content */}
+            {radioFmActive
+              ? (fmTab === 'radio' ? <FmRadioPanel /> : <LyricsPanel />)
+              : <LyricsPanel />
+            }
+          </div>
+
+          {/* ── Desktop layout ─────────────────────────────────────────────── */}
+          <div className="hidden md:flex flex-1 h-full overflow-hidden">
+
+            {/* Left column */}
+            <div className="flex flex-col items-center justify-center shrink-0 px-10 gap-6"
+              style={{ width: '38%', minWidth: 240 }}>
+              <ArtBox mobile={false} />
+              <div className="text-center w-full px-2">
+                {displayTitle  && <p className="text-white font-bold text-xl leading-tight">{displayTitle}</p>}
+                {displayArtist && <p className="text-white/50 text-sm mt-1">{displayArtist}</p>}
+                {displayAlbum  && <p className="text-white/30 text-xs mt-0.5">{displayAlbum}</p>}
+                {radioFmActive && !radioFmNowPlaying && <p className="text-white/30 text-sm mt-1">Tuning in…</p>}
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="w-px bg-white/10 shrink-0 my-10" />
+
+            {/* Right column */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {radioFmActive ? (
+                <>
+                  <div className="flex items-center gap-1 px-6 pt-5 pb-3 shrink-0">
+                    {(['radio', 'lyrics'] as const).map(tab => (
+                      <button key={tab} onClick={() => setFmTab(tab)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
+                          fmTab === tab ? 'bg-white/10 text-white/90' : 'text-white/35 hover:text-white/65 hover:bg-white/5'
+                        }`}>
+                        {tab === 'radio' ? 'Radio' : 'Lyrics'}
+                      </button>
+                    ))}
+                  </div>
+                  {fmTab === 'radio' ? <FmRadioPanel /> : <LyricsPanel padded />}
+                </>
               ) : (
-                <div className="w-full h-full bg-white/10 flex items-center justify-center">
-                  <Music className="text-white/20 w-16 h-16" />
-                </div>
+                <LyricsPanel padded />
               )}
             </div>
-
-            <div className="text-center w-full px-2">
-              {displayTitle  && <p className="text-white font-bold text-xl leading-tight">{displayTitle}</p>}
-              {displayArtist && <p className="text-white/50 text-sm mt-1">{displayArtist}</p>}
-              {displayAlbum  && <p className="text-white/30 text-xs mt-0.5">{displayAlbum}</p>}
-              {radioFmActive && !radioFmNowPlaying && <p className="text-white/30 text-sm mt-1">Tuning in…</p>}
-            </div>
           </div>
 
-          {/* Vertical divider */}
-          <div className="relative z-10 w-px bg-white/10 shrink-0 my-10" />
-
-          {/* Right column */}
-          <div className="relative z-10 flex-1 overflow-hidden flex flex-col">
-            {radioFmActive ? (
-              /* ── FM mode: tab switcher + content ────────────────────────── */
-              <>
-                {/* Tab bar */}
-                <div className="flex items-center gap-1 px-6 pt-5 pb-3 shrink-0">
-                  {(['radio', 'lyrics'] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setFmTab(tab)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
-                        fmTab === tab
-                          ? 'bg-white/10 text-white/90'
-                          : 'text-white/35 hover:text-white/65 hover:bg-white/5'
-                      }`}
-                    >
-                      {tab === 'radio' ? 'Radio' : 'Lyrics'}
-                    </button>
-                  ))}
-                </div>
-
-                {fmTab === 'radio' ? (
-                  /* Radio: vote + suggest + queue */
-                  <div className="flex-1 overflow-y-auto pb-8 px-6 flex flex-col gap-5" style={{ scrollbarWidth: 'none' }}>
-
-                    {/* Vote */}
-                    {radioFmVote?.active ? (
-                      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-white/50 text-[11px] font-semibold uppercase tracking-widest">
-                            {radioFmVote.kind === 'skip' ? 'Vote to Skip' : 'Vote to Queue'}
-                          </p>
-                          {radioFmVote.seconds_left != null && (
-                            <span className="text-white/30 text-xs tabular-nums">{radioFmVote.seconds_left}s left</span>
-                          )}
-                        </div>
-                        {radioFmVote.track && (
-                          <p className="text-white/80 text-sm font-medium">{radioFmVote.track}</p>
-                        )}
-                        <p className="text-white/30 text-xs">
-                          {radioFmVote.yes ?? 0} yes &middot; {radioFmVote.no ?? 0} no
-                          {radioFmVote.votes_needed != null && <span> &middot; need {radioFmVote.votes_needed}</span>}
-                        </p>
-                        <div className="flex gap-2">
-                          <button onClick={() => getActiveRadioClient()?.castVote('yes')}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-green-600/15 hover:bg-green-600/30 text-green-400 text-sm font-medium transition-colors">
-                            <ThumbsUp size={13} /> Yes
-                          </button>
-                          <button onClick={() => getActiveRadioClient()?.castVote('no')}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-red-900/15 hover:bg-red-900/30 text-red-400 text-sm font-medium transition-colors">
-                            <ThumbsDown size={13} /> No
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => getActiveRadioClient()?.proposeSkip()}
-                        className="flex items-center gap-2 text-sm text-white/30 hover:text-white/65 transition-colors self-start"
-                      >
-                        <SkipForward size={14} /> Vote to skip
-                      </button>
-                    )}
-
-                    {/* Suggest */}
-                    <div className="flex flex-col gap-2">
-                      <p className="text-white/40 text-[11px] font-semibold uppercase tracking-widest">Suggest next song</p>
-                      {proposed ? (
-                        <div className="flex items-center justify-between bg-green-900/20 border border-green-500/20 rounded-xl px-3 py-2">
-                          <div className="flex items-center gap-2 text-green-400 text-sm">
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0 animate-pulse" />
-                            Proposed: <span className="text-green-300 font-medium">{proposed}</span>
-                          </div>
-                          <button onClick={() => { setProposed(null); if (proposeTimer.current) clearTimeout(proposeTimer.current) }}
-                            className="text-green-500/50 hover:text-green-400 transition-colors ml-2 shrink-0">
-                            <X size={13} />
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="relative">
-                            <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 pointer-events-none" />
-                            <input
-                              type="text"
-                              value={suggestQuery}
-                              onChange={(e) => setSuggestQuery(e.target.value)}
-                              placeholder="Search songs…"
-                              className="w-full bg-white/5 text-white/80 text-sm rounded-xl py-2 pl-8 pr-3 border border-white/10 focus:outline-none focus:border-white/25 transition-colors"
-                              style={{ colorScheme: 'dark' }}
-                            />
-                          </div>
-                          {suggestLoading && <p className="text-white/25 text-xs pl-1">Searching…</p>}
-                          {suggestResults.length > 0 && (
-                            <div className="flex flex-col -mx-1">
-                              {suggestResults.map(song => (
-                                <button key={song.id} onClick={() => handlePropose(song)}
-                                  className="text-left px-3 py-2 rounded-xl hover:bg-white/10 transition-colors group">
-                                  <p className="text-white/70 text-sm truncate group-hover:text-white/90 transition-colors">
-                                    {song.track_titles?.[0] || song.name}
-                                  </p>
-                                  <p className="text-white/35 text-xs truncate">{song.credited_artists}</p>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-
-                    {/* Up next */}
-                    {radioFmUpNext && (
-                      <div className="flex flex-col gap-2">
-                        <p className="text-white/40 text-[11px] font-semibold uppercase tracking-widest">Up next</p>
-                        <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
-                          <p className="text-white/80 text-sm font-medium truncate">{radioFmUpNext.title}</p>
-                          {radioFmUpNext.artist && <p className="text-white/40 text-xs mt-0.5">{radioFmUpNext.artist}</p>}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Queue preview */}
-                    {radioFmQueuePreview.length > 0 && (
-                      <div className="flex flex-col gap-2">
-                        <p className="text-white/40 text-[11px] font-semibold uppercase tracking-widest">Coming up</p>
-                        <div className="flex flex-col">
-                          {radioFmQueuePreview.map((title, i) => (
-                            <div key={i} className="flex items-center gap-3 px-1 py-1.5 rounded-lg">
-                              <span className="text-white/20 text-xs w-4 text-right shrink-0">{i + 1}</span>
-                              <p className="text-white/50 text-sm truncate">{title}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  /* Lyrics tab */
-                  !currentTrack ? (
-                    <div className="flex-1 flex flex-col items-center justify-center gap-3 px-12">
-                      <p className="text-white/30 text-sm text-center">No track playing</p>
-                    </div>
-                  ) : !rawLyrics ? (
-                    <div className="flex-1 flex flex-col items-center justify-center gap-3 px-12">
-                      <div className="text-5xl opacity-10">&#9834;</div>
-                      <p className="text-white/30 text-sm text-center">No lyrics for this track</p>
-                      {isEditor && (
-                        <p className="text-white/20 text-xs text-center mt-1">Open the editor to add lyrics</p>
-                      )}
-                    </div>
-                  ) : isSynced && syncedLines.length > 0 ? (
-                    <div ref={containerRef} className="flex-1 overflow-y-auto py-8 pr-12 pl-6" style={{ scrollbarWidth: 'none' }}>
-                      <div>
-                        {syncedLines.map((line, i) => {
-                          const isActive = i === currentLineIdx
-                          const isPast   = i < currentLineIdx
-                          if (!line.text) return <div key={i} className="h-4" />
-                          return (
-                            <div
-                              key={i}
-                              ref={isActive ? activeRef : undefined}
-                              onClick={() => seekAudio(line.time)}
-                              className="cursor-pointer leading-tight transition-all duration-300 mb-4"
-                              style={{
-                                fontSize:   isActive ? '1.75rem' : '1.1rem',
-                                fontWeight: isActive ? 800 : 500,
-                                lineHeight: isActive ? 1.2 : 1.4,
-                                color:      isActive ? 'rgba(255,255,255,1)' : isPast ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.18)',
-                                textShadow: isActive ? '0 0 40px rgba(255,255,255,0.2)' : 'none',
-                                transform:  isActive ? 'translateX(6px)' : 'none',
-                              }}
-                            >{line.text}</div>
-                          )
-                        })}
-                        <div className="h-32" />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex-1 overflow-y-auto py-8 pr-12 pl-6" style={{ scrollbarWidth: 'none' }}>
-                      <pre className="text-white/50 text-base leading-8 whitespace-pre-wrap font-sans">{rawLyrics}</pre>
-                    </div>
-                  )
-                )}
-              </>
-            ) : (
-              /* ── Normal mode: lyrics ─────────────────────────────────────── */
-              !rawLyrics ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-3 px-12">
-                  <div className="text-5xl opacity-10">&#9834;</div>
-                  <p className="text-white/30 text-sm text-center">No lyrics available</p>
-                  {isEditor && (
-                    <p className="text-white/20 text-xs text-center mt-1">Open the editor to add lyrics for this track</p>
-                  )}
-                </div>
-              ) : isSynced && syncedLines.length > 0 ? (
-                <div ref={containerRef} className="flex-1 overflow-y-auto py-20 pr-16 pl-8" style={{ scrollbarWidth: 'none' }}>
-                  <style>{`.wrld-scroll::-webkit-scrollbar { display: none; }`}</style>
-                  <div className="wrld-scroll">
-                    {syncedLines.map((line, i) => {
-                      const isActive = i === currentLineIdx
-                      const isPast   = i < currentLineIdx
-                      if (!line.text) return <div key={i} className="h-5" />
-                      return (
-                        <div
-                          key={i}
-                          ref={isActive ? activeRef : undefined}
-                          onClick={() => seekAudio(line.time)}
-                          className="cursor-pointer leading-tight transition-all duration-300 mb-5"
-                          style={{
-                            fontSize:   isActive ? '2rem' : '1.25rem',
-                            fontWeight: isActive ? 800 : 500,
-                            lineHeight: isActive ? 1.2 : 1.35,
-                            color:      isActive ? 'rgba(255,255,255,1)' : isPast ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.18)',
-                            textShadow: isActive ? '0 0 40px rgba(255,255,255,0.2)' : 'none',
-                            transform:  isActive ? 'translateX(6px)' : 'none',
-                          }}
-                        >{line.text}</div>
-                      )
-                    })}
-                    <div className="h-40" />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex-1 overflow-y-auto py-16 pr-16 pl-8" style={{ scrollbarWidth: 'none' }}>
-                  <pre className="text-white/50 text-base leading-8 whitespace-pre-wrap font-sans">{rawLyrics}</pre>
-                </div>
-              )
-            )}
-          </div>
         </>
       )}
     </div>
