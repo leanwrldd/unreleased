@@ -279,6 +279,67 @@ export default function Player(): JSX.Element {
     }
   }, [playbackSpeed])
 
+  // Media Session API — lock screen / notification metadata
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return
+    const title  = radioFmActive ? (radioFmNowPlaying?.title  ?? '') : (currentTrack?.title  ?? '')
+    const artist = radioFmActive ? (radioFmNowPlaying?.artist ?? '') : (currentTrack?.artist ?? '')
+    const rawArt = radioFmActive
+      ? radioFmMatchedSong?.imageUrl
+      : (currentTrackFull?.albumArt ?? currentTrack?.imageUrl)
+    // Resolve relative image paths
+    const artSrc = rawArt
+      ? rawArt.startsWith('http')
+        ? rawArt
+        : `https://juicewrldapi.com${rawArt}`
+      : undefined
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title,
+      artist,
+      album: '',
+      artwork: artSrc ? [{ src: artSrc }] : [],
+    })
+  }, [
+    currentTrack?.id,
+    currentTrack?.title,
+    currentTrack?.artist,
+    currentTrack?.imageUrl,
+    currentTrackFull?.albumArt,
+    radioFmActive,
+    radioFmNowPlaying?.title,
+    radioFmNowPlaying?.artist,
+    radioFmMatchedSong?.imageUrl,
+  ])
+
+  // Media Session action handlers — play/pause/skip
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return
+    navigator.mediaSession.setActionHandler('play',  () => setIsPlaying(true))
+    navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false))
+    navigator.mediaSession.setActionHandler('nexttrack',     () => nextTrack())
+    navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack())
+    return () => {
+      navigator.mediaSession.setActionHandler('play',          null)
+      navigator.mediaSession.setActionHandler('pause',         null)
+      navigator.mediaSession.setActionHandler('nexttrack',     null)
+      navigator.mediaSession.setActionHandler('previoustrack', null)
+    }
+  }, [setIsPlaying, nextTrack, prevTrack])
+
+  // Media Session position state — for lock screen seek bar
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return
+    const audio = getActive()
+    if (!audio || !audio.duration || isNaN(audio.duration)) return
+    try {
+      navigator.mediaSession.setPositionState({
+        duration:     audio.duration,
+        playbackRate: playbackSpeed,
+        position:     Math.min(currentTime, audio.duration),
+      })
+    } catch {/* ignore */}
+  }, [currentTime, playbackSpeed])
+
   // Audio output device
   useEffect(() => {
     const apply = async (): Promise<void> => {
