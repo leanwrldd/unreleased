@@ -445,8 +445,8 @@ export default function WrldView(): JSX.Element {
                   flex flex-col gap-0 py-2 px-2">
                   {playlists.slice(0, 6).map(pl => (
                     <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)} title={pl.name}
-                      className="flex items-center justify-center py-6 rounded-lg hover:bg-white/10 transition-colors group/pl">
-                      <div className="w-12 h-12 rounded-md shrink-0 bg-white/10 overflow-hidden group-hover/pl:ring-1 group-hover/pl:ring-white/30 transition-all">
+                      className="flex items-center justify-center py-2 rounded-lg hover:bg-white/10 transition-colors group/pl">
+                      <div className="w-24 h-24 rounded-lg shrink-0 bg-white/10 overflow-hidden group-hover/pl:ring-1 group-hover/pl:ring-white/30 transition-all">
                         {(pl.cover_image_url || pl.cover_image)
                           ? <img src={pl.cover_image_url ?? pl.cover_image ?? ''} className="w-full h-full object-cover" />
                           : <div className="w-full h-full bg-white/[0.07]" />}
