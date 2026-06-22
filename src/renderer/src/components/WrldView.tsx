@@ -254,7 +254,7 @@ export default function WrldView(): JSX.Element {
 
       return (
         <div
-          className={`flex-1 flex flex-col justify-center select-none overflow-hidden relative ${padded ? 'pl-6 pr-10 gap-5' : 'pl-3 pr-5 md:pl-4 md:pr-8 gap-3 md:gap-4'}`}
+          className={`flex-1 flex flex-col select-none overflow-hidden relative ${padded ? 'justify-start pt-[14%] pl-6 pr-10 gap-5' : 'justify-center pl-3 pr-5 md:pl-4 md:pr-8 gap-3 md:gap-4'}`}
           onWheel={(e) => {
             e.preventDefault()
             if (autoFollow) {
@@ -456,7 +456,7 @@ export default function WrldView(): JSX.Element {
                 </div>
               </div>
               {/* Notch handle — always visible, grows on hover */}
-              <div className="w-[2px] group-hover:w-[3px] h-28 group-hover:h-44 rounded-full bg-white/[0.18] group-hover:bg-white/50 transition-all duration-200 ease-out shrink-0" />
+              <div className="w-px group-hover:w-[2px] h-40 group-hover:h-60 rounded-sm bg-white/[0.18] group-hover:bg-white/50 transition-all duration-200 ease-out shrink-0" />
             </div>
           )}
 
