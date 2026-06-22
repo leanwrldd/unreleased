@@ -6,6 +6,7 @@ import { seekAudio } from './Player'
 import { buildImageUrl, apiFetch } from '../lib/juicewrldApi'
 import { getActiveRadioClient } from '../lib/radioSocketService'
 import type { JWApiSong } from '../lib/juicewrldApi'
+import * as userApi from '../lib/userApi'
 
 export default function WrldView(): JSX.Element {
   const {
@@ -13,6 +14,7 @@ export default function WrldView(): JSX.Element {
     radioFmActive, setRadioFmActive, radioFmIsLive, radioFmNowPlaying,
     radioFmVote, radioFmUpNext, radioFmQueuePreview,
     radioFmMatchedSong,
+    playlists,
   } = useStore()
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -61,6 +63,13 @@ export default function WrldView(): JSX.Element {
     : (currentTrackFull?.syncedLyrics || currentTrackFull?.lyrics || null)
   const isSynced  = rawLyrics ? isLrcFormat(rawLyrics) : false
   const isEditor  = account?.is_editor || account?.is_administrator
+
+  const handleAddToPlaylist = async (playlistId: number) => {
+    if (!currentTrack?.id) return
+    const numericId = parseInt(currentTrack.id.replace('jw-', ''), 10)
+    if (isNaN(numericId)) return
+    try { await userApi.addToPlaylist(playlistId, numericId) } catch { /* silent */ }
+  }
 
   const syncedLines = useMemo(() => {
     if (rawLyrics && isSynced) return parseLrc(rawLyrics)
@@ -248,7 +257,7 @@ export default function WrldView(): JSX.Element {
                   onClick={() => seekAudio(line.time)}
                   className="cursor-pointer leading-tight transition-all duration-300 mb-4"
                   style={{
-                    fontSize:   isActive ? (padded ? '2rem' : '1.5rem') : (padded ? '1.25rem' : '1rem'),
+                    fontSize:   isActive ? (padded ? '1.5rem' : '1.1rem') : (padded ? '0.95rem' : '0.8rem'),
                     fontWeight: isActive ? 800 : 500,
                     lineHeight: isActive ? 1.2 : 1.4,
                     color:      isActive ? 'rgba(255,255,255,1)' : isPast ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.18)',
@@ -265,7 +274,7 @@ export default function WrldView(): JSX.Element {
     }
     return (
       <div className={`flex-1 overflow-y-auto ${padded ? 'py-16 pr-16 pl-8' : 'py-4 px-4 md:py-8 md:pr-12 md:pl-6'}`} style={{ scrollbarWidth: 'none' }}>
-        <pre className="text-white/50 text-sm md:text-base leading-7 md:leading-8 whitespace-pre-wrap font-sans">{rawLyrics}</pre>
+        <pre className="text-white/50 text-xs md:text-sm leading-6 md:leading-7 whitespace-pre-wrap font-sans">{rawLyrics}</pre>
       </div>
     )
   }
@@ -389,6 +398,30 @@ export default function WrldView(): JSX.Element {
               )}
             </div>
           </div>
+
+          {/* ── Playlist notch ────────────────────────────────────────────── */}
+          {account && playlists.length > 0 && currentTrack && (
+            <div className="group absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center">
+              {/* Expanded panel */}
+              <div className="overflow-hidden max-w-0 group-hover:max-w-[220px] transition-all duration-300 ease-in-out">
+                <div className="w-52 bg-black/75 backdrop-blur-xl rounded-l-2xl border-l border-t border-b border-white/10 flex flex-col gap-0.5 py-3 px-3">
+                  <p className="text-white/30 text-[10px] font-semibold uppercase tracking-widest mb-1.5 px-1">Add to playlist</p>
+                  {playlists.slice(0, 6).map(pl => (
+                    <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)}
+                      className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-white/10 transition-colors text-left group/pl">
+                      <div className="w-6 h-6 rounded-md shrink-0 bg-white/10 overflow-hidden">
+                        {(pl.cover_image_url || pl.cover_image) &&
+                          <img src={pl.cover_image_url ?? pl.cover_image ?? ''} className="w-full h-full object-cover" />}
+                      </div>
+                      <span className="text-white/55 group-hover/pl:text-white/90 text-xs font-medium truncate transition-colors">{pl.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Notch handle */}
+              <div className="w-1.5 group-hover:w-2.5 h-10 group-hover:h-16 rounded-l-full bg-white/15 group-hover:bg-white/35 transition-all duration-300 shrink-0" />
+            </div>
+          )}
 
         </>
       )}
