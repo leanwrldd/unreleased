@@ -439,18 +439,18 @@ export default function WrldView(): JSX.Element {
           {account && playlists.length > 0 && currentTrack && (
             <div className="group absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center">
               {/* Expanded panel — width opens first, content fades in behind */}
-              <div className="overflow-hidden max-w-0 group-hover:max-w-[220px] transition-[max-width] duration-200 ease-out">
-                <div className="w-52 opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-75
+              <div className="overflow-hidden max-w-0 group-hover:max-w-[160px] transition-[max-width] duration-200 ease-out">
+                <div className="w-36 opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-75
                   bg-black/80 backdrop-blur-xl rounded-l-2xl border-l border-t border-b border-white/[0.08]
-                  flex flex-col gap-0.5 py-3 px-3">
+                  flex flex-col gap-0 py-2 px-2">
                   {playlists.slice(0, 6).map(pl => (
                     <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)}
-                      className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-white/10 transition-colors text-left group/pl">
-                      <div className="w-6 h-6 rounded-md shrink-0 bg-white/10 overflow-hidden">
+                      className="flex items-center gap-2 px-2 py-2.5 rounded-lg hover:bg-white/10 transition-colors text-left group/pl">
+                      <div className="w-5 h-5 rounded shrink-0 bg-white/10 overflow-hidden">
                         {(pl.cover_image_url || pl.cover_image) &&
                           <img src={pl.cover_image_url ?? pl.cover_image ?? ''} className="w-full h-full object-cover" />}
                       </div>
-                      <span className="text-white/55 group-hover/pl:text-white/90 text-xs font-medium truncate transition-colors">{pl.name}</span>
+                      <span className="text-white/55 group-hover/pl:text-white/90 text-[11px] font-medium truncate transition-colors">{pl.name}</span>
                     </button>
                   ))}
                 </div>
