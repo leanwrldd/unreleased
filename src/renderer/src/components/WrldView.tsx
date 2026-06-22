@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState } from 'react'
+﻿import { useEffect, useRef, useMemo, useState } from 'react'
 import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, LocateFixed, ChevronDown } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
@@ -264,7 +264,7 @@ export default function WrldView(): JSX.Element {
 
       return (
         <div
-          className={`flex-1 flex flex-col select-none overflow-hidden relative ${padded ? 'justify-start pt-[14%] pl-6 pr-10 gap-5' : 'justify-center pl-3 pr-5 md:pl-4 md:pr-8 gap-3 md:gap-4'}`}
+          className={`flex-1 flex flex-col select-none overflow-hidden relative ${padded ? 'justify-center pl-6 pr-10 gap-5' : 'justify-center pl-3 pr-5 md:pl-4 md:pr-8 gap-3 md:gap-4'}`}
           onWheel={(e) => {
             e.preventDefault()
             if (autoFollow) {

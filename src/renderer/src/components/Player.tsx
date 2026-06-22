@@ -68,6 +68,7 @@ export default function Player(): JSX.Element {
     likedTrackIds,
     toggleLike,
     setActiveView,
+    activeView,
     playNext, account} = useStore()
 
   const [showContextMenu, setShowContextMenu] = useState(false)
@@ -878,7 +879,7 @@ export default function Player(): JSX.Element {
             )}
           </button>}
 
-          {!radioFmActive && <button onClick={() => setShowNowPlaying(!showNowPlaying)}
+          {!radioFmActive && activeView !== 'wrld' && <button onClick={() => setShowNowPlaying(!showNowPlaying)}
             className={`transition-colors ${showNowPlaying ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}
             title="Now Playing">
             <Maximize2 size={16} />
@@ -895,15 +896,6 @@ export default function Player(): JSX.Element {
                 onChange={handleVolumeChange} className="w-full block"
                 style={{ '--val': `${volume * 100}%` } as React.CSSProperties} />
             </div>
-
-            <button
-              ref={outputBtnRef}
-              onClick={openOutputPicker}
-              className={`transition-colors ${showOutputPicker ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}
-              title="Audio output"
-            >
-              <ChevronUp size={13} />
-            </button>
           </div>
         </div>
 
