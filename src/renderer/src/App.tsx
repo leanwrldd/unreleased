@@ -13,7 +13,6 @@ function getViewFromPath(pathname: string): ViewType {
   if (pathname === '/liked') return 'liked'
   if (pathname === '/playlists') return 'playlists'
   if (pathname === '/docs') return 'docs'
-  if (pathname === '/999-fm') return 'radio-fm'
   if (pathname === '/wrld') return 'wrld'
   if (pathname.startsWith('/shared/')) return 'shared-playlist'
   if (pathname === '/auth/discord/callback') return 'api-tracker'
@@ -34,7 +33,6 @@ import SharedPlaylistView from './components/SharedPlaylistView'
 import EditorProfileView from './components/EditorProfileView'
 import NotFoundView from './components/NotFoundView'
 import DocsPage from './components/DocsPage'
-import RadioFmView from './components/RadioFmView'
 import RadioFmPlayer from './components/RadioFmPlayer'
 import WrldView from './components/WrldView'
 import UserAuthModal from './components/UserAuthModal'
@@ -123,7 +121,6 @@ export default function App(): JSX.Element {
               : activeView === 'shared-playlist' ? <SharedPlaylistView />
               : activeView === 'editor-profile' ? <EditorProfileView />
               : activeView === 'docs' ? <DocsPage />
-              : activeView === 'radio-fm' ? <RadioFmView />
               : activeView === 'wrld' ? <WrldView />
               : activeView === 'not-found' ? <NotFoundView />
               : <ApiTrackerView />}

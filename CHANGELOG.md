@@ -6,6 +6,14 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.7.1] — 2026-06-22
+
+- **Remove** RadioFmView (old dedicated 999 FM page) and radioLibrary.ts — FM controls now live in the WRLD view
+- **Remove** 999 FM entry from bottom nav
+- **Remove** `/999-fm` URL route and `radio-fm` ViewType
+
+---
+
 ## [1.7.0] — 2026-06-22
 
 - **New** WRLD view: 999 FM live radio integration — toggle streams live audio with real-time metadata (cover art, title, artist, elapsed/duration)
