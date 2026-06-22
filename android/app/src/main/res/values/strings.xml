@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">unreleased</string>
+    <string name="title_activity_main">unreleased</string>
+    <string name="package_name">com.juicewrldapi.unreleased</string>
+    <string name="custom_url_scheme">com.juicewrldapi.unreleased</string>
+</resources>
