@@ -5,6 +5,7 @@ import {
   ChevronUp, ChevronDown, MoreHorizontal, Folder, Pencil, Plus, ListMusic,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
+import { useShallow } from 'zustand/react/shallow'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 import SongInfoModal from './SongInfoModal'
 import {
@@ -169,7 +170,9 @@ function SongContextMenu({
   canEdit: boolean
   onTogglePlaylists: () => void
 }): JSX.Element {
-  const { playlists, account, refreshPlaylists, setShowUserAuth } = useStore()
+  const { playlists, account, refreshPlaylists, setShowUserAuth } = useStore(
+    useShallow(s => ({ playlists: s.playlists, account: s.account, refreshPlaylists: s.refreshPlaylists, setShowUserAuth: s.setShowUserAuth }))
+  )
   const menuRef = useRef<HTMLDivElement>(null)
   const songId = userApi.trackIdToSongId(`jw-${state.song.id}`)
   const [busyId, setBusyId] = useState<number | null>(null)
@@ -559,7 +562,13 @@ export default function ApiTrackerView(): JSX.Element {
     apiTrackerCategory, setApiTrackerCategory,
     apiTrackerEra, setApiTrackerEra,
     setActiveView, setApiFilesPath, setPendingEditorSongId,
-  } = useStore()
+  } = useStore(useShallow(s => ({
+    playTrack: s.playTrack, addToQueue: s.addToQueue, account: s.account,
+    apiTrackerCategory: s.apiTrackerCategory, setApiTrackerCategory: s.setApiTrackerCategory,
+    apiTrackerEra: s.apiTrackerEra, setApiTrackerEra: s.setApiTrackerEra,
+    setActiveView: s.setActiveView, setApiFilesPath: s.setApiFilesPath,
+    setPendingEditorSongId: s.setPendingEditorSongId,
+  })))
 
   const canEdit = !!(account?.is_editor || account?.is_administrator)
 
