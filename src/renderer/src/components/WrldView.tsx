@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, LocateFixed } from 'lucide-react'
+import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, LocateFixed, ChevronDown } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
 import { seekAudio } from './Player'
@@ -80,6 +80,16 @@ export default function WrldView(): JSX.Element {
 
   const [autoFollow, setAutoFollow] = useState(true)
   const [manualCenter, setManualCenter] = useState(0)
+  type NotchCategory = 'albums' | 'mixtapes' | 'unreleased' | 'playlists'
+  const [notchCategory, setNotchCategory] = useState<NotchCategory>('albums')
+  const [notchDropdownOpen, setNotchDropdownOpen] = useState(false)
+  const NOTCH_LABELS: Record<NotchCategory, string> = { albums: 'Released Albums', mixtapes: 'Mixtapes & Singles', unreleased: 'Unreleased', playlists: 'Playlists' }
+  const NOTCH_OPTIONS: { value: NotchCategory; label: string }[] = [
+    { value: 'albums', label: 'Released Albums' },
+    { value: 'mixtapes', label: 'Mixtapes & Singles' },
+    { value: 'unreleased', label: 'Unreleased' },
+    { value: 'playlists', label: 'Playlists' },
+  ]
   // Reset to auto-follow when the track or lyrics change
   useEffect(() => { setAutoFollow(true) }, [rawLyrics])
 
@@ -442,17 +452,50 @@ export default function WrldView(): JSX.Element {
               <div className="overflow-hidden max-w-0 group-hover:max-w-[160px] transition-[max-width] duration-200 ease-out">
                 <div className="w-36 opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-75
                   bg-black/80 backdrop-blur-xl rounded-l-2xl border-l border-t border-b border-white/[0.08]
-                  flex flex-col gap-0 py-2 px-2">
-                  {playlists.slice(0, 6).map(pl => (
-                    <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)} title={pl.name}
-                      className="flex items-center justify-center py-1 rounded-lg hover:bg-white/10 transition-colors group/pl">
-                      <div className="w-16 h-16 rounded-lg shrink-0 bg-white/10 overflow-hidden group-hover/pl:ring-1 group-hover/pl:ring-white/30 transition-all">
-                        {(pl.cover_image_url || pl.cover_image)
-                          ? <img src={pl.cover_image_url ?? pl.cover_image ?? ''} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full bg-white/[0.07]" />}
-                      </div>
+                  flex flex-col gap-0 pt-2 pb-2 px-2">
+
+                  {/* Category selector */}
+                  <div className="relative mb-1.5 px-0.5">
+                    <button
+                      onClick={() => setNotchDropdownOpen(o => !o)}
+                      className="w-full flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/10 transition-colors"
+                    >
+                      <span className="text-white/45 text-[10px] font-medium truncate leading-none">{NOTCH_LABELS[notchCategory]}</span>
+                      <ChevronDown size={9} className={`text-white/25 shrink-0 transition-transform duration-150 ${notchDropdownOpen ? 'rotate-180' : ''}`} />
                     </button>
-                  ))}
+                    {notchDropdownOpen && (
+                      <div className="absolute top-full left-0 right-0 mt-1 z-10 bg-black/95 backdrop-blur-xl rounded-xl border border-white/10 overflow-hidden py-1">
+                        {NOTCH_OPTIONS.map(opt => (
+                          <button key={opt.value}
+                            onClick={() => { setNotchCategory(opt.value); setNotchDropdownOpen(false) }}
+                            className={`w-full px-3 py-2 text-left text-[10px] transition-colors ${notchCategory === opt.value ? 'text-white/90 bg-white/8' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.06]'}`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Items */}
+                  {notchCategory === 'playlists' ? (
+                    playlists.slice(0, 6).map(pl => (
+                      <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)} title={pl.name}
+                        className="flex items-center justify-center py-1 rounded-lg hover:bg-white/10 transition-colors group/pl">
+                        <div className="w-16 h-16 rounded-lg shrink-0 bg-white/10 overflow-hidden group-hover/pl:ring-1 group-hover/pl:ring-white/30 transition-all">
+                          {(pl.cover_image_url || pl.cover_image)
+                            ? <img src={pl.cover_image_url ?? pl.cover_image ?? ''} className="w-full h-full object-cover" />
+                            : <div className="w-full h-full bg-white/[0.07]" />}
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="flex items-center justify-center py-1">
+                        <div className="w-16 h-16 rounded-lg bg-white/[0.04]" />
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
               {/* Notch handle — always visible, grows on hover */}
