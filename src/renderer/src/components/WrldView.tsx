@@ -402,9 +402,11 @@ export default function WrldView(): JSX.Element {
           {/* ── Playlist notch ────────────────────────────────────────────── */}
           {account && playlists.length > 0 && currentTrack && (
             <div className="group absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center">
-              {/* Expanded panel */}
-              <div className="overflow-hidden max-w-0 group-hover:max-w-[220px] transition-all duration-300 ease-in-out">
-                <div className="w-52 bg-black/75 backdrop-blur-xl rounded-l-2xl border-l border-t border-b border-white/10 flex flex-col gap-0.5 py-3 px-3">
+              {/* Expanded panel — width opens first, content fades in behind */}
+              <div className="overflow-hidden max-w-0 group-hover:max-w-[220px] transition-[max-width] duration-200 ease-out">
+                <div className="w-52 opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-75
+                  bg-black/80 backdrop-blur-xl rounded-l-2xl border-l border-t border-b border-white/[0.08]
+                  flex flex-col gap-0.5 py-3 px-3">
                   <p className="text-white/30 text-[10px] font-semibold uppercase tracking-widest mb-1.5 px-1">Add to playlist</p>
                   {playlists.slice(0, 6).map(pl => (
                     <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)}
@@ -418,8 +420,8 @@ export default function WrldView(): JSX.Element {
                   ))}
                 </div>
               </div>
-              {/* Notch handle */}
-              <div className="w-1.5 group-hover:w-2.5 h-10 group-hover:h-16 rounded-l-full bg-white/15 group-hover:bg-white/35 transition-all duration-300 shrink-0" />
+              {/* Notch handle — always visible, grows on hover */}
+              <div className="w-[3px] group-hover:w-[5px] h-20 group-hover:h-32 rounded-full bg-white/[0.18] group-hover:bg-white/50 transition-all duration-200 ease-out shrink-0" />
             </div>
           )}
 
