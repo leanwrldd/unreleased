@@ -6,7 +6,24 @@ import { StatusBar, Style } from '@capacitor/status-bar'
 import { SplashScreen } from '@capacitor/splash-screen'
 
 // Capacitor native init — only runs inside the native app shell
-if (typeof (window as any).Capacitor !== 'undefined') {
+const _isCapacitor = typeof (window as any).Capacitor !== 'undefined'
+if (_isCapacitor) {
+  // Global error overlay — shows the real crash info in WKWebView
+  const _showCapError = (msg: string): void => {
+    const el = document.createElement('div')
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#0a0a0a;color:#ff4444;padding:20px;font-family:monospace;font-size:11px;white-space:pre-wrap;overflow:auto;z-index:99999'
+    el.textContent = msg
+    document.body?.appendChild(el)
+  }
+  window.onerror = (_msg, src, line, _col, err) => {
+    _showCapError(`JS ERROR\n${err?.message ?? _msg}\n${src}:${line}\n\n${err?.stack ?? ''}`)
+    return false
+  }
+  window.addEventListener('unhandledrejection', (e) => {
+    const r = e.reason
+    _showCapError(`UNHANDLED REJECTION\n${r?.message ?? String(r)}\n\n${r?.stack ?? ''}`)
+  })
+
   StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
   StatusBar.setBackgroundColor({ color: '#000000' }).catch(() => {})
   SplashScreen.hide({ fadeOutDuration: 300 }).catch(() => {})
