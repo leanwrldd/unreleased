@@ -5,8 +5,16 @@ const config: CapacitorConfig = {
   appName: 'unreleased',
   webDir: 'dist',
   plugins: {
-    CapacitorHttp: {
-      enabled: true,
+    SplashScreen: {
+      launchShowDuration: 1500,
+      launchAutoHide: false,
+      backgroundColor: '#000000',
+      androidSplashResourceName: 'splash',
+      showSpinner: false,
+    },
+    StatusBar: {
+      style: 'Dark',
+      backgroundColor: '#000000',
     },
   },
   android: {
