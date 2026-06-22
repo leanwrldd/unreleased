@@ -254,7 +254,7 @@ export default function WrldView(): JSX.Element {
 
       return (
         <div
-          className={`flex-1 flex flex-col justify-center select-none overflow-hidden relative ${padded ? 'px-10 gap-5' : 'px-5 md:px-8 gap-3 md:gap-4'}`}
+          className={`flex-1 flex flex-col justify-center select-none overflow-hidden relative ${padded ? 'pl-6 pr-10 gap-5' : 'pl-3 pr-5 md:pl-4 md:pr-8 gap-3 md:gap-4'}`}
           onWheel={(e) => {
             e.preventDefault()
             if (autoFollow) {
@@ -266,15 +266,6 @@ export default function WrldView(): JSX.Element {
             }
           }}
         >
-          {!autoFollow && (
-            <button
-              onClick={() => setAutoFollow(true)}
-              className="absolute top-3 right-4 z-10 flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/20 text-white/55 hover:text-white/90 rounded-full px-3 py-1.5 transition-colors backdrop-blur-sm"
-            >
-              <LocateFixed size={11} />
-              Follow
-            </button>
-          )}
           {visible.map((line, i) => {
             const absIdx   = winStart + i
             const isCenter = absIdx === centerIdx
@@ -286,9 +277,9 @@ export default function WrldView(): JSX.Element {
                 onClick={() => seekAudio(line.time)}
                 className="cursor-pointer leading-tight transition-all duration-300"
                 style={{
-                  fontSize:   isCenter ? (padded ? '1.5rem' : '1.1rem')
-                            : Math.abs(dist) === 1 ? (padded ? '1rem' : '0.85rem')
-                            : (padded ? '0.85rem' : '0.75rem'),
+                  fontSize:   isCenter ? (padded ? '1.65rem' : '1.2rem')
+                            : Math.abs(dist) === 1 ? (padded ? '1.1rem' : '0.95rem')
+                            : (padded ? '0.9rem' : '0.8rem'),
                   fontWeight: isCenter ? 800 : Math.abs(dist) === 1 ? 500 : 400,
                   lineHeight: 1.3,
                   color:      isCenter ? 'rgba(255,255,255,1)'
@@ -303,6 +294,15 @@ export default function WrldView(): JSX.Element {
               </div>
             )
           })}
+          {!autoFollow && (
+            <button
+              onClick={() => setAutoFollow(true)}
+              className="mt-2 self-start flex items-center gap-1.5 text-[11px] text-white/20 hover:text-white/60 transition-colors"
+            >
+              <LocateFixed size={10} />
+              Follow
+            </button>
+          )}
         </div>
       )
     }
