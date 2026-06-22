@@ -86,6 +86,13 @@ npm run preview
 ## Changelog
 
 See [CHANGELOG.md](./CHANGELOG.md) for the full history.
+### v1.7.1 - 2026-06-20
+- New WRLD view: 999 FM live radio integration — toggle streams live audio with real-time metadata (cover art, title, artist, elapsed/duration)
+- New WRLD view: FM seek bar ticks in real time using a local 500 ms timer synced to elapsed_ms from the WebSocket
+- New WRLD view: FM mode Radio/Lyrics tab panel — vote to skip, suggest next song, view up-next and queue preview
+- New WRLD view: FM song lookup — matches now-playing title to API song for cover art and lyrics display
+- Fix WRLD view: seek bar no longer goes gray in FM mode (removed disabled attribute that triggered browser-native styling)
+- Improve WRLD view: fully responsive — stacked layout on mobile (compact art + title header, scrollable content below), side-by-side on desktop unchanged
 
 ### v1.5.9 — 2026-06-20
 - **Fix** Playlists: description edit trigger was invisible; now shows at 40% opacity and brightens on hover
