@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState } from 'react'
-import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X } from 'lucide-react'
+import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, LocateFixed } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
 import { seekAudio } from './Player'
@@ -78,11 +78,9 @@ export default function WrldView(): JSX.Element {
 
   const currentLineIdx = isSynced ? getCurrentLineIndex(syncedLines, currentTime) : -1
 
-  useEffect(() => {
-    if (activeRef.current) {
-      activeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }, [currentLineIdx])
+  const [autoFollow, setAutoFollow] = useState(true)
+  // Reset to auto-follow when the track or lyrics change
+  useEffect(() => { setAutoFollow(true) }, [rawLyrics])
 
   const fmLabel    = radioFmActive
     ? (radioFmIsLive ? '999 FM · LIVE' : '999 FM · OFF')
@@ -244,27 +242,81 @@ export default function WrldView(): JSX.Element {
         </div>
       )
     }
+
+    // ── Synced lyrics ─────────────────────────────────────────────────────────
     if (isSynced && syncedLines.length > 0) {
+      // ── Windowed mode: show current ± 2 lines, centered ───────────────────
+      if (autoFollow) {
+        const winStart = Math.max(0, currentLineIdx - 2)
+        const winEnd   = Math.min(syncedLines.length - 1, currentLineIdx + 2)
+        const visible  = syncedLines.slice(winStart, winEnd + 1)
+
+        return (
+          <div
+            className={`flex-1 flex flex-col justify-center select-none overflow-hidden ${padded ? 'px-10 gap-5' : 'px-5 md:px-8 gap-3 md:gap-4'}`}
+            onWheel={() => setAutoFollow(false)}
+          >
+            {visible.map((line, i) => {
+              const absIdx   = winStart + i
+              const isActive = absIdx === currentLineIdx
+              const dist     = absIdx - currentLineIdx   // negative = past, positive = future
+              if (!line.text) return null
+              return (
+                <div
+                  key={absIdx}
+                  onClick={() => seekAudio(line.time)}
+                  className="cursor-pointer leading-tight transition-all duration-300"
+                  style={{
+                    fontSize:   isActive ? (padded ? '1.5rem' : '1.1rem')
+                              : Math.abs(dist) === 1 ? (padded ? '1rem' : '0.85rem')
+                              : (padded ? '0.85rem' : '0.75rem'),
+                    fontWeight: isActive ? 800 : Math.abs(dist) === 1 ? 500 : 400,
+                    lineHeight: 1.3,
+                    color:      isActive ? 'rgba(255,255,255,1)'
+                              : dist < 0  ? 'rgba(255,255,255,0.28)'
+                              :             'rgba(255,255,255,0.18)',
+                    opacity:    Math.abs(dist) === 2 ? 0.55 : 1,
+                    textShadow: isActive ? '0 0 40px rgba(255,255,255,0.15)' : 'none',
+                    transform:  isActive ? (padded ? 'translateX(8px)' : 'translateX(4px)') : 'none',
+                  }}
+                >
+                  {line.text}
+                </div>
+              )
+            })}
+          </div>
+        )
+      }
+
+      // ── Free-scroll mode ──────────────────────────────────────────────────
       return (
-        <div ref={containerRef} className={`flex-1 overflow-y-auto ${padded ? 'py-20 pr-16 pl-8' : 'py-4 px-4 md:py-8 md:pr-12 md:pl-6'}`} style={{ scrollbarWidth: 'none' }}>
-          <div>
+        <div className="flex-1 relative overflow-hidden">
+          <button
+            onClick={() => setAutoFollow(true)}
+            className="absolute top-3 right-4 z-10 flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/20 text-white/55 hover:text-white/90 rounded-full px-3 py-1.5 transition-colors backdrop-blur-sm"
+          >
+            <LocateFixed size={11} />
+            Follow
+          </button>
+          <div ref={containerRef} className={`h-full overflow-y-auto ${padded ? 'py-16 pr-16 pl-8' : 'py-4 px-5 md:py-8 md:pr-12 md:pl-6'}`} style={{ scrollbarWidth: 'none' }}>
             {syncedLines.map((line, i) => {
               const isActive = i === currentLineIdx
               const isPast   = i < currentLineIdx
-              if (!line.text) return <div key={i} className="h-4" />
+              if (!line.text) return <div key={i} className="h-3" />
               return (
-                <div key={i} ref={isActive ? activeRef : undefined}
+                <div key={i}
                   onClick={() => seekAudio(line.time)}
-                  className="cursor-pointer leading-tight transition-all duration-300 mb-4"
+                  className="cursor-pointer leading-tight transition-colors duration-150 mb-3 md:mb-4"
                   style={{
                     fontSize:   isActive ? (padded ? '1.5rem' : '1.1rem') : (padded ? '0.95rem' : '0.8rem'),
                     fontWeight: isActive ? 800 : 500,
-                    lineHeight: isActive ? 1.2 : 1.4,
+                    lineHeight: 1.35,
                     color:      isActive ? 'rgba(255,255,255,1)' : isPast ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.18)',
-                    textShadow: isActive ? '0 0 40px rgba(255,255,255,0.2)' : 'none',
-                    transform:  isActive ? 'translateX(6px)' : 'none',
+                    transform:  isActive ? 'translateX(4px)' : 'none',
                   }}
-                >{line.text}</div>
+                >
+                  {line.text}
+                </div>
               )
             })}
             <div className="h-32" />
@@ -272,6 +324,8 @@ export default function WrldView(): JSX.Element {
         </div>
       )
     }
+
+    // ── Plain lyrics ──────────────────────────────────────────────────────────
     return (
       <div className={`flex-1 overflow-y-auto ${padded ? 'py-16 pr-16 pl-8' : 'py-4 px-4 md:py-8 md:pr-12 md:pl-6'}`} style={{ scrollbarWidth: 'none' }}>
         <pre className="text-white/50 text-xs md:text-sm leading-6 md:leading-7 whitespace-pre-wrap font-sans">{rawLyrics}</pre>
