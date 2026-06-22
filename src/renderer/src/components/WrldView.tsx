@@ -79,6 +79,7 @@ export default function WrldView(): JSX.Element {
   const currentLineIdx = isSynced ? getCurrentLineIndex(syncedLines, currentTime) : -1
 
   const [autoFollow, setAutoFollow] = useState(true)
+  const [manualCenter, setManualCenter] = useState(0)
   // Reset to auto-follow when the track or lyrics change
   useEffect(() => { setAutoFollow(true) }, [rawLyrics])
 
@@ -245,82 +246,63 @@ export default function WrldView(): JSX.Element {
 
     // ── Synced lyrics ─────────────────────────────────────────────────────────
     if (isSynced && syncedLines.length > 0) {
-      // ── Windowed mode: show current ± 2 lines, centered ───────────────────
-      if (autoFollow) {
-        const winStart = Math.max(0, currentLineIdx - 2)
-        const winEnd   = Math.min(syncedLines.length - 1, currentLineIdx + 2)
-        const visible  = syncedLines.slice(winStart, winEnd + 1)
+      // centerIdx: live when auto-following, frozen+scrollable when manual
+      const centerIdx = autoFollow ? currentLineIdx : manualCenter
+      const winStart  = Math.max(0, centerIdx - 2)
+      const winEnd    = Math.min(syncedLines.length - 1, centerIdx + 2)
+      const visible   = syncedLines.slice(winStart, winEnd + 1)
 
-        return (
-          <div
-            className={`flex-1 flex flex-col justify-center select-none overflow-hidden ${padded ? 'px-10 gap-5' : 'px-5 md:px-8 gap-3 md:gap-4'}`}
-            onWheel={() => setAutoFollow(false)}
-          >
-            {visible.map((line, i) => {
-              const absIdx   = winStart + i
-              const isActive = absIdx === currentLineIdx
-              const dist     = absIdx - currentLineIdx   // negative = past, positive = future
-              if (!line.text) return null
-              return (
-                <div
-                  key={absIdx}
-                  onClick={() => seekAudio(line.time)}
-                  className="cursor-pointer leading-tight transition-all duration-300"
-                  style={{
-                    fontSize:   isActive ? (padded ? '1.5rem' : '1.1rem')
-                              : Math.abs(dist) === 1 ? (padded ? '1rem' : '0.85rem')
-                              : (padded ? '0.85rem' : '0.75rem'),
-                    fontWeight: isActive ? 800 : Math.abs(dist) === 1 ? 500 : 400,
-                    lineHeight: 1.3,
-                    color:      isActive ? 'rgba(255,255,255,1)'
-                              : dist < 0  ? 'rgba(255,255,255,0.28)'
-                              :             'rgba(255,255,255,0.18)',
-                    opacity:    Math.abs(dist) === 2 ? 0.55 : 1,
-                    textShadow: isActive ? '0 0 40px rgba(255,255,255,0.15)' : 'none',
-                    transform:  isActive ? (padded ? 'translateX(8px)' : 'translateX(4px)') : 'none',
-                  }}
-                >
-                  {line.text}
-                </div>
-              )
-            })}
-          </div>
-        )
-      }
-
-      // ── Free-scroll mode ──────────────────────────────────────────────────
       return (
-        <div className="flex-1 relative overflow-hidden">
-          <button
-            onClick={() => setAutoFollow(true)}
-            className="absolute top-3 right-4 z-10 flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/20 text-white/55 hover:text-white/90 rounded-full px-3 py-1.5 transition-colors backdrop-blur-sm"
-          >
-            <LocateFixed size={11} />
-            Follow
-          </button>
-          <div ref={containerRef} className={`h-full overflow-y-auto ${padded ? 'py-16 pr-16 pl-8' : 'py-4 px-5 md:py-8 md:pr-12 md:pl-6'}`} style={{ scrollbarWidth: 'none' }}>
-            {syncedLines.map((line, i) => {
-              const isActive = i === currentLineIdx
-              const isPast   = i < currentLineIdx
-              if (!line.text) return <div key={i} className="h-3" />
-              return (
-                <div key={i}
-                  onClick={() => seekAudio(line.time)}
-                  className="cursor-pointer leading-tight transition-colors duration-150 mb-3 md:mb-4"
-                  style={{
-                    fontSize:   isActive ? (padded ? '1.5rem' : '1.1rem') : (padded ? '0.95rem' : '0.8rem'),
-                    fontWeight: isActive ? 800 : 500,
-                    lineHeight: 1.35,
-                    color:      isActive ? 'rgba(255,255,255,1)' : isPast ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.18)',
-                    transform:  isActive ? 'translateX(4px)' : 'none',
-                  }}
-                >
-                  {line.text}
-                </div>
-              )
-            })}
-            <div className="h-32" />
-          </div>
+        <div
+          className={`flex-1 flex flex-col justify-center select-none overflow-hidden relative ${padded ? 'px-10 gap-5' : 'px-5 md:px-8 gap-3 md:gap-4'}`}
+          onWheel={(e) => {
+            e.preventDefault()
+            if (autoFollow) {
+              setAutoFollow(false)
+              setManualCenter(currentLineIdx)
+            } else {
+              const dir = e.deltaY > 0 ? 1 : -1
+              setManualCenter(c => Math.max(0, Math.min(syncedLines.length - 1, c + dir)))
+            }
+          }}
+        >
+          {!autoFollow && (
+            <button
+              onClick={() => setAutoFollow(true)}
+              className="absolute top-3 right-4 z-10 flex items-center gap-1.5 text-xs bg-white/10 hover:bg-white/20 text-white/55 hover:text-white/90 rounded-full px-3 py-1.5 transition-colors backdrop-blur-sm"
+            >
+              <LocateFixed size={11} />
+              Follow
+            </button>
+          )}
+          {visible.map((line, i) => {
+            const absIdx   = winStart + i
+            const isCenter = absIdx === centerIdx
+            const dist     = absIdx - centerIdx
+            if (!line.text) return null
+            return (
+              <div
+                key={absIdx}
+                onClick={() => seekAudio(line.time)}
+                className="cursor-pointer leading-tight transition-all duration-300"
+                style={{
+                  fontSize:   isCenter ? (padded ? '1.5rem' : '1.1rem')
+                            : Math.abs(dist) === 1 ? (padded ? '1rem' : '0.85rem')
+                            : (padded ? '0.85rem' : '0.75rem'),
+                  fontWeight: isCenter ? 800 : Math.abs(dist) === 1 ? 500 : 400,
+                  lineHeight: 1.3,
+                  color:      isCenter ? 'rgba(255,255,255,1)'
+                            : dist < 0  ? 'rgba(255,255,255,0.28)'
+                            :             'rgba(255,255,255,0.18)',
+                  opacity:    Math.abs(dist) === 2 ? 0.55 : 1,
+                  textShadow: isCenter ? '0 0 40px rgba(255,255,255,0.15)' : 'none',
+                  transform:  isCenter ? (padded ? 'translateX(8px)' : 'translateX(4px)') : 'none',
+                }}
+              >
+                {line.text}
+              </div>
+            )
+          })}
         </div>
       )
     }
@@ -428,8 +410,8 @@ export default function WrldView(): JSX.Element {
               </div>
             </div>
 
-            {/* Divider */}
-            <div className="w-px bg-white/10 shrink-0 my-10" />
+            {/* Divider — FM only */}
+            {radioFmActive && <div className="w-px bg-white/10 shrink-0 my-10" />}
 
             {/* Right column */}
             <div className="flex-1 overflow-hidden flex flex-col">
@@ -461,7 +443,6 @@ export default function WrldView(): JSX.Element {
                 <div className="w-52 opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-75
                   bg-black/80 backdrop-blur-xl rounded-l-2xl border-l border-t border-b border-white/[0.08]
                   flex flex-col gap-0.5 py-3 px-3">
-                  <p className="text-white/30 text-[10px] font-semibold uppercase tracking-widest mb-1.5 px-1">Add to playlist</p>
                   {playlists.slice(0, 6).map(pl => (
                     <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)}
                       className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-white/10 transition-colors text-left group/pl">
@@ -475,7 +456,7 @@ export default function WrldView(): JSX.Element {
                 </div>
               </div>
               {/* Notch handle — always visible, grows on hover */}
-              <div className="w-[3px] group-hover:w-[5px] h-20 group-hover:h-32 rounded-full bg-white/[0.18] group-hover:bg-white/50 transition-all duration-200 ease-out shrink-0" />
+              <div className="w-[2px] group-hover:w-[3px] h-28 group-hover:h-44 rounded-full bg-white/[0.18] group-hover:bg-white/50 transition-all duration-200 ease-out shrink-0" />
             </div>
           )}
 
