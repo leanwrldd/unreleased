@@ -65,7 +65,7 @@ export default function WrldView(): JSX.Element {
 
   // Lyrics — use FM matched song lyrics in FM mode, otherwise currentTrackFull
   const rawLyrics   = radioFmActive
-    ? (radioFmMatchedSong?.lyrics ?? null)
+    ? (radioFmMatchedSong?.syncedLyrics || radioFmMatchedSong?.lyrics || null)
     : (currentTrackFull?.syncedLyrics || currentTrackFull?.lyrics || null)
   const isSynced    = rawLyrics ? isLrcFormat(rawLyrics) : false
   const isEditor    = account?.is_editor || account?.is_administrator

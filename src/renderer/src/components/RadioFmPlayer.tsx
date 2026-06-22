@@ -68,29 +68,40 @@ export default function RadioFmPlayer(): JSX.Element {
   }, [radioFmActive])
 
 
-  // When FM now-playing changes, search API for cover + lyrics
+  // When FM now-playing changes, look up the song for cover + lyrics
   useEffect(() => {
     const title = radioFmNowPlaying?.title
-    const artist = radioFmNowPlaying?.artist
     if (!title) { setRadioFmMatchedSong(null); return }
-    const query = [title, artist].filter(Boolean).join(' ')
     let cancelled = false
-    apiFetch<{ results: JWApiSong[] }>('/songs/', { search: query, page_size: 3 })
-      .then(data => {
-        if (cancelled) return
-        const song = data.results[0]
-        if (song) {
-          setRadioFmMatchedSong({
-            imageUrl: buildImageUrl(song.image_url) ?? null,
-            lyrics: (song as JWApiSong & { lyrics?: string }).lyrics ?? null,
-          })
-        } else {
-          setRadioFmMatchedSong(null)
-        }
+
+    const apply = (song: JWApiSong) => {
+      if (cancelled) return
+      setRadioFmMatchedSong({
+        imageUrl: buildImageUrl(song.image_url) ?? null,
+        lyrics: song.lyrics ?? null,
+        syncedLyrics: song.synced_lyrics ?? null,
       })
-      .catch(() => { if (!cancelled) setRadioFmMatchedSong(null) })
+    }
+
+    // Prefer direct song_id fetch; fall back to title search
+    const songId = radioFmNowPlaying?.song_id
+    if (songId) {
+      apiFetch<JWApiSong>(`/songs/${songId}/`)
+        .then(apply)
+        .catch(() => {
+          // song_id fetch failed — fall back to title search
+          apiFetch<{ results: JWApiSong[] }>('/songs/', { search: title, page_size: 3 })
+            .then(d => { if (d.results[0]) apply(d.results[0]); else if (!cancelled) setRadioFmMatchedSong(null) })
+            .catch(() => { if (!cancelled) setRadioFmMatchedSong(null) })
+        })
+    } else {
+      apiFetch<{ results: JWApiSong[] }>('/songs/', { search: title, page_size: 3 })
+        .then(d => { if (d.results[0]) apply(d.results[0]); else if (!cancelled) setRadioFmMatchedSong(null) })
+        .catch(() => { if (!cancelled) setRadioFmMatchedSong(null) })
+    }
+
     return () => { cancelled = true }
-  }, [radioFmNowPlaying?.title, radioFmNowPlaying?.artist])
+  }, [radioFmNowPlaying?.title, radioFmNowPlaying?.song_id])
 
   return (
     <audio
