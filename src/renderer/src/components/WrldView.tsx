@@ -437,7 +437,7 @@ export default function WrldView(): JSX.Element {
 
           {/* ── Playlist notch ────────────────────────────────────────────── */}
           {account && playlists.length > 0 && currentTrack && (
-            <div className="group absolute right-0 top-8 z-20 flex items-start">
+            <div className="group absolute right-0 top-1/2 -translate-y-1/2 z-20 flex items-center">
               {/* Expanded panel — width opens first, content fades in behind */}
               <div className="overflow-hidden max-w-0 group-hover:max-w-[160px] transition-[max-width] duration-200 ease-out">
                 <div className="w-36 opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-75
@@ -445,8 +445,8 @@ export default function WrldView(): JSX.Element {
                   flex flex-col gap-0 py-2 px-2">
                   {playlists.slice(0, 6).map(pl => (
                     <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)} title={pl.name}
-                      className="flex items-center justify-center py-2 rounded-lg hover:bg-white/10 transition-colors group/pl">
-                      <div className="w-20 h-20 rounded-lg shrink-0 bg-white/10 overflow-hidden group-hover/pl:ring-1 group-hover/pl:ring-white/30 transition-all">
+                      className="flex items-center justify-center py-1 rounded-lg hover:bg-white/10 transition-colors group/pl">
+                      <div className="w-16 h-16 rounded-lg shrink-0 bg-white/10 overflow-hidden group-hover/pl:ring-1 group-hover/pl:ring-white/30 transition-all">
                         {(pl.cover_image_url || pl.cover_image)
                           ? <img src={pl.cover_image_url ?? pl.cover_image ?? ''} className="w-full h-full object-cover" />
                           : <div className="w-full h-full bg-white/[0.07]" />}
