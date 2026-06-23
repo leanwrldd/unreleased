@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { SearchCode, HardDrive, Settings, ShieldCheck, ListMusic, LogIn, LogOut, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react'
+import { SearchCode, HardDrive, Settings, ShieldCheck, ListMusic, LogIn, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
@@ -46,14 +46,6 @@ export default function Sidebar(): JSX.Element {
 
       {/* Nav items */}
       <nav className={`space-y-1 flex-1 ${collapsed ? 'px-2' : 'px-3'}`}>
-        <a
-          href="https://juicewrldapi.com"
-          title={collapsed ? 'Return to API' : undefined}
-          className={`flex items-center w-full py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'}`}
-        >
-          <ArrowLeft size={18} />
-          {!collapsed && <span className="flex-1 text-left">Return to API</span>}
-        </a>
         {items.map(({ icon, label, view }) => (
           <button
             key={view}
