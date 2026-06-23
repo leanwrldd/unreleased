@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle, PenLine, BookOpen, Copy, Eye, EyeOff, KeyRound, Globe } from 'lucide-react'
+import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle, PenLine, BookOpen, Copy, Eye, EyeOff, ChevronDown, KeyRound, Globe } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { getToken } from '../lib/userApi'
 
@@ -11,6 +11,7 @@ const ACCENT_PRESETS = [
 export default function Settings(): JSX.Element {
   const [showToken, setShowToken] = useState(false)
   const [tokenCopied, setTokenCopied] = useState(false)
+  const [openAbout, setOpenAbout] = useState<string | null>(null)
   const {
     setShowSettings, setActiveView,
     account,
@@ -211,7 +212,7 @@ export default function Settings(): JSX.Element {
               <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">About</h3>
             </div>
             <p className="text-text-muted text-xs mb-3">
-              unreleased v1.7.3 — powered by{' '}
+              unreleased v1.7.5 — powered by{' '}
               <a href="https://juicewrldapi.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                 juicewrldapi.com
               </a>
@@ -290,11 +291,55 @@ export default function Settings(): JSX.Element {
             )}
             <button
               onClick={() => { setShowSettings(false); setActiveView('docs') }}
-              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] border border-[var(--border)] text-text-secondary text-sm font-medium transition-colors mt-2"
+              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] border border-[var(--border)] text-text-secondary text-sm font-medium transition-colors"
             >
               <BookOpen size={15} />
               API Docs
             </button>
+
+            {/* FAQ accordion */}
+            <div className="mt-4 flex flex-col gap-1">
+              {([
+                {
+                  q: 'What is this?',
+                  a: 'The Juice WRLD API is a RESTful API providing access to a comprehensive database of Juice WRLD\'s songs, albums, and eras. With this API, you can explore detailed information about Juice WRLD\'s discography, including release dates, song types, album details, and more. Whether you\'re a fan, developer, or researcher, this API offers the tools you need to dive deep into Juice WRLD\'s music.',
+                  link: { text: 'Check out the documentation to get started.', href: 'https://juicewrldapi.com/docs' },
+                },
+                {
+                  q: 'Who are you?',
+                  a: 'We are passionate Juice WRLD fans and developers who wanted to create an accessible platform for others to explore and analyze Juice WRLD\'s musical legacy. This project is a labor of love, driven by a deep appreciation for Juice WRLD\'s impact on music and culture.',
+                },
+                {
+                  q: 'Why did you build this?',
+                  a: 'We built this API to celebrate Juice WRLD\'s legacy by making his music and history more accessible to fans and developers alike. It\'s a valuable resource for anyone interested in Juice WRLD\'s discography.',
+                },
+                {
+                  q: 'Technical stuff?',
+                  a: 'The Juice WRLD API is built with Django and PostgreSQL, hosted on secure cloud servers with enterprise-grade security. This player (unreleased) is built with React, TypeScript, Vite, and Tailwind CSS. All API data is served as JSON for easy integration.',
+                },
+              ] as { q: string; a: string; link?: { text: string; href: string } }[]).map(({ q, a, link }) => (
+                <div key={q} className="rounded-xl border border-[var(--border)] overflow-hidden">
+                  <button
+                    onClick={() => setOpenAbout(openAbout === q ? null : q)}
+                    className="flex items-center justify-between w-full px-3 py-2.5 bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] transition-colors text-left"
+                  >
+                    <span className="text-text-secondary text-xs font-medium">{q}</span>
+                    <ChevronDown size={13} className={`text-text-muted transition-transform duration-150 shrink-0 ${openAbout === q ? 'rotate-180' : ''}`} />
+                  </button>
+                  {openAbout === q && (
+                    <div className="px-3 py-2.5 bg-[var(--surface)] border-t border-[var(--border)]">
+                      <p className="text-text-muted text-xs leading-relaxed">{a}</p>
+                      {link && (
+                        <a href={link.href} target="_blank" rel="noopener noreferrer"
+                          className="mt-1.5 inline-block text-xs text-accent hover:underline">
+                          {link.text}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </section>
         </div>
       </div>
