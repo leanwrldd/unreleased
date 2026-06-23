@@ -445,7 +445,10 @@ export default function WrldView(): JSX.Element {
             </div>
           </div>
 
-          {/* ── Notch menu ────────────────────────────────────────────── */}
+        </>
+      )}
+
+      {/* ── Notch menu ────────────────────────────────────────────── */}
           <div className="group absolute right-0 top-0 bottom-0 z-20 flex items-center">
             {/* Expanded panel — slides in on hover */}
             <div className="overflow-hidden max-w-0 group-hover:max-w-[160px] transition-[max-width] duration-200 ease-out">
@@ -508,9 +511,6 @@ export default function WrldView(): JSX.Element {
             {/* Notch handle — pill tab visible at rest, grows on hover */}
             <div className="w-[5px] group-hover:w-[3px] h-16 group-hover:h-24 rounded-l-full bg-white/20 group-hover:bg-white/50 transition-all duration-200 ease-out shrink-0" />
           </div>
-
-        </>
-      )}
     </div>
   )
 }
