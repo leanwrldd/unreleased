@@ -54,7 +54,32 @@ export default function Settings(): JSX.Element {
       <div className="bg-surface border border-[var(--border)] rounded-2xl shadow-2xl w-full max-w-[520px] mx-3 max-h-[88vh] md:max-h-[80vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-text-primary font-bold text-lg">Settings</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-text-primary font-bold text-lg">Settings</h2>
+            {isElectron && (
+              <button
+                disabled={updateStatus === 'checking'}
+                title={updateStatus === 'checking' ? 'Checking...' : updateStatus === 'latest' ? 'Up to date' : updateStatus === 'error' ? 'Check failed' : 'Check for updates'}
+                onClick={async () => {
+                  setUpdateStatus('checking')
+                  try {
+                    await (window as any).electron?.checkForUpdates()
+                    setUpdateStatus('latest')
+                  } catch {
+                    setUpdateStatus('error')
+                  }
+                  setTimeout(() => setUpdateStatus('idle'), 4000)
+                }}
+                className={`p-1 rounded transition-colors disabled:opacity-50 ${
+                  updateStatus === 'latest' ? 'text-emerald-400' :
+                  updateStatus === 'error' ? 'text-red-400' :
+                  'text-text-muted hover:text-text-primary'
+                }`}
+              >
+                <RefreshCw size={14} className={updateStatus === 'checking' ? 'animate-spin' : ''} />
+              </button>
+            )}
+          </div>
           <button onClick={() => setShowSettings(false)} className="text-text-muted hover:text-text-primary transition-colors">
             <X size={20} />
           </button>
@@ -296,25 +321,7 @@ export default function Settings(): JSX.Element {
                 )}
               </div>
             )}
-            {isElectron && (
-              <button
-                disabled={updateStatus === 'checking'}
-                onClick={async () => {
-                  setUpdateStatus('checking')
-                  try {
-                    await (window as any).electron?.checkForUpdates()
-                    setUpdateStatus('latest')
-                  } catch {
-                    setUpdateStatus('error')
-                  }
-                  setTimeout(() => setUpdateStatus('idle'), 4000)
-                }}
-                className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] border border-[var(--border)] text-text-secondary text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                <RefreshCw size={15} className={updateStatus === 'checking' ? 'animate-spin' : ''} />
-                {updateStatus === 'checking' ? 'Checking...' : updateStatus === 'latest' ? 'Up to date' : updateStatus === 'error' ? 'Check failed' : 'Check for updates'}
-              </button>
-            )}
+
             <button
               onClick={() => { setShowSettings(false); setActiveView('docs') }}
               className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] border border-[var(--border)] text-text-secondary text-sm font-medium transition-colors"

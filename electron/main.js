@@ -62,6 +62,14 @@ ipcMain.handle('check-for-updates', () => {
   return autoUpdater.checkForUpdatesAndNotify()
 })
 
+ipcMain.handle('minimize-window', () => { mainWindow?.minimize() })
+ipcMain.handle('maximize-window', () => {
+  if (mainWindow?.isMaximized()) mainWindow.unmaximize()
+  else mainWindow?.maximize()
+})
+ipcMain.handle('close-window', () => { mainWindow?.close() })
+ipcMain.handle('is-maximized', () => mainWindow?.isMaximized() ?? false)
+
 app.whenReady().then(() => {
   createWindow()
 

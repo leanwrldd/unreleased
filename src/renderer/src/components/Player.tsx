@@ -896,6 +896,17 @@ export default function Player(): JSX.Element {
                 onChange={handleVolumeChange} className="w-full block"
                 style={{ '--val': `${volume * 100}%` } as React.CSSProperties} />
             </div>
+
+            {outputDevices.length > 1 && (
+              <button
+                ref={outputBtnRef}
+                onClick={openOutputPicker}
+                title="Audio output"
+                className={`transition-colors ${audioOutput ? 'text-accent' : 'text-text-muted hover:text-text-primary'}`}
+              >
+                <Volume2 size={14} />
+              </button>
+            )}
           </div>
         </div>
 

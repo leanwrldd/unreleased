@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { useStore } from './store/useStore'
 import { setToken, getToken } from './lib/userApi'
 import { ViewType } from './types'
@@ -50,6 +50,32 @@ function lightenHex(hex: string, amount: number): string {
   return `#${Math.min(255, r + amount).toString(16).padStart(2, '0')}${Math.min(255, g + amount).toString(16).padStart(2, '0')}${Math.min(255, b + amount).toString(16).padStart(2, '0')}`
 }
 
+function WindowControls(): JSX.Element {
+  const [maximized, setMaximized] = React.useState(false)
+  const el = (window as any).electron
+
+  React.useEffect(() => {
+    el?.isMaximized().then((v: boolean) => setMaximized(v))
+  }, [])
+
+  const btn = "flex items-center justify-center w-11 h-7 text-white/60 hover:text-white transition-colors"
+  return (
+    <div className="fixed top-0 right-0 z-[10000] flex" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+      <button className={btn} onClick={() => el?.minimizeWindow()} title="Minimize">
+        <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><rect width="10" height="1"/></svg>
+      </button>
+      <button className={btn} onClick={async () => { await el?.maximizeWindow(); el?.isMaximized().then((v: boolean) => setMaximized(v)) }} title={maximized ? "Restore" : "Maximize"}>
+        {maximized
+          ? <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1"><rect x="2" y="0" width="8" height="8"/><rect x="0" y="2" width="8" height="8" fill="var(--surface)"/><rect x="0" y="2" width="8" height="8"/></svg>
+          : <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1"><rect x="0.5" y="0.5" width="9" height="9"/></svg>}
+      </button>
+      <button className={`${btn} hover:bg-red-600 hover:text-white`} onClick={() => el?.closeWindow()} title="Close">
+        <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.2"><line x1="0" y1="0" x2="10" y2="10"/><line x1="10" y1="0" x2="0" y2="10"/></svg>
+      </button>
+    </div>
+  )
+}
+
 export default function App(): JSX.Element {
   const { showNowPlaying, showQueue, showSettings, activeView, theme, accentColor, loadAccount, completeDiscordLogin, showUserAuth, setShowUserAuth } = useStore()
   // Seed auth token from env in local dev — always override so the token stays fresh
@@ -60,6 +86,11 @@ export default function App(): JSX.Element {
 
   // Sync view from URL on mount + handle back/forward
   useEffect(() => {
+    // In Electron (file:// protocol) skip URL routing — always start on tracker
+    if (window.location.protocol === 'file:') {
+      useStore.setState({ activeView: 'api-tracker' })
+      return
+    }
     const syncFromPath = (): void => {
       useStore.setState({ activeView: getViewFromPath(window.location.pathname) })
     }
@@ -106,7 +137,14 @@ export default function App(): JSX.Element {
 
   return (
     <div className="flex flex-col h-dvh bg-surface overflow-hidden">
-      {isElectron && <div style={{ WebkitAppRegion: "drag" } as React.CSSProperties} className="fixed top-0 left-0 right-0 h-7 z-[9999] pointer-events-none select-none" />}
+      {isElectron && (
+        <>
+          {/* Frameless drag region */}
+          <div style={{ WebkitAppRegion: "drag" } as React.CSSProperties} className="fixed top-0 left-0 right-0 h-7 z-[9999] pointer-events-none select-none" />
+          {/* Window controls */}
+          <WindowControls />
+        </>
+      )}
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <main className="flex-1 overflow-hidden flex">
