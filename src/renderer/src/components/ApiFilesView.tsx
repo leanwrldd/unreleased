@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Folder, Music2, ChevronRight, ArrowLeft, Home, Play, Loader2,
   FolderOpen, HardDrive, LayoutList, LayoutGrid, ImageIcon, Video,
-  Download, ArrowUpDown, ArrowUp, ArrowDown, Link, Check, Info, ListPlus, MoreHorizontal, X, Pencil,
+  Download, ArrowUpDown, ArrowUp, ArrowDown, Link, Check, Info, ListPlus,
+  X, Pencil, PackageOpen, CheckSquare2, Square,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import {
@@ -13,6 +14,7 @@ import {
   JWApiBrowseResponse,
   JWApiSong,
   JWApiPaginatedResponse,
+  JWAPI_BASE,
 } from '../lib/juicewrldApi'
 import { getFileExt, getMediaType } from '../lib/fileTypes'
 import { Track } from '../types'
@@ -22,6 +24,7 @@ import SongInfoModal from './SongInfoModal'
 type ViewMode = 'list' | 'grid'
 type SortBy = 'name' | 'type' | 'size'
 type SortDir = 'asc' | 'desc'
+type ZipStatus = 'idle' | 'starting' | 'zipping' | 'done' | 'error'
 
 const LS_SORT_BY = 'api-files:sortBy'
 const LS_SORT_DIR = 'api-files:sortDir'
@@ -152,6 +155,12 @@ export default function ApiFilesView(): JSX.Element {
   const [infoSong, setInfoSong] = useState<JWApiSong | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ entry: JWApiFileEntry; x: number; y: number } | null>(null)
 
+  // Multi-select state
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
+  const [zipStatus, setZipStatus] = useState<ZipStatus>('idle')
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Persisted view settings
   const [viewMode, setViewModeState] = useState<ViewMode>(
     () => (localStorage.getItem(LS_VIEW_MODE) as ViewMode) || 'list'
@@ -216,6 +225,14 @@ export default function ApiFilesView(): JSX.Element {
     window.addEventListener('popstate', handlePopstate)
     return () => window.removeEventListener('popstate', handlePopstate)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ESC exits select mode
+  useEffect(() => {
+    if (!selectMode) return
+    const handleKeyDown = (e: KeyboardEvent): void => { if (e.key === 'Escape') exitSelectMode() }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectMode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const goBack = (): void => {
     if (history.length > 0) {
@@ -290,6 +307,76 @@ export default function ApiFilesView(): JSX.Element {
     setLightboxItems(items)
     setLightboxIndex(idx >= 0 ? idx : 0)
   }
+
+  // ── Selection helpers ──────────────────────────────────────────────────────
+
+  const enterSelectMode = (entry: JWApiFileEntry): void => {
+    setSelectMode(true)
+    setSelectedPaths(new Set([entry.path]))
+    setCtxMenu(null)
+  }
+
+  const toggleSelect = (path: string): void => {
+    setSelectedPaths(prev => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
+  const exitSelectMode = (): void => {
+    setSelectMode(false)
+    setSelectedPaths(new Set())
+    setZipStatus('idle')
+  }
+
+  const handleLongPressStart = (entry: JWApiFileEntry): void => {
+    longPressTimer.current = setTimeout(() => enterSelectMode(entry), 500)
+  }
+
+  const handleLongPressEnd = (): void => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
+  }
+
+  const downloadZip = async (): Promise<void> => {
+    if (selectedPaths.size === 0) return
+    setZipStatus('starting')
+    try {
+      const res = await fetch(`${JWAPI_BASE}/start-zip-job/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paths: [...selectedPaths] }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const { job_id } = await res.json() as { job_id: string }
+      setZipStatus('zipping')
+      const poll = async (): Promise<void> => {
+        const st = await apiFetch<{ status: string; download_url?: string; error?: string }>(`/zip-job-status/${job_id}/`)
+        if (st.status === 'completed' && st.download_url) {
+          const a = document.createElement('a')
+          a.href = st.download_url
+          a.download = 'selection.zip'
+          a.target = '_blank'
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          setZipStatus('done')
+          setTimeout(() => setZipStatus('idle'), 3000)
+        } else if (st.status === 'failed') {
+          throw new Error(st.error || 'ZIP job failed')
+        } else {
+          setTimeout(() => { poll().catch(() => { setZipStatus('error'); setTimeout(() => setZipStatus('idle'), 3000) }) }, 1500)
+        }
+      }
+      await poll()
+    } catch {
+      setZipStatus('error')
+      setTimeout(() => setZipStatus('idle'), 3000)
+    }
+  }
+
+  // ── Sorted entries ─────────────────────────────────────────────────────────
 
   const sortedEntries = useMemo(
     () => sortEntries(entries, sortBy, sortDir),
@@ -397,7 +484,7 @@ export default function ApiFilesView(): JSX.Element {
               <p className="text-text-muted text-sm">Nothing here</p>
             </div>
           ) : viewMode === 'list' ? (
-            /* ── List view ─────────────────────────────────────────────────── */
+            /* ── List view ────────────────────────────────────────────────────── */
             <div className="space-y-0.5">
               {currentPath && (
                 <button onClick={goBack} className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-surface-overlay transition-colors text-left">
@@ -410,29 +497,48 @@ export default function ApiFilesView(): JSX.Element {
                 const mt = isDir ? 'folder' : getMediaType(entry.name)
                 const ext = getFileExt(entry.name).slice(1).toUpperCase()
                 const isMedia = mt === 'image' || mt === 'video'
+                const isSelected = selectedPaths.has(entry.path)
                 return (
                   <div key={entry.path}
-                    className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-overlay transition-colors cursor-default"
-                    onClick={() => { if (isDir) navigate(entry.path); else if (isMedia) openLightbox(entry) }}
-                    onDoubleClick={() => { if (mt === 'audio') handlePlay(entry) }}
+                    className={`group flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-default ${
+                      isSelected ? 'bg-accent/10 hover:bg-accent/15' : 'hover:bg-surface-overlay'
+                    }`}
+                    onClick={() => {
+                      if (selectMode) { toggleSelect(entry.path); return }
+                      if (isDir) navigate(entry.path)
+                      else if (isMedia) openLightbox(entry)
+                    }}
+                    onDoubleClick={() => { if (!selectMode && mt === 'audio') handlePlay(entry) }}
                     onContextMenu={e => { e.preventDefault(); setCtxMenu({ entry, x: e.clientX, y: e.clientY }) }}
+                    onTouchStart={() => handleLongPressStart(entry)}
+                    onTouchEnd={handleLongPressEnd}
                   >
+                    {/* Checkbox (select mode) */}
+                    {selectMode && (
+                      <div className="shrink-0 w-5 flex items-center justify-center">
+                        {isSelected
+                          ? <CheckSquare2 size={16} className="text-accent" />
+                          : <Square size={16} className="text-text-muted opacity-50" />}
+                      </div>
+                    )}
                     {/* Icon / thumbnail */}
                     <div className="relative shrink-0 w-9 h-9">
                       {isDir ? (
                         <div className="w-9 h-9 flex items-center justify-center">
-                          <Folder size={20} className="text-text-secondary group-hover:text-accent transition-colors" />
+                          <Folder size={20} className={`transition-colors ${isSelected ? 'text-accent' : 'text-text-secondary group-hover:text-accent'}`} />
                         </div>
                       ) : mt === 'audio' ? (
                         <button
                           className="relative w-9 h-9 rounded overflow-hidden"
-                          onClick={(e) => { e.stopPropagation(); handlePlay(entry) }}
+                          onClick={(e) => { e.stopPropagation(); if (!selectMode) handlePlay(entry) }}
                           title="Play"
                         >
                           <ApiCoverThumb path={entry.path} size={36} />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded">
-                            {playing === entry.path ? <Loader2 size={14} className="text-white animate-spin" /> : <Play size={14} fill="white" className="text-white ml-0.5" />}
-                          </div>
+                          {!selectMode && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded">
+                              {playing === entry.path ? <Loader2 size={14} className="text-white animate-spin" /> : <Play size={14} fill="white" className="text-white ml-0.5" />}
+                            </div>
+                          )}
                         </button>
                       ) : mt === 'image' ? (
                         <div className="w-9 h-9"><ApiImageThumb path={entry.path} size={36} /></div>
@@ -447,7 +553,7 @@ export default function ApiFilesView(): JSX.Element {
                       <span className="hidden md:inline text-text-muted text-xs shrink-0 w-14 text-right">{(entry.size / 1_048_576).toFixed(1)} MB</span>
                     )}
                     {!isDir && <span className="hidden md:inline text-[10px] uppercase tracking-wide text-text-muted bg-surface-overlay px-1.5 py-0.5 rounded shrink-0">{ext}</span>}
-                    {mt === 'audio' && (
+                    {!selectMode && mt === 'audio' && (
                       <button
                         className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 rounded-full bg-surface-raised hover:bg-surface-overlay flex items-center justify-center transition-opacity shrink-0 border border-[var(--border)]"
                         onClick={(e) => { e.stopPropagation(); openSongInfo(entry) }}
@@ -456,7 +562,7 @@ export default function ApiFilesView(): JSX.Element {
                         <Info size={12} className="text-text-muted" />
                       </button>
                     )}
-                    {mt === 'audio' && (
+                    {!selectMode && mt === 'audio' && (
                       <button
                         className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 rounded-full bg-surface-raised hover:bg-surface-overlay flex items-center justify-center transition-opacity shrink-0 border border-[var(--border)]"
                         onClick={(e) => { e.stopPropagation(); addToQueue(fileToTrack(entry)) }}
@@ -465,7 +571,7 @@ export default function ApiFilesView(): JSX.Element {
                         <ListPlus size={12} className="text-text-muted" />
                       </button>
                     )}
-                    {!isDir && (
+                    {!selectMode && !isDir && (
                       <button
                         className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 rounded-full bg-surface-raised hover:bg-surface-overlay flex items-center justify-center transition-opacity shrink-0 border border-[var(--border)]"
                         onClick={(e) => { e.stopPropagation(); handleDownload(entry) }}
@@ -474,19 +580,21 @@ export default function ApiFilesView(): JSX.Element {
                         {downloading === entry.path ? <Loader2 size={12} className="text-text-muted animate-spin" /> : <Download size={12} className="text-text-muted" />}
                       </button>
                     )}
-                    <button
-                      className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 rounded-full bg-surface-raised hover:bg-surface-overlay flex items-center justify-center transition-opacity shrink-0 border border-[var(--border)]"
-                      onClick={(e) => { e.stopPropagation(); copyLink(entry) }}
-                      title={isDir ? 'Copy folder link' : 'Copy file link'}
-                    >
-                      {copiedPath === entry.path ? <Check size={12} className="text-accent" /> : <Link size={12} className="text-text-muted" />}
-                    </button>
+                    {!selectMode && (
+                      <button
+                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 rounded-full bg-surface-raised hover:bg-surface-overlay flex items-center justify-center transition-opacity shrink-0 border border-[var(--border)]"
+                        onClick={(e) => { e.stopPropagation(); copyLink(entry) }}
+                        title={isDir ? 'Copy folder link' : 'Copy file link'}
+                      >
+                        {copiedPath === entry.path ? <Check size={12} className="text-accent" /> : <Link size={12} className="text-text-muted" />}
+                      </button>
+                    )}
                   </div>
                 )
               })}
             </div>
           ) : (
-            /* ── Grid view ─────────────────────────────────────────────────── */
+            /* ── Grid view ────────────────────────────────────────────────────── */
             <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
               {currentPath && (
                 <button onClick={goBack} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-surface-overlay hover:bg-surface-raised transition-colors">
@@ -499,54 +607,74 @@ export default function ApiFilesView(): JSX.Element {
                 const mt = isDir ? 'folder' : getMediaType(entry.name)
                 const ext = getFileExt(entry.name).slice(1).toUpperCase()
                 const isMedia = mt === 'image' || mt === 'video'
+                const isSelected = selectedPaths.has(entry.path)
                 return (
                   <div key={entry.path}
-                    className="group flex flex-col rounded-xl overflow-hidden bg-surface-overlay hover:bg-surface-raised transition-colors cursor-default"
+                    className={`group flex flex-col rounded-xl overflow-hidden transition-colors cursor-default ${
+                      isSelected ? 'bg-accent/10 ring-2 ring-accent/40' : 'bg-surface-overlay hover:bg-surface-raised'
+                    }`}
                     onClick={() => {
+                      if (selectMode) { toggleSelect(entry.path); return }
                       if (isDir) navigate(entry.path)
                       else if (isMedia) openLightbox(entry)
                       else if (mt === 'audio') handlePlay(entry)
                     }}
                     onContextMenu={e => { e.preventDefault(); setCtxMenu({ entry, x: e.clientX, y: e.clientY }) }}
+                    onTouchStart={() => handleLongPressStart(entry)}
+                    onTouchEnd={handleLongPressEnd}
                   >
                     {/* Thumb */}
                     <div className="relative w-full aspect-square bg-surface-raised flex items-center justify-center overflow-hidden">
                       {isDir ? (
-                        <Folder size={40} className="text-text-secondary group-hover:text-accent transition-colors" />
+                        <Folder size={40} className={`transition-colors ${isSelected ? 'text-accent' : 'text-text-secondary group-hover:text-accent'}`} />
                       ) : mt === 'audio' ? (
                         <>
                           <img src={buildCoverArtUrl(entry.path)} alt="" className="w-full h-full object-cover"
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                            {playing === entry.path
-                              ? <Loader2 size={24} className="text-white animate-spin" />
-                              : <Play size={24} fill="white" className="text-white ml-0.5" />}
-                          </div>
+                          {!selectMode && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                              {playing === entry.path
+                                ? <Loader2 size={24} className="text-white animate-spin" />
+                                : <Play size={24} fill="white" className="text-white ml-0.5" />}
+                            </div>
+                          )}
                         </>
                       ) : mt === 'image' ? (
                         <>
                           <img src={buildStreamUrl(entry.path)} alt={entry.name} className="w-full h-full object-cover"
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <div className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                              <ImageIcon size={16} className="text-white" />
+                          {!selectMode && (
+                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <div className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                                <ImageIcon size={16} className="text-white" />
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </>
                       ) : mt === 'video' ? (
                         <>
                           <Video size={36} className="text-text-muted" />
-                          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <div className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                              <Play size={16} fill="white" className="text-white ml-0.5" />
+                          {!selectMode && (
+                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <div className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                                <Play size={16} fill="white" className="text-white ml-0.5" />
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </>
                       ) : (
                         <span className="text-xs uppercase text-text-muted">{ext}</span>
                       )}
-                      {/* Top-right overlay buttons (grid) */}
-                      {!isDir && (
+                      {/* Checkbox overlay (select mode) */}
+                      {selectMode && (
+                        <div className="absolute top-1.5 left-1.5 z-10">
+                          {isSelected
+                            ? <CheckSquare2 size={18} className="text-accent drop-shadow" />
+                            : <Square size={18} className="text-white/70 drop-shadow" />}
+                        </div>
+                      )}
+                      {/* Top-right overlay buttons (grid, non-select mode) */}
+                      {!selectMode && !isDir && (
                         <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           {mt === 'audio' && (
                             <button
@@ -594,6 +722,49 @@ export default function ApiFilesView(): JSX.Element {
             </div>
           )}
         </div>
+
+        {/* Selection action bar */}
+        {selectMode && (
+          <div className="shrink-0 border-t border-[var(--border)] bg-surface px-4 py-2.5 flex items-center gap-2">
+            <span className="text-sm text-text-primary font-medium flex-1">
+              {selectedPaths.size} {selectedPaths.size === 1 ? 'item' : 'items'} selected
+            </span>
+            <button
+              onClick={() => setSelectedPaths(new Set(sortedEntries.map(e => e.path)))}
+              className="text-xs text-text-muted hover:text-text-primary px-2 py-1 rounded transition-colors"
+            >
+              Select all
+            </button>
+            <button
+              onClick={() => setSelectedPaths(new Set())}
+              className="text-xs text-text-muted hover:text-text-primary px-2 py-1 rounded transition-colors"
+            >
+              Clear
+            </button>
+            <button
+              onClick={downloadZip}
+              disabled={selectedPaths.size === 0 || zipStatus === 'starting' || zipStatus === 'zipping'}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-white rounded-lg text-xs font-medium disabled:opacity-50 transition-opacity hover:opacity-90"
+            >
+              {zipStatus === 'starting' || zipStatus === 'zipping' ? (
+                <><Loader2 size={13} className="animate-spin" /> {zipStatus === 'starting' ? 'Starting…' : 'Zipping…'}</>
+              ) : zipStatus === 'done' ? (
+                <><Check size={13} /> Done</>
+              ) : zipStatus === 'error' ? (
+                <><X size={13} /> Error</>
+              ) : (
+                <><PackageOpen size={13} /> Download ZIP</>
+              )}
+            </button>
+            <button
+              onClick={exitSelectMode}
+              className="p-1.5 rounded-lg hover:bg-surface-overlay transition-colors"
+              title="Exit selection"
+            >
+              <X size={15} className="text-text-muted" />
+            </button>
+          </div>
+        )}
       </div>
 
       {lightboxIndex >= 0 && lightboxItems.length > 0 && (
@@ -610,7 +781,7 @@ export default function ApiFilesView(): JSX.Element {
           <div className="fixed inset-0 z-40" onClick={() => setCtxMenu(null)} />
           <div
             className="fixed z-50 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[180px]"
-            style={{ left: Math.min(ctxMenu.x, window.innerWidth - 200), top: Math.min(ctxMenu.y, window.innerHeight - 260) }}
+            style={{ left: Math.min(ctxMenu.x, window.innerWidth - 200), top: Math.min(ctxMenu.y, window.innerHeight - 300) }}
             onClick={e => e.stopPropagation()}
           >
             {getMediaType(ctxMenu.entry.name) === 'audio' && (
@@ -643,6 +814,10 @@ export default function ApiFilesView(): JSX.Element {
                 <div className="border-t border-[var(--border)] my-1" />
               </>
             )}
+            <button onClick={() => enterSelectMode(ctxMenu.entry)}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
+              <CheckSquare2 size={14} className="text-text-muted" /> Select
+            </button>
             <button onClick={() => { copyLink(ctxMenu.entry); setCtxMenu(null) }}
               className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
               <Link size={14} className="text-text-muted" /> Copy link
