@@ -298,7 +298,7 @@ export default function Settings(): JSX.Element {
             </button>
 
             {/* FAQ accordion */}
-            <div className="mt-4 flex flex-col gap-1">
+            <div className="mt-4 rounded-xl border border-[var(--border)] overflow-hidden divide-y divide-[var(--border)]">
               {([
                 {
                   q: 'What is this?',
@@ -318,16 +318,16 @@ export default function Settings(): JSX.Element {
                   a: 'The Juice WRLD API is built with Django and PostgreSQL, hosted on secure cloud servers with enterprise-grade security. This player (unreleased) is built with React, TypeScript, Vite, and Tailwind CSS. All API data is served as JSON for easy integration.',
                 },
               ] as { q: string; a: string; link?: { text: string; href: string } }[]).map(({ q, a, link }) => (
-                <div key={q} className="rounded-xl border border-[var(--border)] overflow-hidden">
+                <div key={q}>
                   <button
                     onClick={() => setOpenAbout(openAbout === q ? null : q)}
-                    className="flex items-center justify-between w-full px-3 py-2.5 bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] transition-colors text-left"
+                    className="flex items-center justify-between w-full px-3 py-2.5 hover:bg-[var(--surface-raised)] transition-colors text-left"
                   >
                     <span className="text-text-secondary text-xs font-medium">{q}</span>
-                    <ChevronDown size={13} className={`text-text-muted transition-transform duration-150 shrink-0 ${openAbout === q ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={12} className={`text-text-muted transition-transform duration-150 shrink-0 ml-2 ${openAbout === q ? 'rotate-180' : ''}`} />
                   </button>
                   {openAbout === q && (
-                    <div className="px-3 py-2.5 bg-[var(--surface)] border-t border-[var(--border)]">
+                    <div className="px-3 pb-3 pt-0">
                       <p className="text-text-muted text-xs leading-relaxed">{a}</p>
                       {link && (
                         <a href={link.href} target="_blank" rel="noopener noreferrer"
