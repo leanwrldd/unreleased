@@ -1,4 +1,4 @@
-name: Sync web → app
+name: Sync web ? app
 
 on:
   push:
@@ -26,15 +26,15 @@ jobs:
         run: |
           git fetch origin web
 
-          # Merge web → app without committing yet
+          # Merge web into app without committing yet
           git merge origin/web --no-commit --no-ff || true
 
           # Restore app-specific files so they never get overwritten
-          git checkout HEAD -- electron/ package.json vite.config.ts
+          git checkout HEAD -- electron/ package.json vite.config.ts .github/
 
           # Only push if there are actual changes
           if git diff --cached --quiet; then
-            echo "Already up to date — nothing to sync."
+            echo "Already up to date � nothing to sync."
           else
             git commit -m "chore: sync from web [skip ci]"
             git push origin app
