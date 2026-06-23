@@ -25,6 +25,7 @@ export default function WrldView(): JSX.Element {
   const [suggestResults, setSuggestResults] = useState<JWApiSong[]>([])
   const [suggestLoading, setSuggestLoading] = useState(false)
   const [proposed, setProposed]             = useState<string | null>(null)
+  const [textIsDark, setTextIsDark]          = useState(false)
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const proposeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -58,11 +59,43 @@ export default function WrldView(): JSX.Element {
 
   useEffect(() => { setArtError(false) }, [artSrc])
 
+  useEffect(() => {
+    if (!artSrc || artError) {
+      setTextIsDark(theme === 'light' && !radioFmActive)
+      return
+    }
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = 50; canvas.height = 50
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { setTextIsDark(false); return }
+        ctx.drawImage(img, 0, 0, 50, 50)
+        const data = ctx.getImageData(0, 0, 50, 50).data
+        let sum = 0
+        for (let i = 0; i < data.length; i += 4)
+          sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
+        const avg = sum / (data.length / 4)
+        const factor = theme === 'dark' ? 0.22 : 0.45
+        setTextIsDark(avg * factor > 90)
+      } catch { setTextIsDark(false) }
+    }
+    img.onerror = () => setTextIsDark(false)
+    img.src = artSrc
+  }, [artSrc, artError, theme, radioFmActive])
+
   const rawLyrics = radioFmActive
     ? (radioFmMatchedSong?.syncedLyrics || radioFmMatchedSong?.lyrics || null)
     : (currentTrackFull?.syncedLyrics || currentTrackFull?.lyrics || null)
   const isSynced  = rawLyrics ? isLrcFormat(rawLyrics) : false
   const isEditor  = account?.is_editor || account?.is_administrator
+
+  const txtPri   = textIsDark ? 'rgba(0,0,0,0.85)'  : 'rgba(255,255,255,1)'
+  const txtSec   = textIsDark ? 'rgba(0,0,0,0.5)'   : 'rgba(255,255,255,0.5)'
+  const txtTer   = textIsDark ? 'rgba(0,0,0,0.35)'  : 'rgba(255,255,255,0.3)'
+  const txtFaint = textIsDark ? 'rgba(0,0,0,0.22)'  : 'rgba(255,255,255,0.2)'
 
   const handleAddToPlaylist = async (playlistId: number) => {
     if (!currentTrack?.id) return
@@ -237,18 +270,18 @@ export default function WrldView(): JSX.Element {
 
   const LyricsPanel = ({ padded }: { padded?: boolean }) => {
     const noLyricsMsg = radioFmActive
-      ? <p className="dark:text-white/30 text-gray-500 text-sm text-center">No lyrics found for this track</p>
+      ? <p className="text-sm text-center" style={{ color: txtTer }}>No lyrics found for this track</p>
       : <>
           <div className="text-5xl opacity-10">&#9834;</div>
-          <p className="dark:text-white/30 text-gray-500 text-sm text-center">No lyrics available</p>
-          {isEditor && <p className="dark:text-white/20 text-gray-400 text-xs text-center mt-1">Open the editor to add lyrics</p>}
+          <p className="text-sm text-center" style={{ color: txtTer }}>No lyrics available</p>
+          {isEditor && <p className="text-xs text-center mt-1" style={{ color: txtFaint }}>Open the editor to add lyrics</p>}
         </>
 
     if (!rawLyrics) {
       return (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8">
           {!radioFmActive && !currentTrack
-            ? <p className="dark:text-white/30 text-gray-500 text-sm text-center">No track playing</p>
+            ? <p className="text-sm text-center" style={{ color: txtTer }}>No track playing</p>
             : noLyricsMsg}
         </div>
       )
@@ -292,11 +325,11 @@ export default function WrldView(): JSX.Element {
                             : (padded ? '0.9rem' : '0.8rem'),
                   fontWeight: isCenter ? 800 : Math.abs(dist) === 1 ? 500 : 400,
                   lineHeight: 1.3,
-                  color:      isCenter ? (theme === 'dark' ? 'rgba(255,255,255,1)' : 'rgba(0,0,0,0.85)')
-                            : dist < 0  ? (theme === 'dark' ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.45)')
-                            :             (theme === 'dark' ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.3)'),
+                  color:      isCenter ? txtPri
+                            : dist < 0  ? (textIsDark ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.28)')
+                            :             (textIsDark ? 'rgba(0,0,0,0.3)'  : 'rgba(255,255,255,0.18)'),
                   opacity:    Math.abs(dist) === 2 ? 0.55 : 1,
-                  textShadow: isCenter ? (theme === 'dark' ? '0 0 40px rgba(255,255,255,0.15)' : '0 0 20px rgba(0,0,0,0.08)') : 'none',
+                  textShadow: isCenter ? (textIsDark ? '0 0 20px rgba(0,0,0,0.08)' : '0 0 40px rgba(255,255,255,0.15)') : 'none',
                   transform:  isCenter ? (padded ? 'translateX(8px)' : 'translateX(4px)') : 'none',
                 }}
               >
@@ -307,7 +340,7 @@ export default function WrldView(): JSX.Element {
           {!autoFollow && (
             <button
               onClick={() => setAutoFollow(true)}
-              className="mt-2 self-start flex items-center gap-1.5 text-[11px] dark:text-white/20 dark:hover:text-white/60 text-gray-400 hover:text-gray-600 transition-colors"
+              className="mt-2 self-start flex items-center gap-1.5 text-[11px] transition-colors" style={{ color: txtFaint }}
             >
               <LocateFixed size={10} />
               Follow
@@ -320,7 +353,7 @@ export default function WrldView(): JSX.Element {
     // ── Plain lyrics ──────────────────────────────────────────────────────────
     return (
       <div className={`flex-1 overflow-y-auto ${padded ? 'py-16 pr-16 pl-8' : 'py-4 px-4 md:py-8 md:pr-12 md:pl-6'}`} style={{ scrollbarWidth: 'none' }}>
-        <pre className="dark:text-white/50 text-gray-700 text-xs md:text-sm leading-6 md:leading-7 whitespace-pre-wrap font-sans">{rawLyrics}</pre>
+        <pre className="text-xs md:text-sm leading-6 md:leading-7 whitespace-pre-wrap font-sans" style={{ color: txtSec }}>{rawLyrics}</pre>
       </div>
     )
   }
@@ -369,10 +402,10 @@ export default function WrldView(): JSX.Element {
             <div className="flex items-center gap-3 px-4 pt-12 pb-3 shrink-0">
               <ArtBox mobile />
               <div className="flex-1 min-w-0">
-                {displayTitle  && <p className="text-white font-bold text-sm leading-tight truncate">{displayTitle}</p>}
-                {displayArtist && <p className="text-white/50 text-xs mt-0.5 truncate">{displayArtist}</p>}
-                {displayAlbum  && <p className="text-white/30 text-xs mt-0.5 truncate">{displayAlbum}</p>}
-                {radioFmActive && !radioFmNowPlaying && <p className="text-white/30 text-xs mt-0.5">Tuning in…</p>}
+                {displayTitle  && <p className="font-bold text-sm leading-tight truncate" style={{ color: txtPri }}>{displayTitle}</p>}
+                {displayArtist && <p className="text-xs mt-0.5 truncate" style={{ color: txtSec }}>{displayArtist}</p>}
+                {displayAlbum  && <p className="text-xs mt-0.5 truncate" style={{ color: txtTer }}>{displayAlbum}</p>}
+                {radioFmActive && !radioFmNowPlaying && <p className="text-xs mt-0.5" style={{ color: txtTer }}>Tuning in…</p>}
               </div>
             </div>
 
@@ -407,10 +440,10 @@ export default function WrldView(): JSX.Element {
               style={{ width: '38%', minWidth: 240 }}>
               <ArtBox mobile={false} />
               <div className="text-center w-full px-2">
-                {displayTitle  && <p className="text-white font-bold text-xl leading-tight">{displayTitle}</p>}
-                {displayArtist && <p className="text-white/50 text-sm mt-1">{displayArtist}</p>}
-                {displayAlbum  && <p className="text-white/30 text-xs mt-0.5">{displayAlbum}</p>}
-                {radioFmActive && !radioFmNowPlaying && <p className="text-white/30 text-sm mt-1">Tuning in…</p>}
+                {displayTitle  && <p className="font-bold text-xl leading-tight" style={{ color: txtPri }}>{displayTitle}</p>}
+                {displayArtist && <p className="text-sm mt-1" style={{ color: txtSec }}>{displayArtist}</p>}
+                {displayAlbum  && <p className="text-xs mt-0.5" style={{ color: txtTer }}>{displayAlbum}</p>}
+                {radioFmActive && !radioFmNowPlaying && <p className="text-sm mt-1" style={{ color: txtTer }}>Tuning in…</p>}
               </div>
             </div>
 
