@@ -445,16 +445,16 @@ export default function WrldView(): JSX.Element {
             </div>
           </div>
 
-          {/* ── Playlist notch ────────────────────────────────────────────── */}
-          {account && playlists.length > 0 && (
-            <div className="group absolute right-0 top-0 bottom-0 z-20 flex items-center">
-              {/* Expanded panel — width opens first, content fades in behind */}
-              <div className="overflow-hidden max-w-0 group-hover:max-w-[160px] transition-[max-width] duration-200 ease-out">
-                <div className="w-36 opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-75
-                  bg-black/80 backdrop-blur-xl rounded-l-2xl border-l border-t border-b border-white/[0.08]
-                  flex flex-col gap-0 pt-2 pb-2 px-2">
+          {/* ── Notch menu ────────────────────────────────────────────── */}
+          <div className="group absolute right-0 top-0 bottom-0 z-20 flex items-center">
+            {/* Expanded panel — slides in on hover */}
+            <div className="overflow-hidden max-w-0 group-hover:max-w-[160px] transition-[max-width] duration-200 ease-out">
+              <div className="w-36 opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-75
+                bg-black/80 backdrop-blur-xl rounded-l-2xl border-l border-t border-b border-white/[0.08]
+                flex flex-col gap-0 pt-2 pb-2 px-2">
 
-                  {/* Category selector */}
+                {/* Category selector */}
+                {account && playlists.length > 0 && (
                   <div className="relative mb-1.5 px-0.5">
                     <button
                       onClick={() => setNotchDropdownOpen(o => !o)}
@@ -476,9 +476,11 @@ export default function WrldView(): JSX.Element {
                       </div>
                     )}
                   </div>
+                )}
 
-                  {/* Items */}
-                  {notchCategory === 'playlists' ? (
+                {/* Items */}
+                {account && playlists.length > 0 ? (
+                  notchCategory === 'playlists' ? (
                     playlists.slice(0, 6).map(pl => (
                       <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)} title={pl.name}
                         className="flex items-center justify-center py-1 rounded-lg hover:bg-white/10 transition-colors group/pl">
@@ -495,13 +497,17 @@ export default function WrldView(): JSX.Element {
                         <div className="w-16 h-16 rounded-lg bg-white/[0.04]" />
                       </div>
                     ))
-                  )}
-                </div>
+                  )
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-1.5 py-4 px-2">
+                    <span className="text-white/30 text-[9px] text-center leading-relaxed">Sign in to use playlists</span>
+                  </div>
+                )}
               </div>
-              {/* Notch handle — always visible, grows on hover */}
-              <div className="w-px group-hover:w-[2px] h-40 group-hover:h-60 rounded-sm bg-white/[0.18] group-hover:bg-white/50 transition-all duration-200 ease-out shrink-0" />
             </div>
-          )}
+            {/* Notch handle — pill tab visible at rest, grows on hover */}
+            <div className="w-[5px] group-hover:w-[3px] h-16 group-hover:h-24 rounded-l-full bg-white/20 group-hover:bg-white/50 transition-all duration-200 ease-out shrink-0" />
+          </div>
 
         </>
       )}
