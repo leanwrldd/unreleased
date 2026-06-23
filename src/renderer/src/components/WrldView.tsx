@@ -446,7 +446,7 @@ export default function WrldView(): JSX.Element {
           </div>
 
           {/* ── Playlist notch ────────────────────────────────────────────── */}
-          {account && playlists.length > 0 && currentTrack && (
+          {account && playlists.length > 0 && (
             <div className="group absolute right-0 top-0 bottom-0 z-20 flex items-center">
               {/* Expanded panel — width opens first, content fades in behind */}
               <div className="overflow-hidden max-w-0 group-hover:max-w-[160px] transition-[max-width] duration-200 ease-out">
