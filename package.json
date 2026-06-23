@@ -43,8 +43,24 @@
       "output": "release"
     },
     "files": [
-      "electron/**/*",
-      "dist/**/*"
+      "**/*",
+      "!src/**/*",
+      "!out/**/*",
+      "!release/**/*",
+      "!.github/**/*",
+      "!.git/**/*",
+      "!node_modules/.bin/**/*",
+      "!**/*.bat",
+      "!**/*.log",
+      "!.env*",
+      "!*.md",
+      "!tsconfig*.json",
+      "!postcss.config.js",
+      "!tailwind.config.js",
+      "!vite.config.ts",
+      "!icons/**/*",
+      "!**/.DS_Store",
+      "!**/Thumbs.db"
     ],
     "mac": {
       "category": "public.app-category.music",
