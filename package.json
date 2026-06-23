@@ -1,6 +1,6 @@
 {
   "name": "unreleased",
-  "version": "1.7.5",
+  "version": "1.7.6",
   "description": "A music player for Juice WRLD",
   "main": "electron/main.js",
   "scripts": {
@@ -48,30 +48,13 @@
     ],
     "mac": {
       "category": "public.app-category.music",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
-      ]
+      "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }]
     },
     "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
     },
     "linux": {
-      "target": [
-        "AppImage"
-      ]
+      "target": ["AppImage"]
     },
     "publish": {
       "provider": "github",

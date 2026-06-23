@@ -1,17 +1,13 @@
-const { app, BrowserWindow, shell, dialog, Menu } = require('electron')
+const { app, BrowserWindow, shell, dialog, Menu, ipcMain } = require('electron')
 const { autoUpdater } = require('electron-updater')
 const path = require('path')
 const fs = require('fs')
 
 const isDev = process.env.NODE_ENV === 'development'
 
-// Set app user model ID for proper Windows taskbar icon + notifications
 app.setAppUserModelId('Unreleased')
-
-// Remove native menu bar (File / Edit / View)
 Menu.setApplicationMenu(null)
 
-// Log to file so we can see what the updater is doing
 const logFile = path.join(app.getPath('userData'), 'updater.log')
 function log(...args) {
   const line = `[${new Date().toISOString()}] ${args.join(' ')}\n`
@@ -24,6 +20,7 @@ autoUpdater.autoDownload = true
 autoUpdater.autoInstallOnAppQuit = true
 
 const iconPath = path.join(__dirname, 'icon.ico')
+const preloadPath = path.join(__dirname, 'preload.js')
 
 let mainWindow = null
 
@@ -40,6 +37,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
+      preload: preloadPath,
     },
     show: false,
   })
@@ -58,12 +56,18 @@ function createWindow() {
   })
 }
 
+// IPC: renderer triggers a manual update check
+ipcMain.handle('check-for-updates', () => {
+  log('Manual update check triggered')
+  return autoUpdater.checkForUpdatesAndNotify()
+})
+
 app.whenReady().then(() => {
   createWindow()
 
   if (!isDev) {
     mainWindow.once('ready-to-show', () => {
-      log('Checking for updates...')
+      log('Checking for updates on startup...')
       autoUpdater.checkForUpdatesAndNotify().catch(err => log('checkForUpdates error:', err.message))
     })
   }
@@ -76,8 +80,6 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
-
-// --- Auto-updater events ---
 
 autoUpdater.on('checking-for-update', () => log('Checking for update...'))
 autoUpdater.on('update-available', (info) => log('Update available:', info.version))
