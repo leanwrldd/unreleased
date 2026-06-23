@@ -1,4 +1,4 @@
-import { SearchCode, Settings, ShieldCheck, ListMusic, ArrowLeft } from 'lucide-react'
+import { SearchCode, Settings, ShieldCheck, ListMusic } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
@@ -15,13 +15,6 @@ export default function BottomNav(): JSX.Element {
 
   return (
     <nav className="md:hidden flex items-stretch bg-sidebar shrink-0" style={{ borderTop: '1px solid var(--border)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-      <a
-        href="https://juicewrldapi.com"
-        className="flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-text-muted transition-colors overflow-hidden"
-      >
-        <ArrowLeft size={24} />
-        <span className="text-[10px] font-semibold leading-none w-full text-center truncate px-0.5">Return to API</span>
-      </a>
       {items.map(({ icon, label, view }) => {
         const active = activeView === view
         return (
