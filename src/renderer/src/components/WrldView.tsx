@@ -347,13 +347,7 @@ export default function WrldView(): JSX.Element {
         <span>{fmLabel}</span>
       </button>
 
-      {!hasContent ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-surface">
-          <div className="text-6xl opacity-10">&#9834;</div>
-          <p className="text-white/30 text-sm">Play a track to see lyrics</p>
-        </div>
-      ) : (
-        <>
+      <>
           {/* Blurred background */}
           <div className="absolute inset-0 overflow-hidden">
             {artSrc && !artError ? (
@@ -445,8 +439,7 @@ export default function WrldView(): JSX.Element {
             </div>
           </div>
 
-        </>
-      )}
+      </>
 
       {/* ── Notch menu ────────────────────────────────────────────── */}
           <div className="group absolute right-0 top-0 bottom-0 z-20 flex items-center">
