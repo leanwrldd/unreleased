@@ -348,7 +348,7 @@ export default function WrldView(): JSX.Element {
       </button>
 
       {!hasContent ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-black">
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 bg-surface">
           <div className="text-6xl opacity-10">&#9834;</div>
           <p className="text-white/30 text-sm">Play a track to see lyrics</p>
         </div>
@@ -457,54 +457,46 @@ export default function WrldView(): JSX.Element {
                 flex flex-col gap-0 pt-2 pb-2 px-2">
 
                 {/* Category selector */}
-                {account && playlists.length > 0 && (
-                  <div className="relative mb-1.5 px-0.5">
-                    <button
-                      onClick={() => setNotchDropdownOpen(o => !o)}
-                      className="w-full flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/10 transition-colors"
-                    >
-                      <span className="text-white/45 text-[10px] font-medium truncate leading-none">{NOTCH_LABELS[notchCategory]}</span>
-                      <ChevronDown size={9} className={`text-white/25 shrink-0 transition-transform duration-150 ${notchDropdownOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    {notchDropdownOpen && (
-                      <div className="absolute top-full left-0 right-0 mt-1 z-10 bg-black/95 backdrop-blur-xl rounded-xl border border-white/10 overflow-hidden py-1">
-                        {NOTCH_OPTIONS.map(opt => (
-                          <button key={opt.value}
-                            onClick={() => { setNotchCategory(opt.value); setNotchDropdownOpen(false) }}
-                            className={`w-full px-3 py-2 text-left text-[10px] transition-colors ${notchCategory === opt.value ? 'text-white/90 bg-white/8' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.06]'}`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                <div className="relative mb-1.5 px-0.5">
+                  <button
+                    onClick={() => setNotchDropdownOpen(o => !o)}
+                    className="w-full flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/10 transition-colors"
+                  >
+                    <span className="text-white/45 text-[10px] font-medium truncate leading-none">{NOTCH_LABELS[notchCategory]}</span>
+                    <ChevronDown size={9} className={`text-white/25 shrink-0 transition-transform duration-150 ${notchDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {notchDropdownOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-1 z-10 bg-black/95 backdrop-blur-xl rounded-xl border border-white/10 overflow-hidden py-1">
+                      {(account ? NOTCH_OPTIONS : NOTCH_OPTIONS.filter(o => o.value !== 'playlists')).map(opt => (
+                        <button key={opt.value}
+                          onClick={() => { setNotchCategory(opt.value); setNotchDropdownOpen(false) }}
+                          className={`w-full px-3 py-2 text-left text-[10px] transition-colors ${notchCategory === opt.value ? 'text-white/90 bg-white/8' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.06]'}`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 {/* Items */}
-                {account && playlists.length > 0 ? (
-                  notchCategory === 'playlists' ? (
-                    playlists.slice(0, 6).map(pl => (
-                      <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)} title={pl.name}
-                        className="flex items-center justify-center py-1 rounded-lg hover:bg-white/10 transition-colors group/pl">
-                        <div className="w-16 h-16 rounded-lg shrink-0 bg-white/10 overflow-hidden group-hover/pl:ring-1 group-hover/pl:ring-white/30 transition-all">
-                          {(pl.cover_image_url || pl.cover_image)
-                            ? <img src={pl.cover_image_url ?? pl.cover_image ?? ''} className="w-full h-full object-cover" />
-                            : <div className="w-full h-full bg-white/[0.07]" />}
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    Array.from({ length: 6 }).map((_, i) => (
-                      <div key={i} className="flex items-center justify-center py-1">
-                        <div className="w-16 h-16 rounded-lg bg-white/[0.04]" />
+                {notchCategory === 'playlists' && account && playlists.length > 0 ? (
+                  playlists.slice(0, 6).map(pl => (
+                    <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)} title={pl.name}
+                      className="flex items-center justify-center py-1 rounded-lg hover:bg-white/10 transition-colors group/pl">
+                      <div className="w-16 h-16 rounded-lg shrink-0 bg-white/10 overflow-hidden group-hover/pl:ring-1 group-hover/pl:ring-white/30 transition-all">
+                        {(pl.cover_image_url || pl.cover_image)
+                          ? <img src={pl.cover_image_url ?? pl.cover_image ?? ''} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full bg-white/[0.07]" />}
                       </div>
-                    ))
-                  )
+                    </button>
+                  ))
                 ) : (
-                  <div className="flex flex-col items-center justify-center gap-1.5 py-4 px-2">
-                    <span className="text-white/30 text-[9px] text-center leading-relaxed">Sign in to use playlists</span>
-                  </div>
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="flex items-center justify-center py-1">
+                      <div className="w-16 h-16 rounded-lg bg-white/[0.04]" />
+                    </div>
+                  ))
                 )}
               </div>
             </div>
