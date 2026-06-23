@@ -1,11 +1,19 @@
-const { app, BrowserWindow, shell, dialog, ipcMain } = require('electron')
+const { app, BrowserWindow, shell, dialog } = require('electron')
 const { autoUpdater } = require('electron-updater')
 const path = require('path')
+const fs = require('fs')
 
 const isDev = process.env.NODE_ENV === 'development'
 
-// Silence auto-updater logs in prod; enable in dev for debugging
-autoUpdater.logger = isDev ? console : null
+// Log to file so we can see what the updater is doing
+const logFile = path.join(app.getPath('userData'), 'updater.log')
+function log(...args) {
+  const line = `[${new Date().toISOString()}] ${args.join(' ')}\n`
+  fs.appendFileSync(logFile, line)
+  if (isDev) console.log(...args)
+}
+
+autoUpdater.logger = { info: log, warn: log, error: log, debug: () => {} }
 autoUpdater.autoDownload = true
 autoUpdater.autoInstallOnAppQuit = true
 
@@ -35,7 +43,6 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 
-  // Open target="_blank" links in the system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }
@@ -45,10 +52,10 @@ function createWindow() {
 app.whenReady().then(() => {
   createWindow()
 
-  // Check for updates after window is ready (skip in dev)
   if (!isDev) {
     mainWindow.once('ready-to-show', () => {
-      autoUpdater.checkForUpdatesAndNotify()
+      log('Checking for updates...')
+      autoUpdater.checkForUpdatesAndNotify().catch(err => log('checkForUpdates error:', err.message))
     })
   }
 
@@ -63,15 +70,17 @@ app.on('window-all-closed', () => {
 
 // --- Auto-updater events ---
 
-autoUpdater.on('update-available', () => {
-  // Update is downloading silently in the background
-})
+autoUpdater.on('checking-for-update', () => log('Checking for update...'))
+autoUpdater.on('update-available', (info) => log('Update available:', info.version))
+autoUpdater.on('update-not-available', (info) => log('Up to date:', info.version))
+autoUpdater.on('download-progress', (p) => log(`Downloading: ${Math.round(p.percent)}%`))
 
-autoUpdater.on('update-downloaded', () => {
+autoUpdater.on('update-downloaded', (info) => {
+  log('Update downloaded:', info.version)
   dialog.showMessageBox(mainWindow, {
     type: 'info',
     title: 'Update ready',
-    message: 'A new version of Unreleased has been downloaded.',
+    message: `Unreleased ${info.version} has been downloaded.`,
     detail: 'Restart the app to apply the update.',
     buttons: ['Restart now', 'Later'],
     defaultId: 0,
@@ -81,6 +90,5 @@ autoUpdater.on('update-downloaded', () => {
 })
 
 autoUpdater.on('error', (err) => {
-  // Silently ignore update errors — don't interrupt the user
-  if (isDev) console.error('Auto-updater error:', err)
+  log('Auto-updater error:', err.message)
 })
