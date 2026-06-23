@@ -10,7 +10,7 @@ import * as userApi from '../lib/userApi'
 
 export default function WrldView(): JSX.Element {
   const {
-    currentTrack, currentTrackFull, currentTime, account,
+    currentTrack, currentTrackFull, currentTime, account, theme,
     radioFmActive, setRadioFmActive, radioFmIsLive, radioFmNowPlaying,
     radioFmVote, radioFmUpNext, radioFmQueuePreview,
     radioFmMatchedSong,
@@ -237,18 +237,18 @@ export default function WrldView(): JSX.Element {
 
   const LyricsPanel = ({ padded }: { padded?: boolean }) => {
     const noLyricsMsg = radioFmActive
-      ? <p className="text-white/30 text-sm text-center">No lyrics found for this track</p>
+      ? <p className="dark:text-white/30 text-gray-500 text-sm text-center">No lyrics found for this track</p>
       : <>
           <div className="text-5xl opacity-10">&#9834;</div>
-          <p className="text-white/30 text-sm text-center">No lyrics available</p>
-          {isEditor && <p className="text-white/20 text-xs text-center mt-1">Open the editor to add lyrics</p>}
+          <p className="dark:text-white/30 text-gray-500 text-sm text-center">No lyrics available</p>
+          {isEditor && <p className="dark:text-white/20 text-gray-400 text-xs text-center mt-1">Open the editor to add lyrics</p>}
         </>
 
     if (!rawLyrics) {
       return (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8">
           {!radioFmActive && !currentTrack
-            ? <p className="text-white/30 text-sm text-center">No track playing</p>
+            ? <p className="dark:text-white/30 text-gray-500 text-sm text-center">No track playing</p>
             : noLyricsMsg}
         </div>
       )
@@ -292,11 +292,11 @@ export default function WrldView(): JSX.Element {
                             : (padded ? '0.9rem' : '0.8rem'),
                   fontWeight: isCenter ? 800 : Math.abs(dist) === 1 ? 500 : 400,
                   lineHeight: 1.3,
-                  color:      isCenter ? 'rgba(255,255,255,1)'
-                            : dist < 0  ? 'rgba(255,255,255,0.28)'
-                            :             'rgba(255,255,255,0.18)',
+                  color:      isCenter ? (theme === 'dark' ? 'rgba(255,255,255,1)' : 'rgba(0,0,0,0.85)')
+                            : dist < 0  ? (theme === 'dark' ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.45)')
+                            :             (theme === 'dark' ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.3)'),
                   opacity:    Math.abs(dist) === 2 ? 0.55 : 1,
-                  textShadow: isCenter ? '0 0 40px rgba(255,255,255,0.15)' : 'none',
+                  textShadow: isCenter ? (theme === 'dark' ? '0 0 40px rgba(255,255,255,0.15)' : '0 0 20px rgba(0,0,0,0.08)') : 'none',
                   transform:  isCenter ? (padded ? 'translateX(8px)' : 'translateX(4px)') : 'none',
                 }}
               >
@@ -307,7 +307,7 @@ export default function WrldView(): JSX.Element {
           {!autoFollow && (
             <button
               onClick={() => setAutoFollow(true)}
-              className="mt-2 self-start flex items-center gap-1.5 text-[11px] text-white/20 hover:text-white/60 transition-colors"
+              className="mt-2 self-start flex items-center gap-1.5 text-[11px] dark:text-white/20 dark:hover:text-white/60 text-gray-400 hover:text-gray-600 transition-colors"
             >
               <LocateFixed size={10} />
               Follow
@@ -320,7 +320,7 @@ export default function WrldView(): JSX.Element {
     // ── Plain lyrics ──────────────────────────────────────────────────────────
     return (
       <div className={`flex-1 overflow-y-auto ${padded ? 'py-16 pr-16 pl-8' : 'py-4 px-4 md:py-8 md:pr-12 md:pl-6'}`} style={{ scrollbarWidth: 'none' }}>
-        <pre className="text-white/50 text-xs md:text-sm leading-6 md:leading-7 whitespace-pre-wrap font-sans">{rawLyrics}</pre>
+        <pre className="dark:text-white/50 text-gray-700 text-xs md:text-sm leading-6 md:leading-7 whitespace-pre-wrap font-sans">{rawLyrics}</pre>
       </div>
     )
   }
@@ -352,8 +352,8 @@ export default function WrldView(): JSX.Element {
           <div className="absolute inset-0 overflow-hidden">
             {artSrc && !artError ? (
               <img src={artSrc} alt=""
-                className="absolute inset-0 w-full h-full object-cover dark:[filter:blur(60px)_brightness(0.22)_saturate(2.4)_scale(1.2)] [filter:blur(60px)_brightness(0.45)_saturate(1.8)_scale(1.2)]"
-                style={{ transform: 'scale(1.2)' }}
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: `blur(60px) brightness(${theme === 'dark' ? 0.22 : 0.45}) saturate(${theme === 'dark' ? 2.4 : 1.8})`, transform: 'scale(1.2)' }}
                 onError={() => setArtError(true)}
               />
             ) : (
