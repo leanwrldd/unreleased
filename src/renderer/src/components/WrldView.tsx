@@ -24,6 +24,7 @@ export default function WrldView(): JSX.Element {
   const [suggestQuery, setSuggestQuery]     = useState('')
   const [suggestResults, setSuggestResults] = useState<JWApiSong[]>([])
   const [suggestLoading, setSuggestLoading] = useState(false)
+  const [voteDismissed, setVoteDismissed]    = useState(false)
   const [proposed, setProposed]             = useState<string | null>(null)
   const [textIsDark, setTextIsDark]          = useState(false)
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -125,6 +126,7 @@ export default function WrldView(): JSX.Element {
   ]
   // Reset to auto-follow when the track or lyrics change
   useEffect(() => { setAutoFollow(true) }, [rawLyrics])
+  useEffect(() => { setVoteDismissed(false) }, [radioFmVote?.track, radioFmVote?.kind])
 
   const fmLabel    = radioFmActive
     ? (radioFmIsLive ? '999 FM · LIVE' : '999 FM · OFF')
@@ -163,15 +165,20 @@ export default function WrldView(): JSX.Element {
   const FmRadioPanel = () => (
     <div className="flex-1 overflow-y-auto pb-8 px-4 md:px-6 flex flex-col gap-4 md:gap-5" style={{ scrollbarWidth: 'none' }}>
       {/* Vote */}
-      {radioFmVote?.active ? (
+      {radioFmVote?.active && !voteDismissed ? (
         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <p className="text-white/50 text-[11px] font-semibold uppercase tracking-widest">
               {radioFmVote.kind === 'skip' ? 'Vote to Skip' : 'Vote to Queue'}
             </p>
-            {radioFmVote.seconds_left != null && (
-              <span className="text-white/30 text-xs tabular-nums">{radioFmVote.seconds_left}s left</span>
-            )}
+            <div className="flex items-center gap-2">
+              {radioFmVote.seconds_left != null && (
+                <span className="text-white/30 text-xs tabular-nums">{radioFmVote.seconds_left}s left</span>
+              )}
+              <button onClick={() => setVoteDismissed(true)} className="text-white/20 hover:text-white/60 transition-colors">
+                <X size={13} />
+              </button>
+            </div>
           </div>
           {radioFmVote.track && <p className="text-white/80 text-sm font-medium">{radioFmVote.track}</p>}
           <p className="text-white/30 text-xs">
@@ -427,7 +434,7 @@ export default function WrldView(): JSX.Element {
 
             {/* Content */}
             {radioFmActive
-              ? (fmTab === 'radio' ? <FmRadioPanel /> : <LyricsPanel />)
+              ? (fmTab === 'radio' ? FmRadioPanel() : <LyricsPanel />)
               : <LyricsPanel />
             }
           </div>
@@ -464,7 +471,7 @@ export default function WrldView(): JSX.Element {
                       </button>
                     ))}
                   </div>
-                  {fmTab === 'radio' ? <FmRadioPanel /> : <LyricsPanel padded />}
+                  {fmTab === 'radio' ? FmRadioPanel() : <LyricsPanel padded />}
                 </>
               ) : (
                 <LyricsPanel padded />

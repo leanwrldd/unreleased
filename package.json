@@ -1,7 +1,7 @@
 {
   "name": "unreleased",
-  "version": "1.7.3",
-  "description": "A music player for Juice WRLD — web version",
+  "version": "1.7.4",
+  "description": "A music player for Juice WRLD \u2014 web version",
   "scripts": {
     "dev": "vite --port 3018 --strictPort --host",
     "build": "tsc --noEmit && vite build",
