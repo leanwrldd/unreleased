@@ -340,7 +340,7 @@ export default function WrldView(): JSX.Element {
             ? 'bg-red-600/80 text-white backdrop-blur-sm ring-1 ring-red-400/50'
             : radioFmActive
             ? 'bg-white/10 text-white/50 backdrop-blur-sm'
-            : 'bg-black/25 text-white/50 hover:text-white/90 hover:bg-black/50 backdrop-blur-sm'}`}
+            : 'bg-black/10 dark:bg-black/25 text-black/50 dark:text-white/50 hover:text-black/80 dark:hover:text-white/90 hover:bg-black/20 dark:hover:bg-black/50 backdrop-blur-sm'}`}
         title={radioFmActive ? 'Turn off 999 FM' : 'Turn on 999 FM'}
       >
         <Radio size={13} className={radioFmActive && radioFmIsLive ? 'animate-pulse' : ''} />
@@ -352,14 +352,14 @@ export default function WrldView(): JSX.Element {
           <div className="absolute inset-0 overflow-hidden">
             {artSrc && !artError ? (
               <img src={artSrc} alt=""
-                className="absolute inset-0 w-full h-full object-cover"
-                style={{ filter: 'blur(60px) brightness(0.22) saturate(2.4)', transform: 'scale(1.2)' }}
+                className="absolute inset-0 w-full h-full object-cover dark:[filter:blur(60px)_brightness(0.22)_saturate(2.4)_scale(1.2)] [filter:blur(60px)_brightness(0.45)_saturate(1.8)_scale(1.2)]"
+                style={{ transform: 'scale(1.2)' }}
                 onError={() => setArtError(true)}
               />
             ) : (
-              <div className={`absolute inset-0 ${radioFmActive ? 'bg-gradient-to-br from-red-950/60 to-black' : 'bg-gradient-to-br from-gray-900 to-black'}`} />
+              <div className={`absolute inset-0 ${radioFmActive ? 'bg-gradient-to-br from-red-950/60 to-black dark:from-red-950/60 dark:to-black' : 'bg-gradient-to-br from-gray-200 to-gray-100 dark:from-gray-900 dark:to-black'}`} />
             )}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/20 dark:from-black/40 dark:via-transparent dark:to-black/70" />
           </div>
 
           {/* ── Mobile layout ─────────────────────────────────────────────── */}
