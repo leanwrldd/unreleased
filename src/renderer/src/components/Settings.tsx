@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle, PenLine, BookOpen, Copy, Eye, EyeOff, ChevronDown, KeyRound, Globe, RefreshCw } from 'lucide-react'
+import {
+  X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle,
+  PenLine, BookOpen, Copy, Eye, EyeOff, ChevronDown, KeyRound, Globe, RefreshCw,
+  FolderOpen, Monitor, BellOff, Minus,
+} from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { getToken } from '../lib/userApi'
 
@@ -7,6 +11,15 @@ const ACCENT_PRESETS = [
   '#1db954', '#7c3aed', '#2563eb', '#dc2626',
   '#ea580c', '#d97706', '#059669', '#db2777',
 ]
+
+type UpdateState = 'idle' | 'checking' | 'available' | 'latest' | 'downloading' | 'downloaded' | 'error'
+
+interface AppSettings {
+  downloadPath: string
+  autoDownload: boolean
+  minimizeToTray: boolean
+  startupView: string
+}
 
 export default function Settings(): JSX.Element {
   const [showToken, setShowToken] = useState(false)
@@ -21,15 +34,27 @@ export default function Settings(): JSX.Element {
     crossfadeEnabled, crossfadeDuration, setCrossfade,
     playbackSpeed, setPlaybackSpeed,
     sleepTimerEnd, setSleepTimer,
+    updateStatus,
   } = useStore()
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const [customAccent, setCustomAccent] = useState(accentColor)
   const [sleepMinutes, setSleepMinutes] = useState(30)
-  const [updateStatus, setUpdateStatus] = useState<'idle'|'checking'|'latest'|'error'>('idle')
+  const [updateState, setUpdateState] = useState<UpdateState>('idle')
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null)
+  const [updatePercent, setUpdatePercent] = useState(0)
   const accentDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
   const isElectron = navigator.userAgent.includes('Electron')
+  const el = (window as any).electron
+
+  // App settings (Electron only)
+  const [appSettings, setAppSettings] = useState<AppSettings>({
+    downloadPath: '',
+    autoDownload: true,
+    minimizeToTray: false,
+    startupView: 'api-tracker',
+  })
 
   useEffect(() => {
     navigator.mediaDevices?.enumerateDevices().then((devs) => {
@@ -37,13 +62,60 @@ export default function Settings(): JSX.Element {
     }).catch(() => {})
   }, [])
 
-  const toggleSleepTimer = (): void => {
-    if (sleepTimerEnd) {
-      setSleepTimer(null)
-    } else {
-      setSleepTimer(Date.now() + sleepMinutes * 60 * 1000)
-    }
+  // Load app settings from main process
+  useEffect(() => {
+    if (!isElectron || !el) return
+    el.getAppSettings().then((s: AppSettings) => setAppSettings(s)).catch(() => {})
+  }, [isElectron, el])
+
+  // Subscribe to update status events
+  useEffect(() => {
+    if (!isElectron || !el) return
+    const off = el.onUpdateStatus((d: { type: string; version?: string; percent?: number; message?: string }) => {
+      if (d.type === 'checking') { setUpdateState('checking'); setUpdateVersion(null) }
+      else if (d.type === 'available') { setUpdateState('available'); setUpdateVersion(d.version ?? null) }
+      else if (d.type === 'not-available') { setUpdateState('latest'); setUpdateVersion(d.version ?? null); setTimeout(() => setUpdateState('idle'), 5000) }
+      else if (d.type === 'downloading') { setUpdateState('downloading'); setUpdatePercent(d.percent ?? 0) }
+      else if (d.type === 'downloaded') { setUpdateState('downloaded'); setUpdateVersion(d.version ?? null) }
+      else if (d.type === 'error') { setUpdateState('error'); setTimeout(() => setUpdateState('idle'), 5000) }
+    })
+    return () => off?.()
+  }, [isElectron, el])
+
+  // Sync from store updateStatus on first render (in case it was set before Settings opened)
+  useEffect(() => {
+    if (!updateStatus) return
+    if (updateStatus.type === 'downloading') { setUpdateState('downloading'); setUpdatePercent(updateStatus.percent ?? 0) }
+    else if (updateStatus.type === 'downloaded') { setUpdateState('downloaded'); setUpdateVersion(updateStatus.version ?? null) }
+    else if (updateStatus.type === 'available') { setUpdateState('available'); setUpdateVersion(updateStatus.version ?? null) }
+    else if (updateStatus.type === 'checking') setUpdateState('checking')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const setSetting = async (key: keyof AppSettings, value: unknown) => {
+    if (!el) return
+    setAppSettings((prev) => ({ ...prev, [key]: value }))
+    await el.setAppSetting(key, value)
   }
+
+  const pickDownloadFolder = async () => {
+    if (!el) return
+    const picked = await el.pickFolder()
+    if (picked) setSetting('downloadPath', picked)
+  }
+
+  const toggleSleepTimer = (): void => {
+    if (sleepTimerEnd) setSleepTimer(null)
+    else setSleepTimer(Date.now() + sleepMinutes * 60 * 1000)
+  }
+
+  const updateBtnTitle = updateState === 'checking' ? 'Checking...'
+    : updateState === 'available' ? `v${updateVersion} available`
+    : updateState === 'downloading' ? `Downloading ${updatePercent}%`
+    : updateState === 'downloaded' ? 'Ready to install'
+    : updateState === 'latest' ? 'Up to date'
+    : updateState === 'error' ? 'Check failed'
+    : 'Check for updates'
 
   return (
     <div
@@ -54,7 +126,37 @@ export default function Settings(): JSX.Element {
       <div className="bg-surface border border-[var(--border)] rounded-2xl shadow-2xl w-full max-w-[520px] mx-3 max-h-[88vh] md:max-h-[80vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-text-primary font-bold text-lg">Settings</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-text-primary font-bold text-lg">Settings</h2>
+            {isElectron && (
+              <button
+                disabled={updateState === 'checking' || updateState === 'downloading'}
+                title={updateBtnTitle}
+                onClick={async () => {
+                  if (updateState === 'downloaded') { el?.installUpdate?.(); return }
+                  setUpdateState('checking')
+                  try { await el?.checkForUpdates() } catch { setUpdateState('error'); setTimeout(() => setUpdateState('idle'), 4000) }
+                }}
+                className={`p-1 rounded transition-colors disabled:opacity-50 ${
+                  updateState === 'latest' || updateState === 'downloaded' ? 'text-emerald-400' :
+                  updateState === 'available' ? 'text-yellow-400' :
+                  updateState === 'error' ? 'text-red-400' :
+                  'text-text-muted hover:text-text-primary'
+                }`}
+              >
+                <RefreshCw size={14} className={updateState === 'checking' || updateState === 'downloading' ? 'animate-spin' : ''} />
+              </button>
+            )}
+            {updateState === 'downloading' && (
+              <span className="text-[10px] text-accent font-medium">{updatePercent}%</span>
+            )}
+            {updateState === 'available' && updateVersion && (
+              <span className="text-[10px] text-yellow-400">v{updateVersion}</span>
+            )}
+            {updateState === 'downloaded' && (
+              <span className="text-[10px] text-emerald-400">Restart to update</span>
+            )}
+          </div>
           <button onClick={() => setShowSettings(false)} className="text-text-muted hover:text-text-primary transition-colors">
             <X size={20} />
           </button>
@@ -65,8 +167,6 @@ export default function Settings(): JSX.Element {
           {/* Appearance */}
           <section>
             <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest mb-4">Appearance</h3>
-
-            {/* Theme */}
             <div className="flex items-center justify-between mb-4">
               <span className="text-text-primary text-sm">Theme</span>
               <div className="flex rounded-lg bg-surface-overlay p-0.5 gap-0.5">
@@ -84,8 +184,6 @@ export default function Settings(): JSX.Element {
                 ))}
               </div>
             </div>
-
-            {/* Accent color */}
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Palette size={14} className="text-text-muted" />
@@ -104,10 +202,10 @@ export default function Settings(): JSX.Element {
                   type="color"
                   value={customAccent}
                   onChange={(e) => {
-                  setCustomAccent(e.target.value)
-                  if (accentDebounceRef.current) clearTimeout(accentDebounceRef.current)
-                  accentDebounceRef.current = setTimeout(() => setAccentColor(e.target.value), 80)
-                }}
+                    setCustomAccent(e.target.value)
+                    if (accentDebounceRef.current) clearTimeout(accentDebounceRef.current)
+                    accentDebounceRef.current = setTimeout(() => setAccentColor(e.target.value), 80)
+                  }}
                   className="w-7 h-7 rounded-full cursor-pointer border-0 p-0 bg-transparent"
                   title="Custom color"
                 />
@@ -118,8 +216,6 @@ export default function Settings(): JSX.Element {
           {/* Playback */}
           <section>
             <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest mb-4">Playback</h3>
-
-            {/* Audio output */}
             {devices.length > 0 && (
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
@@ -138,8 +234,6 @@ export default function Settings(): JSX.Element {
                 </select>
               </div>
             )}
-
-            {/* Playback speed */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Zap size={14} className="text-text-muted" />
@@ -155,8 +249,6 @@ export default function Settings(): JSX.Element {
                 />
               </div>
             </div>
-
-            {/* Crossfade */}
             <div className="flex items-center justify-between mb-4">
               <span className="text-text-primary text-sm">Crossfade</span>
               <div className="flex items-center gap-3">
@@ -179,8 +271,6 @@ export default function Settings(): JSX.Element {
                 </button>
               </div>
             </div>
-
-            {/* Sleep timer */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Clock size={14} className="text-text-muted" />
@@ -212,6 +302,79 @@ export default function Settings(): JSX.Element {
             </div>
           </section>
 
+          {/* App (Electron only) */}
+          {isElectron && (
+            <section>
+              <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest mb-4">App</h3>
+
+              {/* Download path */}
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <FolderOpen size={14} className="text-text-muted" />
+                  <span className="text-text-primary text-sm">Download folder</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 text-text-muted text-xs truncate bg-surface-overlay rounded-lg px-3 py-2 border border-[var(--border)]" title={appSettings.downloadPath}>
+                    {appSettings.downloadPath || 'Default Downloads folder'}
+                  </span>
+                  <button
+                    onClick={pickDownloadFolder}
+                    className="shrink-0 px-3 py-2 rounded-lg text-xs font-medium bg-surface-overlay hover:bg-surface-raised border border-[var(--border)] text-text-secondary transition-colors"
+                  >
+                    Change
+                  </button>
+                </div>
+              </div>
+
+              {/* Startup view */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Monitor size={14} className="text-text-muted" />
+                  <span className="text-text-primary text-sm">Start on</span>
+                </div>
+                <select
+                  value={appSettings.startupView}
+                  onChange={(e) => setSetting('startupView', e.target.value)}
+                  className="bg-surface-overlay text-text-primary text-xs rounded-lg px-2 py-1.5 border border-[var(--border)]"
+                >
+                  <option value="api-tracker">Tracker</option>
+                  <option value="api-files">Files</option>
+                  <option value="api-categories">Categories</option>
+                  <option value="liked">Liked Songs</option>
+                  <option value="playlists">Playlists</option>
+                </select>
+              </div>
+
+              {/* Auto-update */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <BellOff size={14} className="text-text-muted" />
+                  <span className="text-text-primary text-sm">Auto-download updates</span>
+                </div>
+                <button
+                  onClick={() => setSetting('autoDownload', !appSettings.autoDownload)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${appSettings.autoDownload ? 'bg-accent' : 'bg-surface-overlay'}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${appSettings.autoDownload ? 'left-5' : 'left-0.5'}`} />
+                </button>
+              </div>
+
+              {/* Minimize to tray */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Minus size={14} className="text-text-muted" />
+                  <span className="text-text-primary text-sm">Minimize to tray on close</span>
+                </div>
+                <button
+                  onClick={() => setSetting('minimizeToTray', !appSettings.minimizeToTray)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${appSettings.minimizeToTray ? 'bg-accent' : 'bg-surface-overlay'}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${appSettings.minimizeToTray ? 'left-5' : 'left-0.5'}`} />
+                </button>
+              </div>
+            </section>
+          )}
+
           {/* About */}
           <section>
             <div className="flex items-center gap-2 mb-4">
@@ -219,7 +382,7 @@ export default function Settings(): JSX.Element {
               <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">About</h3>
             </div>
             <p className="text-text-muted text-xs mb-3">
-              unreleased v1.7.5 — powered by{' '}
+              unreleased v1.7.8 — powered by{' '}
               <a href="https://juicewrldapi.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                 juicewrldapi.com
               </a>
@@ -296,28 +459,10 @@ export default function Settings(): JSX.Element {
                 )}
               </div>
             )}
-            {isElectron && (
-              <button
-                disabled={updateStatus === 'checking'}
-                onClick={async () => {
-                  setUpdateStatus('checking')
-                  try {
-                    await (window as any).electron?.checkForUpdates()
-                    setUpdateStatus('latest')
-                  } catch {
-                    setUpdateStatus('error')
-                  }
-                  setTimeout(() => setUpdateStatus('idle'), 4000)
-                }}
-                className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] border border-[var(--border)] text-text-secondary text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                <RefreshCw size={15} className={updateStatus === 'checking' ? 'animate-spin' : ''} />
-                {updateStatus === 'checking' ? 'Checking...' : updateStatus === 'latest' ? 'Up to date' : updateStatus === 'error' ? 'Check failed' : 'Check for updates'}
-              </button>
-            )}
+
             <button
               onClick={() => { setShowSettings(false); setActiveView('docs') }}
-              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] border border-[var(--border)] text-text-secondary text-sm font-medium transition-colors"
+              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] border border-[var(--border)] text-text-secondary text-sm font-medium transition-colors mt-2"
             >
               <BookOpen size={15} />
               API Docs

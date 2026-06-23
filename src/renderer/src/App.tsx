@@ -38,6 +38,7 @@ import Player from './components/Player'
 import NowPlaying from './components/NowPlaying'
 import QueuePanel from './components/QueuePanel'
 import Settings from './components/Settings'
+import DownloadManager from './components/DownloadManager'
 import ErrorBoundary from './components/ErrorBoundary'
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -131,6 +132,7 @@ export default function App(): JSX.Element {
       <BottomNav />
       {showSettings && <Settings />}
       {showUserAuth && <UserAuthModal onClose={() => setShowUserAuth(false)} />}
+      <DownloadManager />
     </div>
   )
 }
