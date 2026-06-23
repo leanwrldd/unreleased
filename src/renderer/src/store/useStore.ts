@@ -167,7 +167,6 @@ export const useStore = create<AppStore>((set, get, store) => ({
       'api-tracker': '/tracker',
       'api-files': '/files',
       'editor': '/editor',
-      'compilation': '/compilation',
       'admin': '/admin',
       'liked': '/liked',
       'playlists': '/playlists',

@@ -8,7 +8,6 @@ function getViewFromPath(pathname: string): ViewType {
   if (pathname.startsWith('/files')) return 'api-files'
   if (pathname === '/categories') return 'api-categories'
   if (pathname === '/editor') return 'editor'
-  if (pathname === '/compilation') return 'compilation'
   if (pathname === '/admin') return 'admin'
   if (pathname === '/liked') return 'liked'
   if (pathname === '/playlists') return 'playlists'
@@ -24,7 +23,6 @@ import BottomNav from './components/BottomNav'
 import ApiTrackerView from './components/ApiTrackerView'
 import ApiFilesView from './components/ApiFilesView'
 import ApiCategoryView from './components/ApiCategoryView'
-import ApiCompilationView from './components/ApiCompilationView'
 import EditorPage from './components/EditorPage'
 import AdminPage from './components/AdminPage'
 import LikedSongsView from './components/LikedSongsView'
@@ -114,7 +112,6 @@ export default function App(): JSX.Element {
               : activeView === 'api-files' ? <ApiFilesView />
               : activeView === 'api-categories' ? <ApiCategoryView />
               : activeView === 'editor' ? <EditorPage />
-              : activeView === 'compilation' ? <ApiCompilationView />
               : activeView === 'admin' ? <AdminPage />
               : activeView === 'liked' ? <LikedSongsView />
               : activeView === 'playlists' ? <PlaylistsView />
