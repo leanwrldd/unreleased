@@ -668,7 +668,7 @@ export default function Player(): JSX.Element {
             </p>
           </div>
           <div className="flex items-center gap-0.5 shrink-0">
-            <button onClick={handlePrev} className="p-2 text-text-secondary hover:text-text-primary transition-colors">
+            <button onClick={handlePrev} disabled={radioFmActive} className="p-2 text-text-secondary hover:text-text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
               <SkipBack size={18} fill="currentColor" />
             </button>
             <button
@@ -680,7 +680,7 @@ export default function Player(): JSX.Element {
                 ? <Pause size={16} fill="#000" className="text-black" />
                 : <Play  size={16} fill="#000" className="text-black ml-0.5" />}
             </button>
-            <button onClick={handleNext} className="p-2 text-text-secondary hover:text-text-primary transition-colors">
+            <button onClick={handleNext} disabled={radioFmActive} className="p-2 text-text-secondary hover:text-text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
               <SkipForward size={18} fill="currentColor" />
             </button>
           </div>
@@ -804,7 +804,7 @@ export default function Player(): JSX.Element {
               <Shuffle size={18} />
             </button>}
 
-            <button onClick={handlePrev} className="text-text-secondary hover:text-text-primary transition-colors">
+            <button onClick={handlePrev} disabled={radioFmActive} className="text-text-secondary hover:text-text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
               <SkipBack size={20} fill="currentColor" />
             </button>
 
@@ -818,7 +818,7 @@ export default function Player(): JSX.Element {
                 : <Play  size={18} fill="#000" className="text-black ml-0.5" />}
             </button>
 
-            <button onClick={handleNext} className="text-text-secondary hover:text-text-primary transition-colors">
+            <button onClick={handleNext} disabled={radioFmActive} className="text-text-secondary hover:text-text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
               <SkipForward size={20} fill="currentColor" />
             </button>
 
