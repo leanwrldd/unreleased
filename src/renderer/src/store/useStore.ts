@@ -23,6 +23,20 @@ const ls = {
   },
 }
 
+// ─── Download item (in-session, Electron only) ────────────────────────────────
+
+export interface DownloadItem {
+  id: string
+  filename: string
+  type: 'file' | 'zip' | 'update'
+  state: 'downloading' | 'done' | 'error' | 'cancelled'
+  percent: number
+  received?: number
+  total?: number
+  savePath?: string
+  error?: string
+}
+
 // ─── Non-queue state ──────────────────────────────────────────────────────────
 
 interface AppState {
@@ -75,6 +89,11 @@ interface AppState {
   // Editor
   pendingEditorSongId: number | null
   pendingEditProposal: { id: number; songId: number; proposedData: Record<string, unknown>; editorNotes: string } | null
+
+  // Downloads (Electron only)
+  downloads: DownloadItem[]
+  showDownloadManager: boolean
+  updateStatus: { type: string; version?: string; percent?: number; bytesPerSecond?: number; message?: string } | null
 }
 
 interface AppActions {
@@ -122,6 +141,13 @@ interface AppActions {
 
   setPendingEditorSongId: (id: number | null) => void
   setPendingEditProposal: (p: { id: number; songId: number; proposedData: Record<string, unknown>; editorNotes: string } | null) => void
+
+  addDownload: (item: DownloadItem) => void
+  updateDownload: (id: string, updates: Partial<DownloadItem>) => void
+  removeDownload: (id: string) => void
+  clearCompletedDownloads: () => void
+  setShowDownloadManager: (show: boolean) => void
+  setUpdateStatus: (status: { type: string; version?: string; percent?: number; bytesPerSecond?: number; message?: string } | null) => void
 }
 
 export type AppStore = QueueSlice & AppState & AppActions
@@ -332,4 +358,20 @@ export const useStore = create<AppStore>((set, get, store) => ({
   pendingEditProposal: null,
   setPendingEditorSongId: (pendingEditorSongId) => set({ pendingEditorSongId }),
   setPendingEditProposal: (pendingEditProposal) => set({ pendingEditProposal }),
+
+  // ── Downloads ─────────────────────────────────────────────────────────────
+  downloads: [],
+  showDownloadManager: false,
+  updateStatus: null,
+
+  addDownload: (item) => set((s) => ({ downloads: [item, ...s.downloads] })),
+  updateDownload: (id, updates) => set((s) => ({
+    downloads: s.downloads.map((d) => d.id === id ? { ...d, ...updates } : d),
+  })),
+  removeDownload: (id) => set((s) => ({ downloads: s.downloads.filter((d) => d.id !== id) })),
+  clearCompletedDownloads: () => set((s) => ({
+    downloads: s.downloads.filter((d) => d.state === 'downloading'),
+  })),
+  setShowDownloadManager: (show) => set({ showDownloadManager: show }),
+  setUpdateStatus: (updateStatus) => set({ updateStatus }),
 }))
