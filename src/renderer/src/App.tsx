@@ -102,8 +102,11 @@ export default function App(): JSX.Element {
     document.documentElement.style.setProperty('--accent-hover-rgb', `${hr} ${hg} ${hb}`)
   }, [accentColor])
 
+  const isElectron = navigator.userAgent.includes("Electron")
+
   return (
     <div className="flex flex-col h-dvh bg-surface overflow-hidden">
+      {isElectron && <div style={{ WebkitAppRegion: "drag" } as React.CSSProperties} className="fixed top-0 left-0 right-0 h-7 z-[9999] pointer-events-none select-none" />}
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <main className="flex-1 overflow-hidden flex">

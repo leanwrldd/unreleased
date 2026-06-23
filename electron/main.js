@@ -1,9 +1,15 @@
-const { app, BrowserWindow, shell, dialog } = require('electron')
+const { app, BrowserWindow, shell, dialog, Menu } = require('electron')
 const { autoUpdater } = require('electron-updater')
 const path = require('path')
 const fs = require('fs')
 
 const isDev = process.env.NODE_ENV === 'development'
+
+// Set app user model ID for proper Windows taskbar icon + notifications
+app.setAppUserModelId('Unreleased')
+
+// Remove native menu bar (File / Edit / View)
+Menu.setApplicationMenu(null)
 
 // Log to file so we can see what the updater is doing
 const logFile = path.join(app.getPath('userData'), 'updater.log')
@@ -17,6 +23,8 @@ autoUpdater.logger = { info: log, warn: log, error: log, debug: () => {} }
 autoUpdater.autoDownload = true
 autoUpdater.autoInstallOnAppQuit = true
 
+const iconPath = path.join(__dirname, 'icon.ico')
+
 let mainWindow = null
 
 function createWindow() {
@@ -26,12 +34,13 @@ function createWindow() {
     minWidth: 960,
     minHeight: 600,
     backgroundColor: '#0a0a0a',
+    icon: iconPath,
+    frame: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
     },
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     show: false,
   })
 

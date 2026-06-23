@@ -38,6 +38,7 @@
   "build": {
     "appId": "com.juicewrldapi.player",
     "productName": "Unreleased",
+    "icon": "electron/icon.ico",
     "directories": {
       "output": "release"
     },
