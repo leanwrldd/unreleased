@@ -9,7 +9,7 @@ export default function BottomNav(): JSX.Element {
 
   const items: { icon: React.ReactNode; label: string; view: ViewType }[] = [
     { icon: <SearchCode size={24} />, label: 'Tracker', view: 'api-tracker' },
-    { icon: <img src={logo} alt="WRLD" className="w-6 h-6 object-contain" />, label: 'WRLD', view: 'wrld' },
+    { icon: <img src={logo} alt="WRLD" className="w-8 h-8 object-contain" />, label: 'WRLD', view: 'wrld' },
     { icon: <ListMusic size={24} />, label: 'Playlists', view: 'playlists' },
   ]
 

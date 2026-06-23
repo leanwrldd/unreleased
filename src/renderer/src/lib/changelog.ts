@@ -6,6 +6,24 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.7.5',
+    date: '2026-06-23',
+    changes: [
+      { type: 'improve', text: 'Removed Compilation page' },
+      { type: 'improve', text: 'Removed Files tab from mobile bottom nav' },
+      { type: 'improve', text: 'Cleaned all Capacitor/mobile files from web branch' },
+    ],
+  },
+  {
+    version: '1.7.4',
+    date: '2026-06-23',
+    changes: [
+      { type: 'fix', text: 'Fixed 999 FM song search input losing focus after each keystroke' },
+      { type: 'new', text: 'Added dismiss button on active vote card in 999 FM' },
+      { type: 'improve', text: 'Skip forward/back buttons disabled while 999 FM is active' },
+    ],
+  },
+  {
     version: '1.7.3',
     date: '2026-06-22',
     changes: [
