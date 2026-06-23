@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle, PenLine, BookOpen, Copy, Eye, EyeOff, ChevronDown, KeyRound, Globe } from 'lucide-react'
+import { X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle, PenLine, BookOpen, Copy, Eye, EyeOff, ChevronDown, KeyRound, Globe, RefreshCw } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { getToken } from '../lib/userApi'
 
@@ -26,7 +26,10 @@ export default function Settings(): JSX.Element {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const [customAccent, setCustomAccent] = useState(accentColor)
   const [sleepMinutes, setSleepMinutes] = useState(30)
+  const [updateStatus, setUpdateStatus] = useState<'idle'|'checking'|'latest'|'error'>('idle')
+  const accentDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
+  const isElectron = navigator.userAgent.includes('Electron')
 
   useEffect(() => {
     navigator.mediaDevices?.enumerateDevices().then((devs) => {
@@ -100,7 +103,11 @@ export default function Settings(): JSX.Element {
                 <input
                   type="color"
                   value={customAccent}
-                  onChange={(e) => { setCustomAccent(e.target.value); setAccentColor(e.target.value) }}
+                  onChange={(e) => {
+                  setCustomAccent(e.target.value)
+                  if (accentDebounceRef.current) clearTimeout(accentDebounceRef.current)
+                  accentDebounceRef.current = setTimeout(() => setAccentColor(e.target.value), 80)
+                }}
                   className="w-7 h-7 rounded-full cursor-pointer border-0 p-0 bg-transparent"
                   title="Custom color"
                 />
@@ -288,6 +295,25 @@ export default function Settings(): JSX.Element {
                   </button>
                 )}
               </div>
+            )}
+            {isElectron && (
+              <button
+                disabled={updateStatus === 'checking'}
+                onClick={async () => {
+                  setUpdateStatus('checking')
+                  try {
+                    await (window as any).electron?.checkForUpdates()
+                    setUpdateStatus('latest')
+                  } catch {
+                    setUpdateStatus('error')
+                  }
+                  setTimeout(() => setUpdateStatus('idle'), 4000)
+                }}
+                className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] border border-[var(--border)] text-text-secondary text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                <RefreshCw size={15} className={updateStatus === 'checking' ? 'animate-spin' : ''} />
+                {updateStatus === 'checking' ? 'Checking...' : updateStatus === 'latest' ? 'Up to date' : updateStatus === 'error' ? 'Check failed' : 'Check for updates'}
+              </button>
             )}
             <button
               onClick={() => { setShowSettings(false); setActiveView('docs') }}

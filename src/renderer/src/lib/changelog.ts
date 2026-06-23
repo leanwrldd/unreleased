@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.7.6',
+    date: '2026-06-23',
+    changes: [
+      { type: 'fix', text: 'Accent color picker no longer lags -- debounced CSS variable updates' },
+      { type: 'new', text: 'Check for updates button in Settings (desktop app only)' },
+      { type: 'improve', text: 'Desktop: frameless window, custom icon, no native menu bar' },
+      { type: 'improve', text: 'Removed Return to API button from sidebar and bottom nav' },
+    ],
+  },
+  {
     version: '1.7.5',
     date: '2026-06-23',
     changes: [
