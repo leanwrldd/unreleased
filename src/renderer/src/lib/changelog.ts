@@ -6,6 +6,26 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.7.9',
+    date: '2026-06-24',
+    changes: [
+      { type: 'new', text: 'Browser-style downloads popup -- slides up from the bottom, shows progress, open-in-folder button when done' },
+      { type: 'fix', text: 'Local files: images and videos now open in the in-app viewer instead of Windows default app' },
+      { type: 'fix', text: 'Local files: audio now builds the playback queue from local folder entries' },
+    ],
+  },
+  {
+    version: '1.7.8',
+    date: '2026-06-24',
+    changes: [
+      { type: 'new', text: 'Download manager -- tracks file, zip, and update downloads with progress' },
+      { type: 'new', text: 'Local files toggle in Files view (desktop only) -- browse and play files from your computer' },
+      { type: 'new', text: 'App settings: download folder, startup view, auto-update, minimize to tray' },
+      { type: 'fix', text: 'Update status no longer stays stuck on 'checking'' },
+      { type: 'new', text: 'Force-update button to reinstall latest release without version check' },
+    ],
+  },
+  {
     version: '1.7.6',
     date: '2026-06-23',
     changes: [

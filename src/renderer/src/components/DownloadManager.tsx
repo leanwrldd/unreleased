@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Download, X, ChevronDown, ChevronUp, CheckCircle2, AlertCircle, Loader2, RefreshCw } from 'lucide-react'
+import { Download, X, ChevronDown, ChevronUp, CheckCircle2, AlertCircle, Loader2, RefreshCw, FolderOpen } from 'lucide-react'
 import { useStore, DownloadItem } from '../store/useStore'
 
 export default function DownloadManager(): JSX.Element | null {
-  const { downloads, showDownloadManager, setShowDownloadManager, addDownload, updateDownload, clearCompletedDownloads, setUpdateStatus, updateStatus } = useStore()
-  const [minimized, setMinimized] = useState(false)
+  const { downloads, showDownloadManager, setShowDownloadManager, addDownload, updateDownload, clearCompletedDownloads, setUpdateStatus } = useStore()
+  const [collapsed, setCollapsed] = useState(false)
   const el = (window as any).electron
 
-  // Wire up Electron download events
   useEffect(() => {
     if (!el) return
 
@@ -26,110 +25,84 @@ export default function DownloadManager(): JSX.Element | null {
     })
 
     const offProgress = el.onDownloadProgress((d: { filename: string; received: number; total: number; percent: number }) => {
-      // Find last matching download by filename that's still downloading
-      const { downloads: current } = useStore.getState()
-      const match = [...current].reverse().find((x) => x.filename === d.filename && x.state === 'downloading')
-      if (match) {
-        updateDownload(match.id, { percent: d.percent, received: d.received, total: d.total })
-      }
+      const { downloads: cur } = useStore.getState()
+      const match = [...cur].reverse().find((x) => x.filename === d.filename && x.state === 'downloading')
+      if (match) updateDownload(match.id, { percent: d.percent, received: d.received, total: d.total })
     })
 
     const offDone = el.onDownloadDone((d: { filename: string; state: string; savePath: string }) => {
-      const { downloads: current } = useStore.getState()
-      const match = [...current].reverse().find((x) => x.filename === d.filename && x.state === 'downloading')
+      const { downloads: cur } = useStore.getState()
+      const match = [...cur].reverse().find((x) => x.filename === d.filename && x.state === 'downloading')
       if (match) {
-        const finalState = d.state === 'completed' ? 'done'
-          : d.state === 'cancelled' ? 'cancelled'
-          : 'error'
+        const finalState = d.state === 'completed' ? 'done' : d.state === 'cancelled' ? 'cancelled' : 'error'
         updateDownload(match.id, { state: finalState, percent: finalState === 'done' ? 100 : match.percent, savePath: d.savePath })
       }
     })
 
-    const offUpdate = el.onUpdateStatus((d: { type: string; version?: string; percent?: number; bytesPerSecond?: number; message?: string }) => {
+    const offUpdate = el.onUpdateStatus((d: { type: string; version?: string; percent?: number; message?: string }) => {
       setUpdateStatus(d)
       if (d.type === 'downloading') {
-        // Upsert update download item
-        const { downloads: current } = useStore.getState()
-        const existing = current.find((x) => x.type === 'update')
+        const { downloads: cur } = useStore.getState()
+        const existing = cur.find((x) => x.type === 'update')
         if (existing) {
           updateDownload(existing.id, { percent: d.percent ?? 0, state: 'downloading' })
         } else {
-          addDownload({
-            id: 'update',
-            filename: `Update${d.version ? ` v${d.version}` : ''}`,
-            type: 'update',
-            state: 'downloading',
-            percent: d.percent ?? 0,
-          })
+          addDownload({ id: 'update', filename: `Update${d.version ? ` v${d.version}` : ''}`, type: 'update', state: 'downloading', percent: d.percent ?? 0 })
           setShowDownloadManager(true)
         }
       } else if (d.type === 'downloaded') {
-        const { downloads: current } = useStore.getState()
-        const existing = current.find((x) => x.type === 'update')
+        const { downloads: cur } = useStore.getState()
+        const existing = cur.find((x) => x.type === 'update')
         if (existing) updateDownload(existing.id, { state: 'done', percent: 100, filename: `Update v${d.version ?? ''} ready` })
       } else if (d.type === 'error') {
-        const { downloads: current } = useStore.getState()
-        const existing = current.find((x) => x.type === 'update' && x.state === 'downloading')
+        const { downloads: cur } = useStore.getState()
+        const existing = cur.find((x) => x.type === 'update' && x.state === 'downloading')
         if (existing) updateDownload(existing.id, { state: 'error', error: d.message })
       }
     })
 
-    return () => {
-      offStarted?.()
-      offProgress?.()
-      offDone?.()
-      offUpdate?.()
-    }
+    return () => { offStarted?.(); offProgress?.(); offDone?.(); offUpdate?.() }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (!showDownloadManager && downloads.length === 0) return null
 
   const active = downloads.filter((d) => d.state === 'downloading').length
-  const done = downloads.filter((d) => d.state === 'done').length
-  const errors = downloads.filter((d) => d.state === 'error' || d.state === 'cancelled').length
+  const completed = downloads.filter((d) => d.state !== 'downloading').length
 
   return (
-    <div className="fixed bottom-20 right-4 z-[200] w-72 rounded-2xl border border-[var(--border)] bg-surface shadow-2xl overflow-hidden">
+    <div className="fixed bottom-0 right-5 z-[200] w-[320px] rounded-t-xl border-x border-t border-[var(--border)] bg-[var(--surface)] shadow-[0_-4px_24px_rgba(0,0,0,0.35)] overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--border)] bg-surface-overlay">
-        <Download size={14} className="text-accent shrink-0" />
-        <span className="text-text-primary text-xs font-semibold flex-1">
+      <div className="flex items-center gap-2 px-3 py-2 bg-[var(--surface-overlay)] border-b border-[var(--border)]">
+        <Download size={13} className="text-[var(--accent)] shrink-0" />
+        <span className="text-[var(--text-primary)] text-xs font-semibold flex-1">
           Downloads
-          {active > 0 && <span className="ml-1 text-text-muted">· {active} active</span>}
+          {active > 0
+            ? <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-medium">{active} active</span>
+            : downloads.length > 0 ? <span className="ml-1 text-[var(--text-muted)] font-normal text-[10px]">· {downloads.length}</span> : null}
         </span>
-        {done + errors > 0 && (
-          <button
-            onClick={clearCompletedDownloads}
-            className="text-[10px] text-text-muted hover:text-text-primary transition-colors px-1"
-            title="Clear completed"
-          >
+        {completed > 0 && (
+          <button onClick={clearCompletedDownloads} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors px-1 rounded">
             Clear
           </button>
         )}
-        <button
-          onClick={() => setMinimized((v) => !v)}
-          className="text-text-muted hover:text-text-primary transition-colors"
-        >
-          {minimized ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        <button onClick={() => setCollapsed(v => !v)} className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+          {collapsed ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         </button>
-        <button
-          onClick={() => setShowDownloadManager(false)}
-          className="text-text-muted hover:text-text-primary transition-colors"
-        >
-          <X size={14} />
+        <button onClick={() => setShowDownloadManager(false)} className="p-0.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+          <X size={13} />
         </button>
       </div>
 
-      {/* Download list */}
-      {!minimized && (
-        <div className="max-h-64 overflow-y-auto divide-y divide-[var(--border)]">
+      {/* List */}
+      {!collapsed && (
+        <div className="max-h-60 overflow-y-auto">
           {downloads.length === 0 ? (
-            <p className="text-text-muted text-xs text-center py-5">No downloads</p>
+            <p className="text-[var(--text-muted)] text-xs text-center py-5">No downloads</p>
           ) : (
-            downloads.map((item) => (
-              <DownloadRow key={item.id} item={item} />
-            ))
+            <div className="divide-y divide-[var(--border)]/40">
+              {downloads.map((item) => <DownloadRow key={item.id} item={item} />)}
+            </div>
           )}
         </div>
       )}
@@ -138,53 +111,73 @@ export default function DownloadManager(): JSX.Element | null {
 }
 
 function DownloadRow({ item }: { item: DownloadItem }): JSX.Element {
-  const icon = item.state === 'done'
-    ? <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
-    : item.state === 'error' || item.state === 'cancelled'
-    ? <AlertCircle size={14} className="text-red-400 shrink-0" />
+  const el = (window as any).electron
+  const isActive = item.state === 'downloading'
+  const isDone = item.state === 'done'
+  const isError = item.state === 'error' || item.state === 'cancelled'
+
+  const StatusIcon = isDone
+    ? () => <CheckCircle2 size={13} className="text-emerald-400 shrink-0" />
+    : isError
+    ? () => <AlertCircle size={13} className="text-red-400 shrink-0" />
     : item.type === 'update'
-    ? <RefreshCw size={14} className="text-accent shrink-0 animate-spin" />
-    : <Loader2 size={14} className="text-accent shrink-0 animate-spin" />
+    ? () => <RefreshCw size={13} className="text-[var(--accent)] shrink-0 animate-spin" />
+    : () => <Loader2 size={13} className="text-[var(--accent)] shrink-0 animate-spin" />
 
   const sizeLabel = item.total && item.total > 0
     ? `${fmtBytes(item.received ?? 0)} / ${fmtBytes(item.total)}`
     : item.received ? fmtBytes(item.received) : null
 
   return (
-    <div className="px-3 py-2.5">
-      <div className="flex items-center gap-2 mb-1.5">
-        {icon}
-        <span className="text-text-primary text-xs truncate flex-1" title={item.filename}>
-          {item.filename}
-        </span>
-        {item.state === 'downloading' && (
-          <span className="text-text-muted text-[10px] shrink-0">{item.percent}%</span>
-        )}
-      </div>
-      {item.state === 'downloading' && (
-        <div className="h-1 bg-surface-overlay rounded-full overflow-hidden">
-          <div
-            className="h-full bg-accent rounded-full transition-all duration-300"
-            style={{ width: `${item.percent}%` }}
-          />
+    <div className="px-3 py-2.5 hover:bg-[var(--surface-overlay)] transition-colors">
+      <div className="flex items-start gap-2">
+        <div className="mt-0.5"><StatusIcon /></div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[var(--text-primary)] text-xs truncate leading-snug" title={item.filename}>
+            {item.filename}
+          </p>
+          {isActive && sizeLabel && (
+            <p className="text-[var(--text-muted)] text-[10px] mt-0.5">{sizeLabel}</p>
+          )}
+          {isDone && item.savePath && (
+            <p className="text-[var(--text-muted)] text-[10px] mt-0.5 truncate" title={item.savePath}>
+              {item.savePath.split(/[/\\]/).pop()}
+            </p>
+          )}
+          {isError && item.error && (
+            <p className="text-red-400 text-[10px] mt-0.5 truncate">{item.error}</p>
+          )}
+          {isActive && (
+            <div className="mt-1.5 h-1 bg-[var(--surface-overlay)] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[var(--accent)] rounded-full transition-all duration-200"
+                style={{ width: `${item.percent}%` }}
+              />
+            </div>
+          )}
         </div>
-      )}
-      {item.state === 'downloading' && sizeLabel && (
-        <p className="text-[10px] text-text-muted mt-1">{sizeLabel}</p>
-      )}
-      {item.state === 'error' && item.error && (
-        <p className="text-[10px] text-red-400 mt-0.5 truncate">{item.error}</p>
-      )}
-      {item.state === 'done' && item.savePath && (
-        <p className="text-[10px] text-text-muted mt-0.5 truncate">{item.savePath}</p>
-      )}
+        <div className="flex items-center gap-1 shrink-0">
+          {isActive && (
+            <span className="text-[var(--text-muted)] text-[10px]">{item.percent}%</span>
+          )}
+          {isDone && item.savePath && el?.openPath && (
+            <button
+              onClick={() => el.openPath(item.savePath!)}
+              title="Show in folder"
+              className="p-1 rounded hover:bg-[var(--surface-raised)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              <FolderOpen size={12} />
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
 
 function fmtBytes(b: number): string {
   if (b < 1024) return `${b} B`
-  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`
-  if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`
-  return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`
+  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`
+  if (b < 1073741824) return `${(b / 1048576).toFixed(1)} MB`
+  return `${(b / 1073741824).toFixed(2)} GB`
 }

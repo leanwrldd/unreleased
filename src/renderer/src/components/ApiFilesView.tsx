@@ -67,6 +67,26 @@ function fileToTrack(entry: JWApiFileEntry): Track {
   }
 }
 
+function localFileToTrack(entry: { name: string; path: string; size: number | null }): Track {
+  const title = entry.name.replace(/\.[^.]+$/, '')
+  const fileUrl = 'file:///' + entry.path.replace(/\\/g, '/')
+  return {
+    id: `local-${entry.path}`,
+    path: entry.path,
+    streamUrl: fileUrl,
+    imageUrl: '',
+    title,
+    artist: '',
+    album: '',
+    albumArtist: '',
+    year: null,
+    trackNumber: null,
+    duration: 0,
+    genre: '',
+    hasAlbumArt: false,
+  }
+}
+
 function ApiCoverThumb({ path, size = 36 }: { path: string; size?: number }): JSX.Element {
   const [errored, setErrored] = useState(false)
   if (errored) {
@@ -190,6 +210,29 @@ export default function ApiFilesView(): JSX.Element {
     const el = (window as any).electron
     if (!el) return
     await el.openPath(filePath)
+  }
+
+  const handleLocalPlay = (entry: { name: string; path: string; type: string; size: number | null }): void => {
+    const track = localFileToTrack(entry)
+    const queue = localEntries
+      .filter(e => e.type === 'file' && getMediaType(e.name) === 'audio')
+      .map(localFileToTrack)
+    playTrack(track, queue.length > 0 ? queue : [track])
+  }
+
+  const openLocalLightbox = (entry: { name: string; path: string; type: string; size: number | null }): void => {
+    const mediaEntries = localEntries.filter(e => {
+      const mt = getMediaType(e.name)
+      return e.type === 'file' && (mt === 'image' || mt === 'video')
+    })
+    const items: LightboxItem[] = mediaEntries.map(e => ({
+      url: 'file:///' + e.path.replace(/\\/g, '/'),
+      type: getMediaType(e.name) as 'image' | 'video',
+      name: e.name,
+    }))
+    const idx = mediaEntries.findIndex(e => e.path === entry.path)
+    setLightboxItems(items)
+    setLightboxIndex(idx >= 0 ? idx : 0)
   }
 
   const pickLocalFolder = async (): Promise<void> => {
@@ -581,9 +624,9 @@ export default function ApiFilesView(): JSX.Element {
                       className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-overlay transition-colors cursor-default"
                       onClick={() => {
                         if (isDir) browseLocal(entry.path)
-                        else if (mt === 'audio') handlePlay({ name: entry.name, path: 'file:///' + entry.path.replace(/\\/g, '/'), type: 'file', size: entry.size, children_count: null })
+                        else if (mt === 'audio') handleLocalPlay(entry)
+                        else if (mt === 'image' || mt === 'video') openLocalLightbox(entry)
                       }}
-                      onDoubleClick={() => { if (!isDir) openLocalFile(entry.path) }}
                     >
                       <div className="w-9 h-9 flex items-center justify-center shrink-0">
                         {isDir
@@ -598,7 +641,7 @@ export default function ApiFilesView(): JSX.Element {
                       </div>
                       {mt === 'audio' && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); handlePlay({ name: entry.name, path: 'file:///' + entry.path.replace(/\\/g, '/'), type: 'file', size: entry.size, children_count: null }) }}
+                          onClick={(e) => { e.stopPropagation(); handleLocalPlay(entry) }}
                           className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full hover:bg-accent/15 text-accent transition-all"
                           title="Play"
                         ><Play size={14} /></button>
