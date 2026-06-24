@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react'
+﻿import { useRef, useState, useEffect } from 'react'
 import { X, GripVertical, ListMusic, Trash2, History, ChevronDown, Radio } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
@@ -155,7 +155,7 @@ export default function QueuePanel(): JSX.Element {
             <div className="px-4 pt-3 pb-4">
               <p className="text-text-muted text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold flex items-center gap-1.5">
                 <Radio size={10} className="text-accent" />
-                <span className="text-accent">Radio</span>
+                <span className="text-accent">Random</span>
                 <span className="opacity-60">· Up Next</span>
               </p>
               {radioNext ? (

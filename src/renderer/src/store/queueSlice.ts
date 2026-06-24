@@ -65,6 +65,7 @@ export interface QueueSlice {
   radioNext: Track | null
   /** True when nextTrack() was called but radioNext wasn't ready yet. */
   _radioWaiting: boolean
+  radioFilter: { category: string; era: string; search: string; total: number } | null
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -159,6 +160,7 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
   radioMode: false,
   radioNext: null,
   _radioWaiting: false,
+  radioFilter: null,
 
   // ── Simple setters ─────────────────────────────────────────────────────────
   setIsPlaying: (isPlaying) => set({ isPlaying }),
@@ -192,7 +194,7 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
   },
 
   // ── startRadio ─────────────────────────────────────────────────────────────
-  startRadio: (track) => {
+  startRadio: (track, filter = null) => {
     set({
       queue: [track],
       queueIndex: 0,
@@ -202,6 +204,7 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       queueFilter: null,
       queueLoadingMore: false,
       radioMode: true,
+      radioFilter: filter,
       radioNext: null,
       _radioWaiting: false,
       progress: 0,
@@ -247,18 +250,17 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
     if (repeat === 'one') {
       nextIdx = queueIndex
     } else if (shuffle) {
-      const upcomingCount = queue.length - queueIndex - 1
-      if (upcomingCount > 0) {
-        nextIdx = queueIndex + 1 + Math.floor(Math.random() * upcomingCount)
-      } else if (repeat === 'all') {
-        const reshuffled = fisherYates(queue)
-        const first = reshuffled[0]
-        set({ queue: reshuffled, queueIndex: 0, currentTrack: first, currentTrackFull: null, isPlaying: true, progress: 0, currentTime: 0 })
-        get()._loadMore()
-        return first
-      } else {
-        set({ isPlaying: false })
-        return null
+      nextIdx = queueIndex + 1
+      if (nextIdx >= queue.length) {
+        if (repeat === 'all') {
+          const reshuffled = fisherYates(queue)
+          const first = reshuffled[0]
+          set({ queue: reshuffled, queueIndex: 0, currentTrack: first, currentTrackFull: null, isPlaying: true, progress: 0, currentTime: 0 })
+          get()._loadMore()
+          return first
+        } else {
+          set({ isPlaying: false }); return null
+        }
       }
     } else {
       nextIdx = queueIndex + 1
@@ -323,7 +325,10 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
     // Turning ON: tracker context → radio mode; otherwise shuffle the queue
     if (queueSource === 'tracker' && currentTrack) {
       set({ shuffle: true })
-      get().startRadio(currentTrack)
+      const rf = queueFilter
+        ? { category: queueFilter.category, era: queueFilter.era, search: queueFilter.search, total: queueFilter.total }
+        : null
+      get().startRadio(currentTrack, rf)
       return
     }
 

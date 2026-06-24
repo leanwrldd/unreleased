@@ -634,7 +634,7 @@ export default function ApiTrackerView(): JSX.Element {
   }
 
   const [search, setSearch] = useState(() => localStorage.getItem(LS_TRACKER_SEARCH) || '')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState(() => localStorage.getItem(LS_TRACKER_SEARCH) || '')
   const [category, setCategory] = useState<Category>('')
   const [era, setEra] = useState('')
 
