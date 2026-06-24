@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle,
-  PenLine, BookOpen, Copy, Eye, EyeOff, ChevronDown, KeyRound, Globe, RefreshCw,
+  PenLine, BookOpen, Copy, Eye, EyeOff, ChevronDown, KeyRound, Globe, RefreshCw, DownloadCloud,
   FolderOpen, Monitor, BellOff, Minus,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
@@ -48,7 +48,6 @@ export default function Settings(): JSX.Element {
   const isElectron = navigator.userAgent.includes('Electron')
   const el = (window as any).electron
 
-  // App settings (Electron only)
   const [appSettings, setAppSettings] = useState<AppSettings>({
     downloadPath: '',
     autoDownload: true,
@@ -62,16 +61,14 @@ export default function Settings(): JSX.Element {
     }).catch(() => {})
   }, [])
 
-  // Load app settings from main process
   useEffect(() => {
     if (!isElectron || !el) return
     el.getAppSettings().then((s: AppSettings) => setAppSettings(s)).catch(() => {})
   }, [isElectron, el])
 
-  // Subscribe to update status events
   useEffect(() => {
     if (!isElectron || !el) return
-    const off = el.onUpdateStatus((d: { type: string; version?: string; percent?: number; message?: string }) => {
+    const off = el.onUpdateStatus?.((d: { type: string; version?: string; percent?: number; message?: string }) => {
       if (d.type === 'checking') { setUpdateState('checking'); setUpdateVersion(null) }
       else if (d.type === 'available') { setUpdateState('available'); setUpdateVersion(d.version ?? null) }
       else if (d.type === 'not-available') { setUpdateState('latest'); setUpdateVersion(d.version ?? null); setTimeout(() => setUpdateState('idle'), 5000) }
@@ -82,7 +79,6 @@ export default function Settings(): JSX.Element {
     return () => off?.()
   }, [isElectron, el])
 
-  // Sync from store updateStatus on first render (in case it was set before Settings opened)
   useEffect(() => {
     if (!updateStatus) return
     if (updateStatus.type === 'downloading') { setUpdateState('downloading'); setUpdatePercent(updateStatus.percent ?? 0) }
@@ -133,11 +129,10 @@ export default function Settings(): JSX.Element {
                 disabled={updateState === 'checking' || updateState === 'downloading'}
                 title={updateBtnTitle}
                 onClick={async () => {
-                  if (updateState === 'downloaded') { el?.installUpdate?.(); return }
+                  if (updateState === 'downloaded') { (el as any)?.installUpdate?.(); return }
                   setUpdateState('checking')
                   try {
                     await el?.checkForUpdates()
-                    // Fallback: if events haven't updated state yet, assume up-to-date
                     setUpdateState((s: UpdateState) => s === 'checking' ? 'latest' : s)
                     setTimeout(() => setUpdateState((s: UpdateState) => s === 'latest' ? 'idle' : s), 4000)
                   } catch {
@@ -153,6 +148,15 @@ export default function Settings(): JSX.Element {
                 }`}
               >
                 <RefreshCw size={14} className={updateState === 'checking' || updateState === 'downloading' ? 'animate-spin' : ''} />
+              </button>
+            )}
+            {isElectron && updateState !== 'downloading' && updateState !== 'checking' && (
+              <button
+                title="Force reinstall latest release"
+                onClick={() => el?.forceUpdate?.()}
+                className="p-1 rounded transition-colors text-text-muted hover:text-text-primary"
+              >
+                <DownloadCloud size={14} />
               </button>
             )}
             {updateState === 'downloading' && (
@@ -248,7 +252,7 @@ export default function Settings(): JSX.Element {
                 <span className="text-text-primary text-sm">Playback speed</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-text-muted text-xs">{playbackSpeed.toFixed(2)}×</span>
+                <span className="text-text-muted text-xs">{playbackSpeed.toFixed(2)}x</span>
                 <input
                   type="range" min={0.5} max={2} step={0.05}
                   value={playbackSpeed}
@@ -314,8 +318,6 @@ export default function Settings(): JSX.Element {
           {isElectron && (
             <section>
               <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest mb-4">App</h3>
-
-              {/* Download path */}
               <div className="mb-4">
                 <div className="flex items-center gap-2 mb-2">
                   <FolderOpen size={14} className="text-text-muted" />
@@ -333,8 +335,6 @@ export default function Settings(): JSX.Element {
                   </button>
                 </div>
               </div>
-
-              {/* Startup view */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Monitor size={14} className="text-text-muted" />
@@ -352,8 +352,6 @@ export default function Settings(): JSX.Element {
                   <option value="playlists">Playlists</option>
                 </select>
               </div>
-
-              {/* Auto-update */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <BellOff size={14} className="text-text-muted" />
@@ -366,8 +364,6 @@ export default function Settings(): JSX.Element {
                   <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${appSettings.autoDownload ? 'left-5' : 'left-0.5'}`} />
                 </button>
               </div>
-
-              {/* Minimize to tray */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Minus size={14} className="text-text-muted" />
@@ -390,7 +386,7 @@ export default function Settings(): JSX.Element {
               <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">About</h3>
             </div>
             <p className="text-text-muted text-xs mb-3">
-              unreleased v1.7.8 — powered by{' '}
+              unreleased v1.7.8 &mdash; powered by{' '}
               <a href="https://juicewrldapi.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                 juicewrldapi.com
               </a>
@@ -458,7 +454,7 @@ export default function Settings(): JSX.Element {
                     title="Click to copy"
                   >
                     <code className="flex-1 text-left text-[10px] font-mono text-text-muted truncate">
-                      {getToken() ?? '—'}
+                      {getToken() ?? '&#8212;'}
                     </code>
                     <span className={`flex-shrink-0 flex items-center gap-1 text-[10px] font-medium transition-colors ${tokenCopied ? 'text-emerald-500' : 'text-text-muted group-hover:text-text-primary'}`}>
                       {tokenCopied ? 'Copied!' : <><Copy size={11} /> Copy</>}
@@ -476,25 +472,24 @@ export default function Settings(): JSX.Element {
               API Docs
             </button>
 
-            {/* FAQ accordion */}
             <div className="mt-4 rounded-xl border border-[var(--border)] overflow-hidden divide-y divide-[var(--border)]">
               {([
                 {
                   q: 'What is this?',
-                  a: 'The Juice WRLD API is a RESTful API providing access to a comprehensive database of Juice WRLD\'s songs, albums, and eras. With this API, you can explore detailed information about Juice WRLD\'s discography, including release dates, song types, album details, and more. Whether you\'re a fan, developer, or researcher, this API offers the tools you need to dive deep into Juice WRLD\'s music.',
+                  a: "The Juice WRLD API is a RESTful API providing access to a comprehensive database of Juice WRLD songs, albums, and eras. Whether you are a fan, developer, or researcher, this API offers the tools you need to dive deep into Juice WRLD music.",
                   link: { text: 'Check out the documentation to get started.', href: 'https://juicewrldapi.com/docs' },
                 },
                 {
                   q: 'Who are you?',
-                  a: 'We are passionate Juice WRLD fans and developers who wanted to create an accessible platform for others to explore and analyze Juice WRLD\'s musical legacy. This project is a labor of love, driven by a deep appreciation for Juice WRLD\'s impact on music and culture.',
+                  a: "We are passionate Juice WRLD fans and developers who wanted to create an accessible platform for others to explore and analyze Juice WRLD musical legacy.",
                 },
                 {
                   q: 'Why did you build this?',
-                  a: 'We built this API to celebrate Juice WRLD\'s legacy by making his music and history more accessible to fans and developers alike. It\'s a valuable resource for anyone interested in Juice WRLD\'s discography.',
+                  a: "We built this API to celebrate Juice WRLD legacy by making his music and history more accessible to fans and developers alike.",
                 },
                 {
                   q: 'Technical stuff?',
-                  a: 'The Juice WRLD API is built with Django and PostgreSQL, hosted on secure cloud servers with enterprise-grade security. This player (unreleased) is built with React, TypeScript, Vite, and Tailwind CSS. All API data is served as JSON for easy integration.',
+                  a: 'The Juice WRLD API is built with Django and PostgreSQL. This player (unreleased) is built with React, TypeScript, Vite, and Tailwind CSS.',
                 },
               ] as { q: string; a: string; link?: { text: string; href: string } }[]).map(({ q, a, link }) => (
                 <div key={q}>
