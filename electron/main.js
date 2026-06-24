@@ -518,4 +518,5 @@ autoUpdater.on('update-downloaded', (info) => {
 
 autoUpdater.on('error', (err) => {
   log('Auto-updater error:', err.message)
-  mainWindow?.webC
+  mainWindow?.webContents.send('update-status', { type: 'error', message: err.message })
+})
