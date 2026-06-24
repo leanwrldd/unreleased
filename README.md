@@ -73,13 +73,8 @@ npm run preview
 
 ## To-dos
 
-- Add synced lyrics from API
-- Add synced lyrics editor
-- Rework compilation UI
 - Add "similar songs" feature
 - Add CDQ remasters of unsurfaced songs
-- Add submission / contribute page
-- Add editor dashboard (lyrics coverage stats, etc.)
 
 ---
 
