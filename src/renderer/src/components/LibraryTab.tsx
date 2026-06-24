@@ -52,9 +52,10 @@ function AlbumArtThumb({ track, size = 48 }: { track: LibraryTrack; size?: numbe
   }, [track.albumArt])
 
   useEffect(() => {
-    if (!el || !track.hasAlbumArt || track.albumArt) return
+    if (!el || track.albumArt !== undefined) return
     el.readAlbumArt(track.filePath).then((a: string | null) => {
-      if (a) { setArt(a); updateLibraryTrack(track.id, { albumArt: a }) }
+      updateLibraryTrack(track.id, { albumArt: a ?? null })
+      if (a) setArt(a)
     })
   }, [track.id])
 

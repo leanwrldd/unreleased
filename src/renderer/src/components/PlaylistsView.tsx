@@ -191,6 +191,8 @@ export default function PlaylistsView(): JSX.Element {
   const [trackMenu, setTrackMenu] = useState<TrackMenuState | null>(null)
   const [libMenu, setLibMenu] = useState<LibMenuState | null>(null)
   const [localCardMenu, setLocalCardMenu] = useState<{ id: string; name: string; x: number; y: number } | null>(null)
+  const [localRenaming, setLocalRenaming] = useState(false)
+  const [localRenameVal, setLocalRenameVal] = useState('')
   const [showAddAllMenu, setShowAddAllMenu] = useState(false)
   const addAllMenuRef = useRef<HTMLDivElement>(null)
 
@@ -1089,8 +1091,6 @@ export default function PlaylistsView(): JSX.Element {
     const localTracks = localPl.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter(Boolean) as LibraryTrack[]
     const localQTracks: Track[] = localTracks.map(libTrackToTrack)
     const localDurLabel = totalDurationLabel(localQTracks)
-    const [localRenaming, setLocalRenaming] = React.useState(false)
-    const [localRenameVal, setLocalRenameVal] = React.useState('')
 
     return (
       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden">
@@ -1255,9 +1255,9 @@ export default function PlaylistsView(): JSX.Element {
           </button>
 
           {playlists.map(p => (
-            <button key={p.id} onClick={() => setSelectedId(p.id)}
+            <div key={p.id} className="group text-left relative cursor-pointer"
+              onClick={() => setSelectedId(p.id)}
               onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setLibMenu({ playlist: p, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
-              className="group text-left"
             >
               <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
                 {covers[p.id] === undefined ? (
@@ -1279,9 +1279,16 @@ export default function PlaylistsView(): JSX.Element {
                   )
                 })()}
               </div>
+              {/* Context menu button */}
+              <button
+                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
+                onClick={e => { e.stopPropagation(); setLibMenu({ playlist: p, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+              >
+                <MoreHorizontal size={13} />
+              </button>
               <p className="text-text-primary text-sm font-semibold truncate">{p.name}</p>
               <p className="text-text-muted text-xs mt-0.5">{p.track_count} {p.track_count === 1 ? 'track' : 'tracks'}</p>
-            </button>
+            </div>
           ))}
 
           {/* Local playlists */}
