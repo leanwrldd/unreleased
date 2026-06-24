@@ -270,6 +270,189 @@ ipcMain.handle('set-app-setting', (_, key, value) => {
   return true
 })
 
+
+// ── IPC: library management ───────────────────────────────────────────────────
+
+const AUDIO_EXTS = new Set(['.mp3', '.flac', '.aac', '.m4a', '.ogg', '.opus', '.wav', '.wma', '.aiff', '.ape', '.wv'])
+
+const libraryDataPath = path.join(app.getPath('userData'), 'library-data.json')
+const localPlaylistsPath = path.join(app.getPath('userData'), 'local-playlists.json')
+
+function loadLibraryData() {
+  try { return JSON.parse(fs.readFileSync(libraryDataPath, 'utf-8')) } catch { return { tracks: [], folders: [], lastScanned: null } }
+}
+function saveLibraryData(data) {
+  try { fs.writeFileSync(libraryDataPath, JSON.stringify(data)) } catch(e) { log('saveLibraryData error:', e.message) }
+}
+function loadLocalPlaylists() {
+  try { return JSON.parse(fs.readFileSync(localPlaylistsPath, 'utf-8')) } catch { return [] }
+}
+function saveLocalPlaylists(playlists) {
+  try { fs.writeFileSync(localPlaylistsPath, JSON.stringify(playlists)) } catch(e) { log('saveLocalPlaylists error:', e.message) }
+}
+
+ipcMain.handle('load-library-data', () => loadLibraryData())
+ipcMain.handle('save-library-data', (_, data) => { saveLibraryData(data); return true })
+ipcMain.handle('load-local-playlists', () => loadLocalPlaylists())
+ipcMain.handle('save-local-playlists', (_, playlists) => { saveLocalPlaylists(playlists); return true })
+
+ipcMain.handle('scan-library', async (_, folders) => {
+  let mm
+  try { mm = require('music-metadata') } catch(e) { return { error: 'music-metadata not installed: ' + e.message, tracks: [] } }
+
+  const tracks = []
+  const errors = []
+
+  async function scanDir(dirPath) {
+    let entries
+    try { entries = fs.readdirSync(dirPath, { withFileTypes: true }) } catch { return }
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue
+      const fullPath = path.join(dirPath, entry.name)
+      if (entry.isDirectory()) {
+        await scanDir(fullPath)
+      } else if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase()
+        if (!AUDIO_EXTS.has(ext)) continue
+        try {
+          const metadata = await mm.parseFile(fullPath, { duration: true, skipCovers: true })
+          const common = metadata.common
+          const format = metadata.format
+          const stat = fs.statSync(fullPath)
+          tracks.push({
+            id: 'local-' + fullPath,
+            filePath: fullPath,
+            ext: ext.slice(1),
+            title: common.title || entry.name.replace(/\.[^.]+$/, ''),
+            artist: (common.artists || []).join(', ') || common.artist || '',
+            album: common.album || '',
+            albumArtist: common.albumartist || '',
+            year: common.year || null,
+            trackNumber: common.track?.no || null,
+            discNumber: common.disk?.no || null,
+            composer: (common.composer || []).join(', '),
+            genre: (common.genre || []).join(', '),
+            duration: format.duration || 0,
+            bitrate: format.bitrate ? Math.round(format.bitrate / 1000) : null,
+            sampleRate: format.sampleRate || null,
+            fileSize: stat.size,
+            lastModified: stat.mtimeMs,
+            hasAlbumArt: (common.picture && common.picture.length > 0) ? true : false,
+            addedAt: Date.now(),
+            // Not included: albumArt base64 (loaded on-demand), lyrics
+          })
+        } catch(e) {
+          errors.push({ path: fullPath, error: e.message })
+        }
+      }
+    }
+  }
+
+  for (const folder of folders) {
+    await scanDir(folder)
+  }
+
+  return { tracks, errors }
+})
+
+ipcMain.handle('read-album-art', async (_, filePath) => {
+  let mm
+  try { mm = require('music-metadata') } catch { return null }
+  try {
+    const metadata = await mm.parseFile(filePath, { skipCovers: false, duration: false })
+    const pic = metadata.common.picture?.[0]
+    if (!pic) return null
+    const b64 = Buffer.from(pic.data).toString('base64')
+    return `data:${pic.format};base64,${b64}`
+  } catch { return null }
+})
+
+ipcMain.handle('read-track-metadata', async (_, filePath) => {
+  let mm
+  try { mm = require('music-metadata') } catch { return null }
+  try {
+    const metadata = await mm.parseFile(filePath, { skipCovers: false, duration: true })
+    const common = metadata.common
+    const format = metadata.format
+    const pic = common.picture?.[0]
+    const albumArt = pic ? `data:${pic.format};base64,${Buffer.from(pic.data).toString('base64')}` : null
+    return {
+      title: common.title || '',
+      artist: (common.artists || []).join(', ') || common.artist || '',
+      album: common.album || '',
+      albumArtist: common.albumartist || '',
+      year: common.year || null,
+      trackNumber: common.track?.no || null,
+      discNumber: common.disk?.no || null,
+      composer: (common.composer || []).join(', '),
+      genre: (common.genre || []).join(', '),
+      lyrics: common.lyrics?.[0]?.text || '',
+      syncedLyrics: common.lyrics?.find(l => l.syncText)?.syncText?.map(s => `[${formatTime(s.timestamp)}]${s.text}`).join('\n') || '',
+      albumArt,
+      bitrate: format.bitrate ? Math.round(format.bitrate / 1000) : null,
+      sampleRate: format.sampleRate || null,
+      duration: format.duration || 0,
+    }
+  } catch(e) { return { error: e.message } }
+})
+
+function formatTime(ms) {
+  const total = Math.floor(ms / 1000)
+  const min = Math.floor(total / 60).toString().padStart(2, '0')
+  const sec = (total % 60).toString().padStart(2, '0')
+  const msRem = (ms % 1000).toString().padStart(3, '0')
+  return `${min}:${sec}.${msRem}`
+}
+
+ipcMain.handle('write-track-metadata', async (_, filePath, metadata) => {
+  const ext = path.extname(filePath).toLowerCase()
+  if (ext !== '.mp3') return { error: 'Only MP3 metadata writing is supported currently' }
+  let NodeID3
+  try { NodeID3 = require('node-id3') } catch { return { error: 'node-id3 not installed' } }
+  try {
+    const tags = {}
+    if (metadata.title !== undefined) tags.title = metadata.title
+    if (metadata.artist !== undefined) tags.artist = metadata.artist
+    if (metadata.album !== undefined) tags.album = metadata.album
+    if (metadata.albumArtist !== undefined) tags.performerInfo = metadata.albumArtist
+    if (metadata.year !== undefined) tags.year = metadata.year != null ? String(metadata.year) : ''
+    if (metadata.trackNumber !== undefined) tags.trackNumber = metadata.trackNumber != null ? String(metadata.trackNumber) : ''
+    if (metadata.composer !== undefined) tags.composer = metadata.composer
+    if (metadata.genre !== undefined) tags.genre = metadata.genre
+    if (metadata.lyrics !== undefined) tags.unsynchronisedLyrics = { language: 'eng', text: metadata.lyrics }
+    if (metadata.albumArtBase64 !== undefined && metadata.albumArtBase64) {
+      // albumArtBase64 is a data URL: "data:<mime>;base64,<data>"
+      const match = metadata.albumArtBase64.match(/^data:([^;]+);base64,(.+)$/)
+      if (match) {
+        tags.image = {
+          mime: match[1],
+          type: { id: 3, name: 'front cover' },
+          description: 'Cover',
+          imageBuffer: Buffer.from(match[2], 'base64'),
+        }
+      }
+    }
+    const result = NodeID3.update(tags, filePath)
+    if (result === false) return { error: 'Failed to write tags' }
+    return { success: true }
+  } catch(e) { return { error: e.message } }
+})
+
+ipcMain.handle('select-image-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] }],
+    title: 'Select album art',
+  })
+  if (result.canceled || !result.filePaths[0]) return null
+  try {
+    const buf = fs.readFileSync(result.filePaths[0])
+    const ext = path.extname(result.filePaths[0]).toLowerCase()
+    const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg'
+    return `data:${mime};base64,${buf.toString('base64')}`
+  } catch { return null }
+})
+
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 app.whenReady().then(() => {
   createWindow()
@@ -335,5 +518,4 @@ autoUpdater.on('update-downloaded', (info) => {
 
 autoUpdater.on('error', (err) => {
   log('Auto-updater error:', err.message)
-  mainWindow?.webContents.send('update-status', { type: 'error', message: err.message })
-})
+  mainWindow?.webC

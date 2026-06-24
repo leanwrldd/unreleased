@@ -14,10 +14,23 @@ contextBridge.exposeInMainWorld('electron', {
   browseLocal: (dirPath) => ipcRenderer.invoke('browse-local', dirPath),
   pickFolder:  ()        => ipcRenderer.invoke('pick-folder'),
   openPath:    (p)       => ipcRenderer.invoke('open-path', p),
+  selectImageFile: ()    => ipcRenderer.invoke('select-image-file'),
 
   // App settings
   getAppSettings:  ()           => ipcRenderer.invoke('get-app-settings'),
   setAppSetting:   (key, value) => ipcRenderer.invoke('set-app-setting', key, value),
+
+  // Library
+  loadLibraryData:    ()              => ipcRenderer.invoke('load-library-data'),
+  saveLibraryData:    (data)          => ipcRenderer.invoke('save-library-data', data),
+  scanLibrary:        (folders)       => ipcRenderer.invoke('scan-library', folders),
+  readAlbumArt:       (filePath)      => ipcRenderer.invoke('read-album-art', filePath),
+  readTrackMetadata:  (filePath)      => ipcRenderer.invoke('read-track-metadata', filePath),
+  writeTrackMetadata: (filePath, meta) => ipcRenderer.invoke('write-track-metadata', filePath, meta),
+
+  // Local playlists
+  loadLocalPlaylists: ()          => ipcRenderer.invoke('load-local-playlists'),
+  saveLocalPlaylists: (playlists) => ipcRenderer.invoke('save-local-playlists', playlists),
 
   // Update status events (returns cleanup fn)
   onUpdateStatus: (cb) => {

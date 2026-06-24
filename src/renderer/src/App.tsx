@@ -14,6 +14,7 @@ function getViewFromPath(pathname: string): ViewType {
   if (pathname === '/docs') return 'docs'
   if (pathname === '/wrld') return 'wrld'
   if (pathname.startsWith('/shared/')) return 'shared-playlist'
+  if (pathname === '/library') return 'library'
   if (pathname === '/auth/discord/callback') return 'api-tracker'
   return 'not-found'
 }
@@ -39,6 +40,7 @@ import NowPlaying from './components/NowPlaying'
 import QueuePanel from './components/QueuePanel'
 import Settings from './components/Settings'
 import DownloadManager from './components/DownloadManager'
+import LibraryTab from './components/LibraryTab'
 import ErrorBoundary from './components/ErrorBoundary'
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -78,7 +80,7 @@ function WindowControls(): JSX.Element {
 }
 
 export default function App(): JSX.Element {
-  const { showNowPlaying, showQueue, showSettings, activeView, theme, accentColor, loadAccount, completeDiscordLogin, showUserAuth, setShowUserAuth } = useStore()
+  const { showNowPlaying, showQueue, showSettings, activeView, theme, accentColor, loadAccount, completeDiscordLogin, showUserAuth, setShowUserAuth, loadLibrary } = useStore()
   // Seed auth token from env in local dev — always override so the token stays fresh
   useEffect(() => {
     const devToken = import.meta.env.VITE_AUTH_TOKEN as string | undefined
@@ -161,6 +163,7 @@ export default function App(): JSX.Element {
               : activeView === 'editor-profile' ? <EditorProfileView />
               : activeView === 'docs' ? <DocsPage />
               : activeView === 'wrld' ? <WrldView />
+              : activeView === 'library' ? <LibraryTab />
               : activeView === 'not-found' ? <NotFoundView />
               : <ApiTrackerView />}
           </ErrorBoundary>
