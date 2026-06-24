@@ -592,8 +592,7 @@ type LibView = 'albums' | 'songs'
 
 export default function LibraryTab(): JSX.Element {
   const {
-    libraryTracks, libraryScanning, localPlaylists,
-    activeLocalPlaylistId, setActiveLocalPlaylistId,
+    libraryTracks, libraryScanning,
     scanLibrary, libraryFolders, loadLibrary,
     setShowSettings, playTrack,
   } = useStore()
@@ -636,7 +635,6 @@ export default function LibraryTab(): JSX.Element {
     return albums.filter(a => a.name.toLowerCase().includes(q) || a.artist.toLowerCase().includes(q))
   }, [albums, searchQ])
 
-  const activePlaylist = localPlaylists.find(p => p.id === activeLocalPlaylistId) ?? null
 
   const playAll = () => {
     if (!filteredTracks.length) return
@@ -654,20 +652,17 @@ export default function LibraryTab(): JSX.Element {
 
   return (
     <div className="flex-1 flex overflow-hidden bg-[var(--bg)]">
-      {/* Playlists sidebar */}
-      <PlaylistsSidebar onSelect={setActiveLocalPlaylistId} activeId={activeLocalPlaylistId} />
-
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar */}
-        <div className="shrink-0 flex items-center gap-3 px-5 py-3 border-b border-[var(--border)]" style={{ WebkitAppRegion: 'no-drag', paddingRight: isElectron ? '148px' : undefined } as React.CSSProperties}>
+        <div className="shrink-0 flex items-center gap-3 px-5 py-3 border-b border-[var(--border)]" style={{ WebkitAppRegion: 'no-drag', paddingRight: isElectron ? '160px' : undefined } as React.CSSProperties}>
           {selectedAlbum && (
             <button onClick={() => setSelectedAlbum(null)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] transition-colors">
               <ChevronLeft size={16} />
             </button>
           )}
 
-          {!selectedAlbum && !activePlaylist && (
+          {!selectedAlbum && (
             <>
               <div className="flex items-center gap-1 bg-[var(--surface-overlay)] rounded-lg p-0.5">
                 <button onClick={() => setLibView('albums')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${libView === 'albums' ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
@@ -713,9 +708,9 @@ export default function LibraryTab(): JSX.Element {
             </>
           )}
 
-          {(selectedAlbum || activePlaylist) && (
+          {selectedAlbum && (
             <h2 className="text-[var(--text-primary)] font-semibold text-base">
-              {selectedAlbum?.name ?? activePlaylist?.name}
+              {selectedAlbum.name}
             </h2>
           )}
         </div>
@@ -728,8 +723,6 @@ export default function LibraryTab(): JSX.Element {
             <Loader2 size={32} className="animate-spin text-[var(--accent)]" />
             <p className="text-[var(--text-muted)] text-sm">Scanning your library…</p>
           </div>
-        ) : activePlaylist ? (
-          <PlaylistDetail playlist={activePlaylist} onEdit={setEditingTrack} onAddToPlaylist={setAddToPlaylistTrack} />
         ) : selectedAlbum ? (
           <AlbumDetail album={selectedAlbum} onBack={() => setSelectedAlbum(null)} onEdit={setEditingTrack} onAddToPlaylist={setAddToPlaylistTrack} />
         ) : libView === 'albums' ? (

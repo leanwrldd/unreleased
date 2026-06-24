@@ -80,6 +80,11 @@ npm run preview
 
 ## Changelog
 
+### v1.8.3
+- **Fix** Window controls overlap in Library toolbar
+- **Improve** Local playlists moved exclusively to Playlists tab
+- **New** Local playlists visible without login
+
 See [CHANGELOG.md](./CHANGELOG.md) for the full history.
 ### v1.7.1 - 2026-06-20
 - New WRLD view: 999 FM live radio integration — toggle streams live audio with real-time metadata (cover art, title, artist, elapsed/duration)
