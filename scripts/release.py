@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 release.py — Full automated release for Unreleased Music Player.
 
@@ -204,7 +204,7 @@ def main():
     run(r"node_modules\.bin\vite.cmd build")
     run("git add -A")
     run(f'git commit -m "v{ver}"')
-    run("git push origin web")
+    run("git push origin web --force")
 
     # back to app
     git_checkout("app")
