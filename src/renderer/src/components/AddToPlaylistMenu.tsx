@@ -8,11 +8,14 @@ interface Props {
   onClose: () => void
   onAdded?: () => void
   placement?: 'top' | 'bottom'
+  /** Override the outer positioning class — use when rendering inside a portal */
+  anchorClass?: string
 }
 
-export default function AddToPlaylistMenu({ songId, onClose, onAdded, placement = 'bottom' }: Props): JSX.Element {
+export default function AddToPlaylistMenu({ songId, onClose, onAdded, placement = 'bottom', anchorClass }: Props): JSX.Element {
   const { playlists, account, refreshPlaylists, setShowUserAuth } = useStore()
   const verticalClass = placement === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+  const posClass = anchorClass ?? `absolute right-0 ${verticalClass} z-50`
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [busyId, setBusyId] = useState<number | 'new' | null>(null)
@@ -29,7 +32,7 @@ export default function AddToPlaylistMenu({ songId, onClose, onAdded, placement 
 
   if (!account) {
     return (
-      <div ref={ref} className={`absolute right-0 ${verticalClass} z-50 w-56 bg-surface border border-[var(--border)] rounded-xl shadow-2xl p-3`}>
+      <div ref={ref} className={`${posClass} w-56 bg-surface border border-[var(--border)] rounded-xl shadow-2xl p-3`}>
         <p className="text-xs text-text-muted mb-2">Log in to save tracks to playlists.</p>
         <button
           onClick={() => { onClose(); setShowUserAuth(true) }}
@@ -69,7 +72,7 @@ export default function AddToPlaylistMenu({ songId, onClose, onAdded, placement 
   }
 
   return (
-    <div ref={ref} className={`absolute right-0 ${verticalClass} z-50 w-60 bg-surface border border-[var(--border)] rounded-xl shadow-2xl overflow-hidden`}>
+    <div ref={ref} className={`${posClass} w-60 bg-surface border border-[var(--border)] rounded-xl shadow-2xl overflow-hidden`}>
       <div className="px-3 py-2 border-b border-[var(--border)] text-[11px] uppercase tracking-wider text-text-muted font-semibold">
         Add to playlist
       </div>

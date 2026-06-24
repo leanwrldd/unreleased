@@ -19,6 +19,13 @@ import * as userApi from '../lib/userApi'
 type Category = 'released' | 'unreleased' | 'unsurfaced' | 'recording_session' | ''
 type ViewMode = 'list' | 'grid'
 
+const CATEGORY_COLORS: Record<string, string> = {
+  released:          'text-emerald-400 bg-emerald-400/10 border-emerald-400/25',
+  unreleased:        'text-blue-400   bg-blue-400/10   border-blue-400/25',
+  unsurfaced:        'text-amber-400  bg-amber-400/10  border-amber-400/25',
+  recording_session: 'text-purple-400 bg-purple-400/10 border-purple-400/25',
+}
+
 const PAGE_SIZE = 50
 const LS_TRACKER_VIEW = 'api-tracker:viewMode'
 const LS_TRACKER_SIDEBAR = 'api-tracker:showSidebar'
@@ -350,6 +357,7 @@ function SongActions({
     <>
       <button
         className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all shrink-0"
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => { e.stopPropagation(); onInfo() }}
         title="Song info"
       >
@@ -357,6 +365,7 @@ function SongActions({
       </button>
       <button
         className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-surface-raised text-text-muted hover:text-text-primary transition-all shrink-0"
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => { e.stopPropagation(); onContextMenu(e) }}
         title="More options"
       >
@@ -429,7 +438,7 @@ function SongRow({
       )}
       <button
         onClick={() => onCategoryClick(song.category as Category)}
-        className="hidden md:block text-xs px-1.5 py-0.5 rounded border border-[var(--border)] bg-surface text-text-muted shrink-0 w-24 text-center hover:border-accent/40 hover:text-accent transition-colors"
+        className={`hidden md:block text-xs px-1.5 py-0.5 rounded border shrink-0 w-24 text-center transition-colors hover:opacity-80 ${CATEGORY_COLORS[song.category] ?? 'text-text-muted bg-surface border-[var(--border)]'}`}
         title="Filter by category"
       >
         {CATEGORY_LABELS[song.category] ?? song.category}
@@ -445,6 +454,7 @@ function SongRow({
       <div className="md:hidden flex items-center shrink-0">
         <button
           className="p-2 text-text-muted active:text-accent transition-colors"
+          onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onContextMenu(song, e) }}
           title="More options"
         >
@@ -529,7 +539,7 @@ function SongCard({
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onCategoryClick(song.category as Category) }}
-            className="text-[9px] uppercase tracking-wide text-accent/80 bg-accent/10 border border-accent/20 px-1.5 py-0.5 rounded shrink-0 hover:bg-accent/20 transition-colors"
+            className={`text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded border shrink-0 transition-colors hover:opacity-80 ${CATEGORY_COLORS[song.category] ?? 'text-accent/80 bg-accent/10 border-accent/20'}`}
           >
             {CATEGORY_LABELS[song.category] ?? song.category}
           </button>

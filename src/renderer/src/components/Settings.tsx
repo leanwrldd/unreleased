@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import {
   X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle,
   PenLine, BookOpen, Copy, Eye, EyeOff, ChevronDown, KeyRound, Globe, RefreshCw, DownloadCloud,
@@ -433,7 +433,7 @@ export default function Settings(): JSX.Element {
               <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">About</h3>
             </div>
             <p className="text-text-muted text-xs mb-3">
-              unreleased v1.8.0 &mdash; powered by{' '}
+              unreleased v1.8.2 &mdash; powered by{' '}
               <a href="https://juicewrldapi.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                 juicewrldapi.com
               </a>

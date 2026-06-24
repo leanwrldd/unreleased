@@ -13,7 +13,7 @@ export default function QueuePanel(): JSX.Element {
   const {
     queue, queueIndex, currentTrack, isPlaying, shuffle, queueFilter, queueLoadingMore,
     radioMode, radioNext,
-    setShowQueue, removeFromQueue, clearQueue, reorderQueue, playTrack,
+    setShowQueue, removeFromQueue, clearQueue, reorderQueue, playTrack, jumpToTrack,
   } = useStore()
 
   const [panelWidth, dragHandle] = useResizablePanel(300, 240, 480)
@@ -118,7 +118,7 @@ export default function QueuePanel(): JSX.Element {
                       track={track}
                       isActive={false}
                       isPlaying={false}
-                      onPlay={() => playTrack(track)}
+                      onPlay={() => radioMode ? jumpToTrack(track) : playTrack(track)}
                     />
                   ))}
                   {history.length > MAX_HISTORY_SHOWN && (

@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+﻿import { create } from 'zustand'
 import { ViewType, SortField, SortDir, Cols, FullTrack, LibraryTrack, LocalPlaylist } from '../types'
 import * as userApi from '../lib/userApi'
 import type { AccountUser, PlaylistSummary } from '../lib/userApi'
@@ -398,9 +398,13 @@ export const useStore = create<AppStore>((set, get, store) => ({
   activeLocalPlaylistId: null,
 
   setLibraryTracks: (libraryTracks) => set({ libraryTracks }),
-  updateLibraryTrack: (id, updates) => set((s) => ({
-    libraryTracks: s.libraryTracks.map((t) => t.id === id ? { ...t, ...updates } : t),
-  })),
+  updateLibraryTrack: (id, updates) => set((s) => {
+    const newLib = s.libraryTracks.map((t) => t.id === id ? { ...t, ...updates } : t)
+    const newQueue = updates.albumArt
+      ? s.queue.map((t) => t.id === id ? { ...t, imageUrl: updates.albumArt as string } : t)
+      : s.queue
+    return { libraryTracks: newLib, queue: newQueue }
+  }),
   setLibraryFolders: (libraryFolders) => {
     set({ libraryFolders })
     ls.set('libraryFolders', libraryFolders)

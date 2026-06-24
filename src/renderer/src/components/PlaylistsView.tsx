@@ -1,14 +1,14 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   ListMusic, Play, Loader2, Plus, Trash2, Pencil, ArrowLeft,
   X, Check, Heart, Shuffle, Music2, Clock, GripVertical,
   ListPlus, Download, Share2, Archive, Info, FolderInput, MoreHorizontal,
-  Search, ChevronUp, ChevronDown, ImageOff, Globe, Lock, Link, ListEnd,
+  Search, ChevronUp, ChevronDown, ImageOff, Globe, Lock, Link, ListEnd, HardDrive,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
 import type { PlaylistDetail, PlaylistSummary } from '../lib/userApi'
-import { Track } from '../types'
+import { Track, LocalPlaylist, LibraryTrack } from '../types'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 import { buildImageUrl, buildStreamUrl, JWAPI_BASE, apiFetch, JWApiSong, playlistCoverUrl } from '../lib/juicewrldApi'
 import { formatDuration } from '../lib/lyrics'
@@ -123,12 +123,61 @@ function SortHeader({ label, field, sort, onSort }: {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+// ── Local-library helpers ─────────────────────────────────────────────────────
+
+function libTrackToTrack(t: LibraryTrack): Track {
+  return {
+    id: t.id,
+    path: t.filePath,
+    streamUrl: 'file:///' + t.filePath.replace(/\\/g, '/'),
+    imageUrl: t.albumArt || '',
+    title: t.title,
+    artist: t.artist,
+    album: t.album,
+    albumArtist: t.albumArtist,
+    year: t.year,
+    trackNumber: t.trackNumber,
+    duration: t.duration,
+    genre: t.genre,
+    hasAlbumArt: t.hasAlbumArt,
+  } as Track
+}
+
+function LocalPlaylistMosaic({ trackIds, libraryTracks, className = '' }: {
+  trackIds: string[]; libraryTracks: LibraryTrack[]; className?: string
+}): JSX.Element {
+  const artTracks = trackIds
+    .map(id => libraryTracks.find(t => t.id === id))
+    .filter((t): t is LibraryTrack => !!t?.albumArt)
+    .slice(0, 4)
+  if (artTracks.length === 0) {
+    return (
+      <div className={`bg-gradient-to-br from-accent/40 to-accent/10 flex items-center justify-center ${className}`}>
+        <HardDrive size={32} className="text-accent/50" />
+      </div>
+    )
+  }
+  if (artTracks.length < 4) {
+    return <img src={artTracks[0].albumArt!} alt="" className={`object-cover ${className}`} />
+  }
+  return (
+    <div className={`grid grid-cols-2 ${className}`} style={{ overflow: 'hidden' }}>
+      {artTracks.map((t, i) => (
+        <img key={i} src={t.albumArt!} alt="" className="w-full h-full object-cover" style={{ aspectRatio: '1' }} />
+      ))}
+    </div>
+  )
+}
+
+
 export default function PlaylistsView(): JSX.Element {
-  const { account, playlists, refreshPlaylists, playTrack, addToQueue, setShowUserAuth, likedTrackIds, setActiveView, setPendingEditorSongId } = useStore()
+  const { account, playlists, refreshPlaylists, playTrack, addToQueue, setShowUserAuth, likedTrackIds, setActiveView, setPendingEditorSongId,
+    localPlaylists, libraryTracks, loadLibrary, deleteLocalPlaylist, renameLocalPlaylist } = useStore()
   const canEdit = !!(account?.is_editor || account?.is_administrator)
 
   const [showLiked, setShowLiked] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [localSelectedId, setLocalSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<PlaylistDetail | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
 
@@ -248,9 +297,12 @@ export default function PlaylistsView(): JSX.Element {
     }
   }, [detail])
 
+  // Load local library so playlist tracks resolve
+  useEffect(() => { loadLibrary() }, [])
+
   // Listen for sidebar "Playlists" re-click → go back to library
   useEffect(() => {
-    const h = () => { setSelectedId(null); setRenaming(false); setSearch(''); setSort({ field: 'default', dir: 'asc' }); setIsSharedView(false) }
+    const h = () => { setSelectedId(null); setLocalSelectedId(null); setRenaming(false); setSearch(''); setSort({ field: 'default', dir: 'asc' }); setIsSharedView(false) }
     window.addEventListener('playlists:back', h)
     return () => window.removeEventListener('playlists:back', h)
   }, [])
@@ -932,6 +984,124 @@ export default function PlaylistsView(): JSX.Element {
     )
   }
 
+  // ── Local playlist detail ─────────────────────────────────────────────────
+
+  if (localSelectedId !== null) {
+    const localPl = localPlaylists.find(p => p.id === localSelectedId)
+    if (!localPl) { setLocalSelectedId(null); return <div /> }
+    const localTracks = localPl.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter(Boolean) as LibraryTrack[]
+    const localQTracks: Track[] = localTracks.map(libTrackToTrack)
+    const localDurLabel = totalDurationLabel(localQTracks)
+    const [localRenaming, setLocalRenaming] = React.useState(false)
+    const [localRenameVal, setLocalRenameVal] = React.useState('')
+
+    return (
+      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden">
+        {/* Back */}
+        <div className="px-6 pt-5 shrink-0">
+          <button onClick={() => setLocalSelectedId(null)} className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-sm transition-colors mb-4">
+            <ArrowLeft size={15} /> Playlists
+          </button>
+        </div>
+
+        {/* Hero */}
+        <div className="relative px-6 pb-6 shrink-0">
+          <div className="relative z-10 flex gap-6 items-end">
+            <div className="shrink-0 rounded-xl shadow-2xl overflow-hidden" style={{ width: 180, height: 180 }}>
+              <LocalPlaylistMosaic trackIds={localPl.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
+            </div>
+            <div className="min-w-0 flex-1 pb-1">
+              <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-2">Local Playlist</p>
+              {localRenaming ? (
+                <div className="flex items-center gap-2 mb-3">
+                  <input value={localRenameVal} onChange={e => setLocalRenameVal(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { renameLocalPlaylist(localPl.id, localRenameVal.trim() || localPl.name); setLocalRenaming(false) } }}
+                    autoFocus className="bg-surface-overlay border border-[var(--border)] rounded-lg px-3 py-2 text-text-primary text-2xl font-black focus:outline-none focus:border-accent/50 w-full" />
+                  <button onClick={() => { renameLocalPlaylist(localPl.id, localRenameVal.trim() || localPl.name); setLocalRenaming(false) }} className="p-2 rounded-lg bg-accent/15 text-accent shrink-0"><Check size={16} /></button>
+                  <button onClick={() => setLocalRenaming(false)} className="p-2 rounded-lg text-text-muted hover:text-text-primary shrink-0"><X size={16} /></button>
+                </div>
+              ) : (
+                <h1 className="text-text-primary text-3xl md:text-4xl font-black truncate mb-2">{localPl.name}</h1>
+              )}
+              <div className="flex items-center gap-1.5 text-text-muted text-sm mb-4">
+                <HardDrive size={12} className="shrink-0" />
+                <span>Local</span>
+                <span>·</span>
+                <span>{localTracks.length} {localTracks.length === 1 ? 'track' : 'tracks'}</span>
+                {localDurLabel && <><span>·</span><span className="flex items-center gap-1"><Clock size={12} />{localDurLabel}</span></>}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {localQTracks.length > 0 && (
+                  <button onClick={() => playTrack(localQTracks[0], localQTracks)} className="flex items-center gap-2 px-6 py-3 rounded-full bg-accent text-black text-sm font-bold hover:scale-105 active:scale-95 transition-transform shadow-lg">
+                    <Play size={17} fill="currentColor" /> Play
+                  </button>
+                )}
+                {localQTracks.length > 1 && (
+                  <button onClick={() => { const s = [...localQTracks].sort(() => Math.random() - 0.5); playTrack(s[0], s) }} className="flex items-center gap-2 px-4 py-3 rounded-full bg-surface-overlay hover:bg-surface-raised text-text-primary text-sm font-semibold transition-colors border border-[var(--border)]">
+                    <Shuffle size={15} /> Shuffle
+                  </button>
+                )}
+                {!localRenaming && (
+                  <button onClick={() => { setLocalRenameVal(localPl.name); setLocalRenaming(true) }} className="p-2.5 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-overlay text-sm transition-colors">
+                    <Pencil size={15} />
+                  </button>
+                )}
+                <button onClick={() => { deleteLocalPlaylist(localPl.id); setLocalSelectedId(null) }} className="p-2.5 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 text-sm transition-colors">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-[var(--border)] mx-6 mb-3 shrink-0" />
+
+        {/* Track list */}
+        {localTracks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-40 gap-2 text-center px-8">
+            <Music2 className="text-text-muted opacity-20" size={40} />
+            <p className="text-text-muted text-sm">This playlist is empty.</p>
+            <p className="text-text-muted text-xs">Add tracks from the Library tab.</p>
+          </div>
+        ) : (
+          <div className="px-2 pb-8">
+            <div className="grid items-center gap-3 px-4 pb-2 text-text-muted text-xs uppercase tracking-widest" style={{ gridTemplateColumns: '28px 40px 1fr 56px' }}>
+              <span>#</span>
+              <span />
+              <span>Title</span>
+              <div className="flex justify-center"><Clock size={12} /></div>
+            </div>
+            {localTracks.map((lt, i) => {
+              const qt = libTrackToTrack(lt)
+              return (
+                <div key={lt.id} className="group grid items-center gap-3 px-4 py-2 rounded-lg hover:bg-surface-raised transition-colors cursor-default select-none"
+                  style={{ gridTemplateColumns: '28px 40px 1fr 56px' }}
+                  onDoubleClick={() => playTrack(qt, localQTracks)}
+                >
+                  <span className="text-center text-xs text-text-muted tabular-nums group-hover:hidden">{i + 1}</span>
+                  <button className="hidden group-hover:flex items-center justify-center text-text-primary" onClick={() => playTrack(qt, localQTracks)}>
+                    <Play size={14} fill="currentColor" />
+                  </button>
+                  {lt.albumArt
+                    ? <img src={lt.albumArt} alt="" className="w-10 h-10 rounded-md object-cover" />
+                    : <div className="w-10 h-10 rounded-md bg-surface-overlay flex items-center justify-center"><Music2 size={16} className="text-text-muted" /></div>
+                  }
+                  <div className="min-w-0">
+                    <p className="text-text-primary text-sm font-medium truncate">{lt.title}</p>
+                    <p className="text-text-muted text-xs truncate">{lt.artist || 'Unknown Artist'}{lt.album ? ` · ${lt.album}` : ''}</p>
+                  </div>
+                  <span className="text-text-muted text-xs tabular-nums text-center">
+                    {lt.duration ? (() => { const m = Math.floor(lt.duration / 60); const s = Math.floor(lt.duration % 60); return `${m}:${s.toString().padStart(2,'0')}` })() : '--:--'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ── Playlist library ───────────────────────────────────────────────────────
 
   return (
@@ -995,9 +1165,24 @@ export default function PlaylistsView(): JSX.Element {
               <p className="text-text-muted text-xs mt-0.5">{p.track_count} {p.track_count === 1 ? 'track' : 'tracks'}</p>
             </button>
           ))}
+
+          {/* Local playlists */}
+          {localPlaylists.map(lp => (
+            <button key={lp.id} onClick={() => setLocalSelectedId(lp.id)} className="group text-left relative">
+              <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
+                <LocalPlaylistMosaic trackIds={lp.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
+              </div>
+              {/* Local badge */}
+              <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-md">
+                <HardDrive size={9} /> Local
+              </span>
+              <p className="text-text-primary text-sm font-semibold truncate">{lp.name}</p>
+              <p className="text-text-muted text-xs mt-0.5">{lp.trackIds.length} {lp.trackIds.length === 1 ? 'track' : 'tracks'}</p>
+            </button>
+          ))}
         </div>
 
-        {playlists.length === 0 && <p className="text-text-muted text-sm mt-4">No playlists yet — create one to get started.</p>}
+        {playlists.length === 0 && localPlaylists.length === 0 && <p className="text-text-muted text-sm mt-4">No playlists yet — create one to get started.</p>}
       </div>
 
       {/* Library card context menu */}
