@@ -325,7 +325,7 @@ export default function PlaylistsView(): JSX.Element {
     const h = () => { setTrackMenu(null); setLibMenu(null); setShowAddAllMenu(false); setLocalCardMenu(null) }
     window.addEventListener('click', h)
     return () => window.removeEventListener('click', h)
-  }, [trackMenu, libMenu, showAddAllMenu])
+  }, [trackMenu, libMenu, showAddAllMenu, localCardMenu])
 
 
   const loadDetail = useCallback(async (id: number, shared = false) => {
@@ -1282,7 +1282,7 @@ export default function PlaylistsView(): JSX.Element {
               {/* Context menu button */}
               <button
                 className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
-                onClick={e => { e.stopPropagation(); setLibMenu({ playlist: p, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setLibMenu({ playlist: p, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
               >
                 <MoreHorizontal size={13} />
               </button>

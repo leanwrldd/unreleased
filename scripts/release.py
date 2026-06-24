@@ -168,6 +168,7 @@ def main():
     parser.add_argument("--skip-build",  action="store_true", help="Skip vite + electron-builder")
     parser.add_argument("--skip-upload", action="store_true", help="Skip asset upload")
     parser.add_argument("--upload-only", action="store_true", help="Skip build/git; only create/fetch release and upload assets")
+    parser.add_argument("--skip-web",    action="store_true", help="Skip web branch sync (desktop-only release)")
     args = parser.parse_args()
 
     ver   = args.version.lstrip("v")
@@ -244,16 +245,18 @@ def main():
     run("git push origin app")
 
     # -- 4. Sync + build + push web branch ------------------------------------
-    step("Syncing to web branch")
-    git_checkout("web")
-    run("git checkout app -- src/ package.json")
-    run(r"node_modules\.bin\vite.cmd build")
-    run("git add -A")
-    run(f'git commit -m "v{ver}"')
-    run("git push origin web --force")
-
-    # back to app
-    git_checkout("app")
+    if args.skip_web:
+        ok("Skipping web branch sync (--skip-web)")
+    else:
+        step("Syncing to web branch")
+        git_checkout("web")
+        run("git checkout app -- src/ package.json")
+        run(r"node_modules\.bin\vite.cmd build")
+        run("git add -A")
+        run(f'git commit -m "v{ver}"')
+        run("git push origin web --force")
+        # back to app
+        git_checkout("app")
 
     # -- 5. Create GitHub release ----------------------------------------------
     step(f"Creating GitHub release {tag}")

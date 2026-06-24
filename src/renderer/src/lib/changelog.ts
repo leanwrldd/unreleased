@@ -6,6 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.8.6',
+    date: '2026-06-24',
+    changes: [
+      { type: 'fix',     text: 'Fixed black screen / crash when playing local files with cover art' },
+      { type: 'fix',     text: 'Library cover art now loads and updates correctly for all albums' },
+      { type: 'fix',     text: 'Login loading spinner no longer gets stuck after popup closes' },
+      { type: 'fix',     text: 'Playlist context menu (···) now works correctly on hover' },
+      { type: 'improve', text: 'Sidebar now extends to the top of the window in the desktop app' },
+    ],
+  },
+  {
     version: '1.8.5',
     date: '2026-06-24',
     changes: [

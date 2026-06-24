@@ -289,12 +289,8 @@ export default function Player(): JSX.Element {
     const rawArt = radioFmActive
       ? radioFmMatchedSong?.imageUrl
       : (currentTrackFull?.albumArt ?? currentTrack?.imageUrl)
-    // Resolve relative image paths
-    const artSrc = rawArt
-      ? rawArt.startsWith('http')
-        ? rawArt
-        : `https://juicewrldapi.com${rawArt}`
-      : undefined
+    // Only pass HTTP URLs to MediaMetadata — data URIs crash Windows media transport
+    const artSrc = rawArt?.startsWith('http') ? rawArt : undefined
     navigator.mediaSession.metadata = new MediaMetadata({
       title,
       artist,

@@ -206,14 +206,15 @@ function AlbumCard({ album, onPlay, onOpen }: { album: Album; onPlay: () => void
   const [hovered, setHovered] = useState(false)
   const el = (window as any).electron
   const { updateLibraryTrack } = useStore()
-  const [art, setArt] = useState<string | null>(album.coverTrack.albumArt ?? null)
 
   useEffect(() => {
-    if (!el || !album.coverTrack.hasAlbumArt || album.coverTrack.albumArt) return
+    if (!el || album.coverTrack.albumArt !== undefined) return
     el.readAlbumArt(album.coverTrack.filePath).then((a: string | null) => {
-      if (a) { setArt(a); updateLibraryTrack(album.coverTrack.id, { albumArt: a }) }
+      updateLibraryTrack(album.coverTrack.id, { albumArt: a ?? null })
     })
   }, [album.coverTrack.id])
+
+  const art = album.coverTrack.albumArt
 
   return (
     <div
@@ -223,7 +224,9 @@ function AlbumCard({ album, onPlay, onOpen }: { album: Album; onPlay: () => void
       onClick={onOpen}
     >
       <div className="relative rounded-xl overflow-hidden bg-[var(--surface-overlay)] aspect-square mb-2.5 shadow-lg">
-        {art
+        {art === undefined
+          ? <div className="w-full h-full bg-[var(--surface-raised)] animate-pulse" />
+          : art
           ? <img src={art} alt={album.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
           : <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]"><Music size={40} /></div>
         }
@@ -441,14 +444,15 @@ function AlbumDetail({ album, onBack, onEdit, onAddToPlaylist }: {
   const { playTrack } = useStore()
   const el = (window as any).electron
   const { updateLibraryTrack } = useStore()
-  const [art, setArt] = useState<string | null>(album.coverTrack.albumArt ?? null)
 
   useEffect(() => {
-    if (!el || !album.coverTrack.hasAlbumArt || album.coverTrack.albumArt) return
+    if (!el || album.coverTrack.albumArt !== undefined) return
     el.readAlbumArt(album.coverTrack.filePath).then((a: string | null) => {
-      if (a) { setArt(a); updateLibraryTrack(album.coverTrack.id, { albumArt: a }) }
+      updateLibraryTrack(album.coverTrack.id, { albumArt: a ?? null })
     })
   }, [album.coverTrack.id])
+
+  const art = album.coverTrack.albumArt
 
   const totalDur = album.tracks.reduce((s, t) => s + t.duration, 0)
   const sortedTracks = [...album.tracks].sort((a, b) => (a.trackNumber ?? 999) - (b.trackNumber ?? 999))
@@ -471,7 +475,11 @@ function AlbumDetail({ album, onBack, onEdit, onAddToPlaylist }: {
           <ChevronLeft size={18} />
         </button>
         <div className="w-44 h-44 rounded-2xl overflow-hidden shadow-2xl shrink-0 bg-[var(--surface-overlay)] flex items-center justify-center">
-          {art ? <img src={art} alt={album.name} className="w-full h-full object-cover" /> : <Music size={48} className="text-[var(--text-muted)]" />}
+          {art === undefined
+            ? <div className="w-full h-full bg-[var(--surface-raised)] animate-pulse" />
+            : art
+            ? <img src={art} alt={album.name} className="w-full h-full object-cover" />
+            : <Music size={48} className="text-[var(--text-muted)]" />}
         </div>
         <div className="pb-1">
           <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">Album</p>

@@ -16,8 +16,10 @@ export default function UserAuthModal({ onClose }: Props): JSX.Element {
     setLoading(true)
     try {
       await loginWithDiscord()
+      onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not start Discord login')
+    } finally {
       setLoading(false)
     }
   }

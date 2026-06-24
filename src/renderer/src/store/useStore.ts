@@ -411,10 +411,17 @@ export const useStore = create<AppStore>((set, get, store) => ({
   setLibraryTracks: (libraryTracks) => set({ libraryTracks }),
   updateLibraryTrack: (id, updates) => set((s) => {
     const newLib = s.libraryTracks.map((t) => t.id === id ? { ...t, ...updates } : t)
-    const newQueue = updates.albumArt
-      ? s.queue.map((t) => t.id === id ? { ...t, imageUrl: updates.albumArt as string } : t)
+    const newQueue = updates.albumArt !== undefined
+      ? s.queue.map((t) => t.id === id ? { ...t, imageUrl: (updates.albumArt as string) || '' } : t)
       : s.queue
-    return { libraryTracks: newLib, queue: newQueue }
+    const isCurrentTrack = s.currentTrack?.id === id
+    const newCurrentTrack = (isCurrentTrack && updates.albumArt !== undefined && s.currentTrack)
+      ? { ...s.currentTrack, imageUrl: (updates.albumArt as string) || '' }
+      : s.currentTrack
+    const newCurrentTrackFull = (isCurrentTrack && updates.albumArt !== undefined && s.currentTrackFull)
+      ? { ...s.currentTrackFull, albumArt: updates.albumArt as string | null }
+      : s.currentTrackFull
+    return { libraryTracks: newLib, queue: newQueue, currentTrack: newCurrentTrack, currentTrackFull: newCurrentTrackFull }
   }),
   setLibraryFolders: (libraryFolders) => {
     set({ libraryFolders })

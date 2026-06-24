@@ -2,7 +2,7 @@
 
 A browser-based music player for Juice WRLD unreleased songs, powered by the [Juice WRLD API](https://juicewrldapi.com).
 
-![Version](https://img.shields.io/badge/version-1.8.1-blue)
+![Version](https://img.shields.io/badge/version-1.8.6-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -79,6 +79,14 @@ npm run preview
 ---
 
 ## Changelog
+
+### v1.8.6 (desktop only)
+
+- Fix black screen crash when playing local files with loaded cover art
+- Fix library cover art loading for all albums (reworked loading system)
+- Fix login spinner stuck after Discord popup closes without completing
+- Fix playlist context menu (···) not working on API playlists
+- Sidebar now extends to the top of the window (visual polish)
 
 ### v1.8.5
 
