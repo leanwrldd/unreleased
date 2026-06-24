@@ -142,9 +142,12 @@ export default function App(): JSX.Element {
     <div className="flex flex-col h-dvh bg-surface overflow-hidden">
       {isElectron && (
         <>
-          {/* Frameless drag region */}
-          <div style={{ WebkitAppRegion: "drag" } as React.CSSProperties} className="fixed top-0 left-0 right-0 h-7 z-[9999] pointer-events-none select-none" />
-          {/* Window controls */}
+          {/* Title bar — flow element pushes content down + drag region */}
+          <div
+            className="shrink-0 h-7 border-b border-[var(--border)] select-none"
+            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+          />
+          {/* Window controls overlay */}
           <WindowControls />
         </>
       )}

@@ -172,7 +172,7 @@ function LocalPlaylistMosaic({ trackIds, libraryTracks, className = '' }: {
 
 export default function PlaylistsView(): JSX.Element {
   const { account, playlists, refreshPlaylists, playTrack, addToQueue, setShowUserAuth, likedTrackIds, setActiveView, setPendingEditorSongId,
-    localPlaylists, libraryTracks, loadLibrary, deleteLocalPlaylist, renameLocalPlaylist } = useStore()
+    localPlaylists, libraryTracks, loadLibrary, deleteLocalPlaylist, renameLocalPlaylist, updateLocalPlaylist } = useStore()
   const canEdit = !!(account?.is_editor || account?.is_administrator)
 
   const [showLiked, setShowLiked] = useState(false)
@@ -190,6 +190,7 @@ export default function PlaylistsView(): JSX.Element {
   // Context menus
   const [trackMenu, setTrackMenu] = useState<TrackMenuState | null>(null)
   const [libMenu, setLibMenu] = useState<LibMenuState | null>(null)
+  const [localCardMenu, setLocalCardMenu] = useState<{ id: string; name: string; x: number; y: number } | null>(null)
   const [showAddAllMenu, setShowAddAllMenu] = useState(false)
   const addAllMenuRef = useRef<HTMLDivElement>(null)
 
@@ -318,8 +319,8 @@ export default function PlaylistsView(): JSX.Element {
 
   // Close menus on outside click
   useEffect(() => {
-    if (!trackMenu && !libMenu && !showAddAllMenu) return
-    const h = () => { setTrackMenu(null); setLibMenu(null); setShowAddAllMenu(false) }
+    if (!trackMenu && !libMenu && !showAddAllMenu && !localCardMenu) return
+    const h = () => { setTrackMenu(null); setLibMenu(null); setShowAddAllMenu(false); setLocalCardMenu(null) }
     window.addEventListener('click', h)
     return () => window.removeEventListener('click', h)
   }, [trackMenu, libMenu, showAddAllMenu])
@@ -659,16 +660,25 @@ export default function PlaylistsView(): JSX.Element {
           ) : (
             <div className="grid gap-4 mb-8" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
               {localPlaylists.map(lp => (
-                <button key={lp.id} onClick={() => setLocalSelectedId(lp.id)} className="group text-left relative">
+                <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)}>
                   <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
-                    <LocalPlaylistMosaic trackIds={lp.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
+                    {lp.coverImage
+                      ? <img src={lp.coverImage} alt="" className="w-full h-full object-cover" />
+                      : <LocalPlaylistMosaic trackIds={lp.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
+                    }
                   </div>
                   <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-md">
                     <HardDrive size={9} /> Local
                   </span>
+                  <button
+                    className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
+                    onClick={e => { e.stopPropagation(); setLocalCardMenu({ id: lp.id, name: lp.name, x: e.clientX, y: e.clientY }) }}
+                  >
+                    <MoreHorizontal size={13} />
+                  </button>
                   <p className="text-text-primary text-sm font-semibold truncate">{lp.name}</p>
                   <p className="text-text-muted text-xs mt-0.5">{lp.trackIds.length} {lp.trackIds.length === 1 ? 'track' : 'tracks'}</p>
-                </button>
+                </div>
               ))}
             </div>
           )}
@@ -1094,8 +1104,24 @@ export default function PlaylistsView(): JSX.Element {
         {/* Hero */}
         <div className="relative px-6 pb-6 shrink-0">
           <div className="relative z-10 flex gap-6 items-end">
-            <div className="shrink-0 rounded-xl shadow-2xl overflow-hidden" style={{ width: 180, height: 180 }}>
-              <LocalPlaylistMosaic trackIds={localPl.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
+            <div
+              className="shrink-0 rounded-xl shadow-2xl overflow-hidden relative group cursor-pointer"
+              style={{ width: 180, height: 180 }}
+              onClick={async () => {
+                const el = (window as any).electron
+                if (!el) return
+                const dataUrl = await el.selectImageFile()
+                if (dataUrl) updateLocalPlaylist(localPl.id, { coverImage: dataUrl })
+              }}
+              title="Click to change cover"
+            >
+              {localPl.coverImage
+                ? <img src={localPl.coverImage} alt="" className="w-full h-full object-cover" />
+                : <LocalPlaylistMosaic trackIds={localPl.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
+              }
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
+                <ImageOff size={22} className="text-white" />
+              </div>
             </div>
             <div className="min-w-0 flex-1 pb-1">
               <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-2">Local Playlist</p>
@@ -1129,11 +1155,16 @@ export default function PlaylistsView(): JSX.Element {
                   </button>
                 )}
                 {!localRenaming && (
-                  <button onClick={() => { setLocalRenameVal(localPl.name); setLocalRenaming(true) }} className="p-2.5 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-overlay text-sm transition-colors">
+                  <button onClick={() => { setLocalRenameVal(localPl.name); setLocalRenaming(true) }} className="p-2.5 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-overlay text-sm transition-colors" title="Rename">
                     <Pencil size={15} />
                   </button>
                 )}
-                <button onClick={() => { deleteLocalPlaylist(localPl.id); setLocalSelectedId(null) }} className="p-2.5 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 text-sm transition-colors">
+                {localPl.coverImage && (
+                  <button onClick={() => updateLocalPlaylist(localPl.id, { coverImage: null })} className="p-2.5 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-overlay text-sm transition-colors" title="Remove custom cover">
+                    <ImageOff size={15} />
+                  </button>
+                )}
+                <button onClick={() => { deleteLocalPlaylist(localPl.id); setLocalSelectedId(null) }} className="p-2.5 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 text-sm transition-colors" title="Delete playlist">
                   <Trash2 size={15} />
                 </button>
               </div>
@@ -1255,22 +1286,49 @@ export default function PlaylistsView(): JSX.Element {
 
           {/* Local playlists */}
           {localPlaylists.map(lp => (
-            <button key={lp.id} onClick={() => setLocalSelectedId(lp.id)} className="group text-left relative">
+            <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)}>
               <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
-                <LocalPlaylistMosaic trackIds={lp.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
+                {lp.coverImage
+                  ? <img src={lp.coverImage} alt="" className="w-full h-full object-cover" />
+                  : <LocalPlaylistMosaic trackIds={lp.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
+                }
               </div>
               {/* Local badge */}
               <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-md">
                 <HardDrive size={9} /> Local
               </span>
+              {/* Context menu button */}
+              <button
+                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
+                onClick={e => { e.stopPropagation(); setLocalCardMenu({ id: lp.id, name: lp.name, x: e.clientX, y: e.clientY }) }}
+              >
+                <MoreHorizontal size={13} />
+              </button>
               <p className="text-text-primary text-sm font-semibold truncate">{lp.name}</p>
               <p className="text-text-muted text-xs mt-0.5">{lp.trackIds.length} {lp.trackIds.length === 1 ? 'track' : 'tracks'}</p>
-            </button>
+            </div>
           ))}
         </div>
 
         {playlists.length === 0 && localPlaylists.length === 0 && <p className="text-text-muted text-sm mt-4">No playlists yet — create one to get started.</p>}
       </div>
+
+      {/* Local playlist card context menu */}
+      {localCardMenu && (
+        <div
+          className="fixed z-[200] bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[170px]"
+          style={{ left: Math.min(localCardMenu.x, window.innerWidth - 190), top: Math.min(localCardMenu.y, window.innerHeight - 160) }}
+          onClick={e => e.stopPropagation()}
+        >
+          <MenuItem icon={Play} label="Open" onClick={() => { setLocalSelectedId(localCardMenu.id); setLocalCardMenu(null) }} />
+          <MenuItem icon={Pencil} label="Rename" onClick={() => {
+            setLocalSelectedId(localCardMenu.id)
+            setLocalCardMenu(null)
+          }} />
+          <div className="h-px bg-[var(--border)] my-1" />
+          <MenuItem icon={Trash2} label="Delete" destructive onClick={() => { deleteLocalPlaylist(localCardMenu.id); setLocalCardMenu(null) }} />
+        </div>
+      )}
 
       {/* Library card context menu */}
       {libMenu && (

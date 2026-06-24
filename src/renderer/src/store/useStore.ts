@@ -165,6 +165,7 @@ interface AppActions {
   createLocalPlaylist: (name: string) => void
   deleteLocalPlaylist: (id: string) => void
   renameLocalPlaylist: (id: string, name: string) => void
+  updateLocalPlaylist: (id: string, updates: { name?: string; coverImage?: string | null }) => void
   addToLocalPlaylist: (playlistId: string, trackId: string) => void
   removeFromLocalPlaylist: (playlistId: string, trackId: string) => void
   reorderLocalPlaylist: (playlistId: string, trackIds: string[]) => void
@@ -354,7 +355,17 @@ export const useStore = create<AppStore>((set, get, store) => ({
   loginWithDiscord: async () => {
     const redirectUri = userApi.discordRedirectUri()
     const { authorize_url } = await userApi.getDiscordAuthUrl(redirectUri)
-    window.location.href = authorize_url
+    const el = (window as any).electron
+    if (el?.openDiscordLogin) {
+      // Electron: open a popup BrowserWindow — intercepts the OAuth callback
+      const result = await el.openDiscordLogin(authorize_url) as { code: string; state: string } | null
+      if (result?.code && result?.state) {
+        await get().completeDiscordLogin(result.code, result.state)
+      }
+    } else {
+      // Web: standard redirect
+      window.location.href = authorize_url
+    }
   },
 
   completeDiscordLogin: async (code, state) => {
@@ -462,6 +473,12 @@ export const useStore = create<AppStore>((set, get, store) => ({
   renameLocalPlaylist: (id, name) => {
     const el = (window as any).electron
     const next = get().localPlaylists.map((p) => p.id === id ? { ...p, name } : p)
+    set({ localPlaylists: next })
+    el?.saveLocalPlaylists(next)
+  },
+  updateLocalPlaylist: (id, updates) => {
+    const el = (window as any).electron
+    const next = get().localPlaylists.map((p) => p.id === id ? { ...p, ...updates } : p)
     set({ localPlaylists: next })
     el?.saveLocalPlaylists(next)
   },

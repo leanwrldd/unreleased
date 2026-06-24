@@ -5,6 +5,19 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.8.4',
+    date: '2026-06-24',
+    changes: [
+      { type: 'fix',     text: 'Added visual separation between the title bar and app content' },
+      { type: 'fix',     text: 'Library cover art now updates correctly after lazy-loading' },
+      { type: 'new',     text: 'Right-click context menu on library track rows' },
+      { type: 'new',     text: 'Context menus (···) on local playlist cards — rename and delete' },
+      { type: 'new',     text: 'Local playlists now support custom cover images (click the cover to change)' },
+      { type: 'improve', text: 'Metadata editor lyrics section redesigned with full-width editor and line count' },
+      { type: 'improve', text: 'Discord login now opens a proper popup window in the desktop app instead of redirecting' },
+    ],
+  },
     {
     version: '1.8.3',
     date: '2026-06-24',

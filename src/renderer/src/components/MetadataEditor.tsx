@@ -242,24 +242,46 @@ export default function MetadataEditor({ track, onClose, onSaved }: MetadataEdit
             <FieldRow label="Disc #"  value={fields.discNumber}  original={original.discNumber}  onChange={v => set('discNumber', v)}  placeholder="1" />
 
             <SectionLabel label="Lyrics" />
-            <FieldRow label="Lyrics" value={fields.lyrics} original={original.lyrics} onChange={v => set('lyrics', v)} multiline />
-
             <div className="px-4 pb-2">
+              {/* Plain lyrics — full-width tall editor */}
+              <div className={`rounded-lg border transition-colors ${fields.lyrics !== original.lyrics && !(fields.lyrics === '' && original.lyrics === '') ? 'border-[var(--accent)]/50 bg-[var(--accent)]/[0.02]' : 'border-[var(--border)]'}`}>
+                <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--border)]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] opacity-60">Plain</span>
+                  <span className="text-[10px] text-[var(--text-muted)] opacity-40">{fields.lyrics ? fields.lyrics.split('\n').length + ' lines' : 'empty'}</span>
+                </div>
+                <textarea
+                  className="w-full bg-transparent text-sm text-[var(--text-primary)] px-3 py-2.5 focus:outline-none placeholder:text-[var(--text-muted)] placeholder:opacity-25 resize-none font-sans leading-relaxed"
+                  rows={8}
+                  value={fields.lyrics}
+                  onChange={e => set('lyrics', e.target.value)}
+                  placeholder="Paste lyrics here…"
+                  spellCheck={false}
+                />
+              </div>
+
+              {/* Synced lyrics (LRC) */}
               <button
-                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] opacity-55 hover:opacity-100 transition-opacity mt-3 mb-1.5"
+                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] opacity-55 hover:opacity-100 transition-opacity mt-4 mb-1.5"
                 onClick={() => setShowSynced(v => !v)}
               >
                 Synced Lyrics (LRC)
                 {showSynced ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
               </button>
               {showSynced && (
-                <textarea
-                  className="w-full bg-[var(--surface-overlay)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-xs font-mono px-3 py-2 focus:outline-none focus:border-[var(--accent)] transition-colors resize-none"
-                  rows={5}
-                  value={fields.syncedLyrics}
-                  onChange={e => set('syncedLyrics', e.target.value)}
-                  placeholder="[00:12.00]Line one&#10;[00:17.20]Line two"
-                />
+                <div className={`rounded-lg border transition-colors ${fields.syncedLyrics !== original.syncedLyrics && !(fields.syncedLyrics === '' && original.syncedLyrics === '') ? 'border-[var(--accent)]/50 bg-[var(--accent)]/[0.02]' : 'border-[var(--border)]'}`}>
+                  <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--border)]">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] opacity-60">LRC</span>
+                    <span className="text-[10px] text-[var(--text-muted)] opacity-40">{fields.syncedLyrics ? fields.syncedLyrics.split('\n').length + ' lines' : 'empty'}</span>
+                  </div>
+                  <textarea
+                    className="w-full bg-transparent text-xs text-[var(--text-primary)] font-mono px-3 py-2.5 focus:outline-none placeholder:text-[var(--text-muted)] placeholder:opacity-25 resize-none leading-relaxed"
+                    rows={6}
+                    value={fields.syncedLyrics}
+                    onChange={e => set('syncedLyrics', e.target.value)}
+                    placeholder={"[00:12.00]Line one\n[00:17.20]Line two"}
+                    spellCheck={false}
+                  />
+                </div>
               )}
             </div>
 
