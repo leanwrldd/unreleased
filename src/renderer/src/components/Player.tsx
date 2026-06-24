@@ -837,7 +837,7 @@ export default function Player(): JSX.Element {
               <p className="text-text-muted text-xs truncate">{radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.artist : (currentTrack?.artist || '')}</p>
               {(radioMode || radioFmActive) && (
                 <span className={`flex items-center gap-0.5 text-[9px] font-semibold uppercase tracking-widest shrink-0 ${radioFmActive ? 'text-red-400' : 'text-accent'}`}>
-                  <Radio size={9} /> {radioFmActive ? '999 FM' : 'Radio'}
+                  <Radio size={9} /> {radioFmActive ? '999 FM' : 'Random'}
                 </span>
               )}
             </div>

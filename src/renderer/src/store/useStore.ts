@@ -330,9 +330,13 @@ export const useStore = create<AppStore>((set, get, store) => ({
     try {
       const account = await userApi.getMe()
       set({ account })
-    } catch {
-      userApi.clearToken()
-      set({ account: null, playlists: [] })
+    } catch (err) {
+      // Only clear token on auth errors — network/server errors should not log the user out
+      const msg = String(err)
+      if (msg.includes('401') || msg.includes('403') || msg.includes('Unauthorized') || msg.includes('Forbidden')) {
+        userApi.clearToken()
+        set({ account: null, playlists: [] })
+      }
       return
     }
     try {
