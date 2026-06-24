@@ -84,7 +84,8 @@ def api_request(method: str, path: str, token: str, data=None):
     body = json.dumps(data).encode() if data else None
     req  = urllib.request.Request(url, data=body, headers=headers, method=method)
     with urllib.request.urlopen(req) as resp:
-        return json.loads(resp.read())
+        body = resp.read()
+        return json.loads(body) if body else {}
 
 # -- Streaming upload with progress -------------------------------------------
 
