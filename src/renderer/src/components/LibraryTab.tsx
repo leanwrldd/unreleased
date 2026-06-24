@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+﻿import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Music, Play, Shuffle, Search, Plus, MoreHorizontal, Edit2, Trash2, X,
   ChevronLeft, ListMusic, LayoutGrid, List,
@@ -576,7 +576,8 @@ export default function LibraryTab(): JSX.Element {
   } = useStore()
   const isElectron = !!(window as any).electron
 
-  const [libView, setLibView] = useState<LibView>('albums')
+  const [libView, setLibViewRaw] = useState<LibView>(() => (localStorage.getItem('library:view') as LibView) || 'albums')
+  const setLibView = (v: LibView): void => { setLibViewRaw(v); localStorage.setItem('library:view', v) }
   const [searchQ, setSearchQ] = useState('')
   const [editingTrack, setEditingTrack] = useState<LibraryTrack | null>(null)
   const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<LibraryTrack | null>(null)

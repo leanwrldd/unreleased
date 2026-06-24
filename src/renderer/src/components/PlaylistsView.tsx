@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+﻿import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   ListMusic, Play, Loader2, Plus, Trash2, Pencil, ArrowLeft,
   X, Check, Heart, Shuffle, Music2, Clock, GripVertical,
@@ -663,7 +663,7 @@ export default function PlaylistsView(): JSX.Element {
           ) : (
             <div className="grid gap-4 mb-8" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
               {localPlaylists.map(lp => (
-                <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)}>
+                <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setLocalCardMenu({ id: lp.id, name: lp.name, x: e.clientX, y: e.clientY }) }}>
                   <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
                     {lp.coverImage
                       ? <img src={lp.coverImage} alt="" className="w-full h-full object-cover" />
@@ -674,7 +674,7 @@ export default function PlaylistsView(): JSX.Element {
                     <HardDrive size={9} /> Local
                   </span>
                   <button
-                    className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
+                    className="absolute top-1.5 right-1.5 md:opacity-0 md:group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
                     onClick={e => { e.stopPropagation(); setLocalCardMenu({ id: lp.id, name: lp.name, x: e.clientX, y: e.clientY }) }}
                   >
                     <MoreHorizontal size={13} />
@@ -1281,7 +1281,7 @@ export default function PlaylistsView(): JSX.Element {
               </div>
               {/* Context menu button */}
               <button
-                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
+                className="absolute top-1.5 right-1.5 md:opacity-0 md:group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
                 onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setLibMenu({ playlist: p, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
               >
                 <MoreHorizontal size={13} />
@@ -1293,7 +1293,7 @@ export default function PlaylistsView(): JSX.Element {
 
           {/* Local playlists */}
           {localPlaylists.map(lp => (
-            <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)}>
+            <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setLocalCardMenu({ id: lp.id, name: lp.name, x: e.clientX, y: e.clientY }) }}>
               <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
                 {lp.coverImage
                   ? <img src={lp.coverImage} alt="" className="w-full h-full object-cover" />
@@ -1306,7 +1306,7 @@ export default function PlaylistsView(): JSX.Element {
               </span>
               {/* Context menu button */}
               <button
-                className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
+                className="absolute top-1.5 right-1.5 md:opacity-0 md:group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
                 onClick={e => { e.stopPropagation(); setLocalCardMenu({ id: lp.id, name: lp.name, x: e.clientX, y: e.clientY }) }}
               >
                 <MoreHorizontal size={13} />
@@ -1324,7 +1324,7 @@ export default function PlaylistsView(): JSX.Element {
       {localCardMenu && (
         <div
           className="fixed z-[200] bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[190px]"
-          style={{ left: Math.min(localCardMenu.x, window.innerWidth - 210), top: Math.min(localCardMenu.y, window.innerHeight - 280) }}
+          style={{ left: Math.min(localCardMenu.x, window.innerWidth - 210), top: Math.max(8, Math.min(localCardMenu.y, window.innerHeight - 280)) }}
           onClick={e => e.stopPropagation()}
         >
           {!localCardMenuAddPl ? (

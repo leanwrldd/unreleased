@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+﻿import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Play,
@@ -247,7 +247,10 @@ export default function Player(): JSX.Element {
         }).catch(() => {})
         if (!currentTrack.imageUrl) {
           el.readAlbumArt(currentTrack.path).then((a: string | null) => {
-            if (a) updateLibraryTrack(currentTrack.id, { albumArt: a })
+            if (a) {
+              updateLibraryTrack(currentTrack.id, { albumArt: a })
+              setCurrentTrackFull(prev => prev ? { ...prev, albumArt: a } : prev)
+            }
           }).catch(() => {})
         }
       }
@@ -656,7 +659,7 @@ export default function Player(): JSX.Element {
       />
 
       {/* ── Mobile player ── */}
-      <div className="md:hidden bg-surface border-t border-[var(--border)] shrink-0">
+      <div className="md:hidden bg-surface border-t border-[var(--border)] shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {/* Thin progress bar */}
         {radioFmActive ? (
           <div className="h-[2px] bg-red-900/40 relative">

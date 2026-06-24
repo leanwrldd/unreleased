@@ -146,7 +146,7 @@ export default function App(): JSX.Element {
         <main className="flex-1 overflow-hidden flex flex-col">
           {isElectron && (
             <div
-              className="shrink-0 h-7 select-none pr-[132px]"
+              className="shrink-0 h-7 select-none mr-[132px]"
               style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
             />
           )}

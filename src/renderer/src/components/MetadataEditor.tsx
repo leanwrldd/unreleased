@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { X, Save, Upload, Music, Loader2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
+﻿import { useState, useEffect, useRef } from 'react'
+import { X, Save, Upload, Music, Loader2, AlertCircle } from 'lucide-react'
 import { LibraryTrack } from '../types'
 import { useStore } from '../store/useStore'
 
@@ -63,7 +63,7 @@ export default function MetadataEditor({ track, onClose, onSaved }: MetadataEdit
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showSynced, setShowSynced] = useState(true)
+  const [lyricsTab, setLyricsTab] = useState<'lyrics' | 'synced'>('lyrics')
   const [original, setOriginal] = useState<MetaFields>({
     title: track.title, artist: track.artist, album: track.album,
     albumArtist: track.albumArtist, year: track.year ? String(track.year) : '',
@@ -243,48 +243,43 @@ export default function MetadataEditor({ track, onClose, onSaved }: MetadataEdit
 
             <SectionLabel label="Lyrics" />
             <div className="px-4 pb-2">
-              {/* Plain lyrics — full-width tall editor */}
-              <div className={`rounded-lg border transition-colors ${fields.lyrics !== original.lyrics && !(fields.lyrics === '' && original.lyrics === '') ? 'border-[var(--accent)]/50 bg-[var(--accent)]/[0.02]' : 'border-[var(--border)]'}`}>
-                <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--border)]">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] opacity-60">Plain</span>
-                  <span className="text-[10px] text-[var(--text-muted)] opacity-40">{fields.lyrics ? fields.lyrics.split('\n').length + ' lines' : 'empty'}</span>
-                </div>
+              {/* Tab pills */}
+              <div className="flex gap-1 mb-3">
+                {(['lyrics', 'synced'] as Array<'lyrics' | 'synced'>).map(tab => {
+                  const active = lyricsTab === tab
+                  const dirty = tab === 'lyrics'
+                    ? (fields.lyrics !== original.lyrics && !(fields.lyrics === '' && original.lyrics === ''))
+                    : (fields.syncedLyrics !== original.syncedLyrics && !(fields.syncedLyrics === '' && original.syncedLyrics === ''))
+                  return (
+                    <button key={tab} onClick={() => setLyricsTab(tab)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${active ? 'bg-[var(--accent)]/15 text-[var(--accent)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}${dirty ? ' ring-1 ring-[var(--accent)]/40' : ''}`}
+                    >
+                      {tab === 'lyrics' ? 'Lyrics' : 'Synced'}
+                      {dirty && <span className="ml-1 text-[var(--accent)] text-[8px]">●</span>}
+                    </button>
+                  )
+                })}
+              </div>
+              {lyricsTab === 'lyrics' ? (
                 <textarea
-                  className="w-full bg-transparent text-sm text-[var(--text-primary)] px-3 py-2.5 focus:outline-none placeholder:text-[var(--text-muted)] placeholder:opacity-25 resize-none font-sans leading-relaxed"
-                  rows={8}
+                  className="w-full bg-[var(--surface-overlay)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] px-3 py-2.5 focus:outline-none focus:border-[var(--accent)]/50 placeholder:text-[var(--text-muted)] placeholder:opacity-25 resize-none font-sans leading-relaxed"
+                  rows={10}
                   value={fields.lyrics}
                   onChange={e => set('lyrics', e.target.value)}
                   placeholder="Paste lyrics here…"
                   spellCheck={false}
                 />
-              </div>
-
-              {/* Synced lyrics (LRC) */}
-              <button
-                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] opacity-55 hover:opacity-100 transition-opacity mt-4 mb-1.5"
-                onClick={() => setShowSynced(v => !v)}
-              >
-                Synced Lyrics (LRC)
-                {showSynced ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-              </button>
-              {showSynced && (
-                <div className={`rounded-lg border transition-colors ${fields.syncedLyrics !== original.syncedLyrics && !(fields.syncedLyrics === '' && original.syncedLyrics === '') ? 'border-[var(--accent)]/50 bg-[var(--accent)]/[0.02]' : 'border-[var(--border)]'}`}>
-                  <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--border)]">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] opacity-60">LRC</span>
-                    <span className="text-[10px] text-[var(--text-muted)] opacity-40">{fields.syncedLyrics ? fields.syncedLyrics.split('\n').length + ' lines' : 'empty'}</span>
-                  </div>
-                  <textarea
-                    className="w-full bg-transparent text-xs text-[var(--text-primary)] font-mono px-3 py-2.5 focus:outline-none placeholder:text-[var(--text-muted)] placeholder:opacity-25 resize-none leading-relaxed"
-                    rows={6}
-                    value={fields.syncedLyrics}
-                    onChange={e => set('syncedLyrics', e.target.value)}
-                    placeholder={"[00:12.00]Line one\n[00:17.20]Line two"}
-                    spellCheck={false}
-                  />
-                </div>
+              ) : (
+                <textarea
+                  className="w-full bg-[var(--surface-overlay)] border border-[var(--border)] rounded-lg text-xs text-[var(--text-primary)] font-mono px-3 py-2.5 focus:outline-none focus:border-[var(--accent)]/50 placeholder:text-[var(--text-muted)] placeholder:opacity-25 resize-none leading-relaxed"
+                  rows={10}
+                  value={fields.syncedLyrics}
+                  onChange={e => set('syncedLyrics', e.target.value)}
+                  placeholder={"[00:12.00]Line one\n[00:17.20]Line two"}
+                  spellCheck={false}
+                />
               )}
             </div>
-
             <div className="h-4" />
           </div>
         )}

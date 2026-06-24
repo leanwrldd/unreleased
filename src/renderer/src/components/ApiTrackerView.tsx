@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+﻿import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Search, Play, Loader2, Music2, X,
   LayoutList, LayoutGrid, Info, Download, ListPlus, PanelLeft,
@@ -29,6 +29,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 const PAGE_SIZE = 50
 const LS_TRACKER_VIEW = 'api-tracker:viewMode'
 const LS_TRACKER_SIDEBAR = 'api-tracker:showSidebar'
+const LS_TRACKER_SEARCH  = 'api-tracker:search'
 
 function formatDur(secs: number): string {
   if (!secs) return '--:--'
@@ -227,8 +228,8 @@ function SongContextMenu({
   // Adjust to stay on screen
   const menuWidth = state.showPlaylists ? 208 : 208
   const menuHeight = state.showPlaylists ? 320 : 200
-  const top = Math.min(state.y, window.innerHeight - menuHeight - 8)
-  const left = Math.min(state.x, window.innerWidth - menuWidth - 8)
+  const top = Math.max(8, Math.min(state.y, window.innerHeight - menuHeight - 8))
+  const left = Math.max(8, Math.min(state.x, window.innerWidth - menuWidth - 8))
 
   const MenuItem = ({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }): JSX.Element => (
     <button
@@ -632,7 +633,7 @@ export default function ApiTrackerView(): JSX.Element {
     }
   }
 
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => localStorage.getItem(LS_TRACKER_SEARCH) || '')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [category, setCategory] = useState<Category>('')
   const [era, setEra] = useState('')
@@ -646,6 +647,8 @@ export default function ApiTrackerView(): JSX.Element {
   const handleEraClick = useCallback((eraName: string) => { setEra(eraName); resetSongs() }, [resetSongs])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstDebounce = useRef(true)
+
+  useEffect(() => { localStorage.setItem(LS_TRACKER_SEARCH, search) }, [search])
 
   useEffect(() => {
     apiFetch<JWApiStats>('/stats/').then(setStats).catch(console.error)

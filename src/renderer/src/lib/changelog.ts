@@ -6,6 +6,23 @@
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.8.8',
+    date: '2026-06-25',
+    changes: [
+      { type: 'fix',     text: 'Radio mode now respects active category/era filter when prefetching tracks' },
+      { type: 'fix',     text: 'Tracker search now persists when switching tabs instead of resetting' },
+      { type: 'fix',     text: 'Mobile browser address bar no longer hides player controls, nav tabs, or song info close button' },
+      { type: 'fix',     text: 'Context menus now clamp to stay fully on-screen' },
+      { type: 'fix',     text: 'Shuffle queue no longer reorders on each song; advances linearly through pre-shuffled queue' },
+      { type: 'fix',     text: 'Local files grid view toggle now works correctly' },
+      { type: 'fix',     text: 'Window close/minimize/maximize buttons now respond correctly' },
+      { type: 'fix',     text: 'App updates no longer log the user out' },
+      { type: 'new',     text: 'Local playlist cards now support right-click context menu' },
+      { type: 'new',     text: 'Metadata editor lyrics section redesigned with Lyrics / Synced Lyrics tabs' },
+      { type: 'improve', text: 'Local playlist context menu button always visible on mobile' },
+    ],
+  },
+  {
     version: '1.8.7',
     date: '2026-06-25',
     changes: [

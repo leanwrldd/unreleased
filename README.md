@@ -2,7 +2,7 @@
 
 A browser-based music player for Juice WRLD unreleased songs, powered by the [Juice WRLD API](https://juicewrldapi.com).
 
-![Version](https://img.shields.io/badge/version-1.8.7-blue)
+![Version](https://img.shields.io/badge/version-1.8.8-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -79,6 +79,19 @@ npm run preview
 ---
 
 ## Changelog
+
+### v1.8.8 (beta)
+- **Fix**: Radio mode now respects active category/era filter
+- **Fix**: Tracker search persists when switching tabs
+- **Fix**: Mobile browser address bar no longer hides player controls or nav tabs
+- **Fix**: Context menus clamp to stay fully on-screen
+- **Fix**: Shuffle queue no longer reorders on each song
+- **Fix**: Local files grid view toggle now works
+- **Fix**: Window controls (close/min/max) now respond correctly
+- **Fix**: App updates no longer log the user out
+- **New**: Local playlist cards support right-click context menu
+- **New**: Metadata editor redesigned with Lyrics / Synced tabs
+- **Improve**: Local playlist context menu button always visible on mobile
 
 ### v1.8.7 (desktop only)
 
