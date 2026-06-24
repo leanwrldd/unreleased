@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.8.5',
+    date: '2026-06-24',
+    changes: [
+      { type: 'fix',     text: 'Fixed React hooks error (#310) in local playlist detail view' },
+      { type: 'fix',     text: 'Library track cover art now loads correctly for local files' },
+      { type: 'fix',     text: 'Removed visible border from title bar spacing element' },
+      { type: 'new',     text: 'API playlist cards now have a visible ··· context menu button on hover' },
+    ],
+  },
+  {
     version: '1.8.4',
     date: '2026-06-24',
     changes: [

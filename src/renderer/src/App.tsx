@@ -144,7 +144,7 @@ export default function App(): JSX.Element {
         <>
           {/* Title bar — flow element pushes content down + drag region */}
           <div
-            className="shrink-0 h-7 border-b border-[var(--border)] select-none"
+            className="shrink-0 h-7 select-none"
             style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
           />
           {/* Window controls overlay */}

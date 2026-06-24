@@ -80,7 +80,14 @@ npm run preview
 
 ## Changelog
 
-### v1.8.4
+### v1.8.5
+
+- Fix React hooks error in local playlist detail view
+- Fix library track metadata and cover art not loading (local files)
+- Remove visible border from title bar spacing
+- Add ··· context menu button to API playlist cards
+
+## v1.8.4
 - Fix: Added visual separation between the title bar and app content
 - Fix: Library cover art now updates correctly after lazy-loading
 - New: Right-click context menu on library track rows
