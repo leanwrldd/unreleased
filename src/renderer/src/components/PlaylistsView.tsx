@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   ListMusic, Play, Loader2, Plus, Trash2, Pencil, ArrowLeft,
   X, Check, Heart, Shuffle, Music2, Clock, GripVertical,
@@ -325,7 +325,7 @@ export default function PlaylistsView(): JSX.Element {
   useEffect(() => {
     if (!trackMenu && !libMenu && !showAddAllMenu && !localCardMenu) return
     const h = () => { setTrackMenu(null); setLibMenu(null); setShowAddAllMenu(false); setLocalCardMenu(null); setLocalCardMenuAddPl(false) }
-    window.addEventListener('click', h)
+    setTimeout(() => window.addEventListener('click', h), 0)
     return () => window.removeEventListener('click', h)
   }, [trackMenu, libMenu, showAddAllMenu, localCardMenu])
 

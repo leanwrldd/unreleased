@@ -600,7 +600,7 @@ export default function ApiFilesView(): JSX.Element {
                 <p className="text-text-muted text-sm">No files found</p>
                 <button onClick={pickLocalFolder} className="text-accent text-sm underline">Pick a folder</button>
               </div>
-            ) : (
+            ) : viewMode === 'list' ? (
               <div className="space-y-0.5">
                 {localPath && (
                   <button
@@ -650,10 +650,63 @@ export default function ApiFilesView(): JSX.Element {
                   )
                 })}
               </div>
+            ) : (
+              <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
+                {localPath && (
+                  <button
+                    onClick={() => {
+                      const parent = localPath.replace(/[/\\][^/\\]+$/, '')
+                      if (parent && parent !== localPath) browseLocal(parent)
+                    }}
+                    className="flex flex-col items-center gap-2 p-3 rounded-xl bg-surface-overlay hover:bg-surface-raised transition-colors"
+                  >
+                    <div className="w-full aspect-square flex items-center justify-center"><FolderOpen size={40} className="text-text-muted" /></div>
+                    <span className="text-text-muted text-xs">..</span>
+                  </button>
+                )}
+                {localEntries.map((entry) => {
+                  const isDir = entry.type === 'directory'
+                  const mt = isDir ? 'folder' : getMediaType(entry.name)
+                  const ext = getFileExt(entry.name).slice(1).toUpperCase()
+                  return (
+                    <div
+                      key={entry.path}
+                      className="group flex flex-col rounded-xl overflow-hidden transition-colors cursor-default bg-surface-overlay hover:bg-surface-raised"
+                      onClick={() => {
+                        if (isDir) browseLocal(entry.path)
+                        else if (mt === 'audio') handleLocalPlay(entry)
+                        else if (mt === 'image' || mt === 'video') openLocalLightbox(entry)
+                      }}
+                    >
+                      <div className="relative w-full aspect-square bg-surface-raised flex items-center justify-center overflow-hidden">
+                        {isDir
+                          ? <Folder size={40} className="text-text-secondary group-hover:text-accent transition-colors" />
+                          : mt === 'audio' ? (
+                            <>
+                              <Music2 size={36} className="text-text-muted opacity-30" />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Play size={24} fill="white" className="text-white ml-0.5" />
+                              </div>
+                            </>
+                          ) : mt === 'image' ? (
+                            <ImageIcon size={36} className="text-text-muted" />
+                          ) : mt === 'video' ? (
+                            <Video size={36} className="text-text-muted" />
+                          ) : (
+                            <span className="text-xs uppercase text-text-muted">{ext}</span>
+                          )}
+                      </div>
+                      <div className="px-2 py-2">
+                        <p className="text-text-primary text-xs font-medium truncate">{entry.name}</p>
+                        {!isDir && <p className="text-text-muted text-[10px] uppercase tracking-wide mt-0.5">{ext}</p>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
         )}
-
         {/* Content */}
         {!localMode && <div className="flex-1 overflow-y-auto px-5 pb-4">
           {loading ? (

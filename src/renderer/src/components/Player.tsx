@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Play,
@@ -20,6 +20,7 @@ import {
   Radio,
   ListEnd,
   Info,
+  Pencil,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { formatDuration } from '../lib/lyrics'
@@ -28,6 +29,8 @@ import { trackIdToSongId, getApprovedSyncedLyrics} from '../lib/userApi'
 import { FullTrack } from '../types'
 import AddToPlaylistMenu from './AddToPlaylistMenu'
 import SongInfoModal from './SongInfoModal'
+import MetadataEditor from './MetadataEditor'
+import { LibraryTrack } from '../types'
 
 let _seek: ((t: number) => void) | null = null
 export function seekAudio(t: number): void { _seek?.(t) }
@@ -80,6 +83,8 @@ export default function Player(): JSX.Element {
   const currentSongId = currentTrack ? trackIdToSongId(currentTrack.id) : null
   const { radioMode, radioNext } = useStore()
   const { radioFmActive, radioFmNowPlaying, radioFmMatchedSong } = useStore()
+  const { libraryTracks } = useStore()
+  const [editingLocalTrack, setEditingLocalTrack] = useState<LibraryTrack | null>(null)
 
 
   // FM elapsed time — ticks locally between WS updates
@@ -818,6 +823,17 @@ export default function Player(): JSX.Element {
                             <Info size={14} /> Song info
                           </button>
                         )}
+                        {currentSongId == null && currentTrack?.id.startsWith('local-') && (
+                          <button
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                            onClick={() => {
+                              const lt = libraryTracks.find(t => t.id === currentTrack?.id)
+                              if (lt) { setEditingLocalTrack(lt); setShowContextMenu(false) }
+                            }}
+                          >
+                            <Pencil size={14} /> Edit metadata
+                          </button>
+                        )}
                       </div>
                     </>
                   )}
@@ -961,6 +977,10 @@ export default function Player(): JSX.Element {
         {/* Song info modal */}
         {showSongInfo && (
           <SongInfoModal song={songInfoData} onClose={() => { setShowSongInfo(false); setSongInfoData(null) }} />
+        )}
+
+        {editingLocalTrack && (
+          <MetadataEditor track={editingLocalTrack} onClose={() => setEditingLocalTrack(null)} onSaved={(t) => { setEditingLocalTrack(null) }} />
         )}
 
         {/* Output device popover */}
