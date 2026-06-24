@@ -46,6 +46,11 @@ function AlbumArtThumb({ track, size = 48 }: { track: LibraryTrack; size?: numbe
   const { updateLibraryTrack } = useStore()
   const [art, setArt] = useState<string | null>(track.albumArt ?? null)
 
+  // Sync art when store updates the track (e.g. after lazy load by another instance)
+  useEffect(() => {
+    if (track.albumArt) setArt(track.albumArt)
+  }, [track.albumArt])
+
   useEffect(() => {
     if (!el || !track.hasAlbumArt || track.albumArt) return
     el.readAlbumArt(track.filePath).then((a: string | null) => {
@@ -294,6 +299,7 @@ function SongRow({ track, index, queue, onEdit, onAddToPlaylist, showAlbum = tru
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         onDoubleClick={handlePlay}
+        onContextMenu={e => { e.preventDefault(); setMenuOpen(v => !v) }}
         draggable={draggable}
         onDragStart={onDragStart}
         onDragOver={onDragOver}
@@ -655,7 +661,7 @@ export default function LibraryTab(): JSX.Element {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar */}
-        <div className="shrink-0 flex items-center gap-3 px-5 py-3 border-b border-[var(--border)]" style={{ WebkitAppRegion: 'no-drag', paddingRight: isElectron ? '160px' : undefined } as React.CSSProperties}>
+        <div className="shrink-0 flex items-center gap-3 px-5 py-3 border-b border-[var(--border)]" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           {selectedAlbum && (
             <button onClick={() => setSelectedAlbum(null)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] transition-colors">
               <ChevronLeft size={16} />

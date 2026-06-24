@@ -152,6 +152,11 @@ export function trackIdToSongId(trackId: string): number | null {
 export const DISCORD_STATE_KEY = 'unreleased:discordState'
 
 export function discordRedirectUri(): string {
+  // In Electron (file:// protocol) always use the production callback URL,
+  // which is the registered Discord redirect URI
+  if (window.location.protocol === 'file:') {
+    return 'https://player.juicewrldapi.com/auth/discord/callback'
+  }
   return `${window.location.origin}/auth/discord/callback`
 }
 

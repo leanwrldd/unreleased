@@ -80,6 +80,15 @@ npm run preview
 
 ## Changelog
 
+### v1.8.4
+- Fix: Added visual separation between the title bar and app content
+- Fix: Library cover art now updates correctly after lazy-loading
+- New: Right-click context menu on library track rows
+- New: Context menus on local playlist cards (rename, delete)
+- New: Local playlists support custom cover images
+- Improve: Metadata editor lyrics redesigned with full-width editor
+- Improve: Discord login opens a popup window in the desktop app
+
 ### v1.8.3
 - **Fix** Window controls overlap in Library toolbar
 - **Improve** Local playlists moved exclusively to Playlists tab

@@ -438,6 +438,39 @@ ipcMain.handle('write-track-metadata', async (_, filePath, metadata) => {
   } catch(e) { return { error: e.message } }
 })
 
+ipcMain.handle('open-discord-login', (_, authorizeUrl) => {
+  return new Promise((resolve) => {
+    const loginWin = new BrowserWindow({
+      width: 520, height: 720,
+      parent: mainWindow || undefined,
+      modal: false,
+      title: 'Log in with Discord',
+      webPreferences: { nodeIntegration: false, contextIsolation: true },
+    })
+    loginWin.setMenu(null)
+    loginWin.loadURL(authorizeUrl)
+
+    const CALLBACK_HOST = 'player.juicewrldapi.com'
+    const CALLBACK_PATH = '/auth/discord/callback'
+
+    const intercept = (_, url) => {
+      try {
+        const parsed = new URL(url)
+        if (parsed.hostname === CALLBACK_HOST && parsed.pathname === CALLBACK_PATH) {
+          const code = parsed.searchParams.get('code')
+          const state = parsed.searchParams.get('state')
+          loginWin.close()
+          resolve(code && state ? { code, state } : null)
+        }
+      } catch {}
+    }
+
+    loginWin.webContents.on('will-navigate', intercept)
+    loginWin.webContents.on('will-redirect', intercept)
+    loginWin.on('closed', () => resolve(null))
+  })
+})
+
 ipcMain.handle('select-image-file', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],

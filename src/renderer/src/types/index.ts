@@ -61,6 +61,7 @@ export interface LocalPlaylist {
   name: string
   trackIds: string[]          // LibraryTrack ids
   createdAt: number
+  coverImage?: string | null  // base64 data URL or null
 }
 
 export interface Playlist {

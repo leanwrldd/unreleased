@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electron', {
   pickFolder:  ()        => ipcRenderer.invoke('pick-folder'),
   openPath:    (p)       => ipcRenderer.invoke('open-path', p),
   selectImageFile: ()    => ipcRenderer.invoke('select-image-file'),
+  openDiscordLogin: (url) => ipcRenderer.invoke('open-discord-login', url),
 
   // App settings
   getAppSettings:  ()           => ipcRenderer.invoke('get-app-settings'),
