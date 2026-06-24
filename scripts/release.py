@@ -166,11 +166,56 @@ def main():
     parser.add_argument("--notes",       default="", help="Release notes body")
     parser.add_argument("--skip-build",  action="store_true", help="Skip vite + electron-builder")
     parser.add_argument("--skip-upload", action="store_true", help="Skip asset upload")
+    parser.add_argument("--upload-only", action="store_true", help="Skip build/git; only create/fetch release and upload assets")
     args = parser.parse_args()
 
     ver   = args.version.lstrip("v")
     tag   = f"v{ver}"
     token = get_token()
+
+    # -- upload-only shortcut -------------------------------------------------
+    if args.upload_only:
+        step(f"Upload-only: creating/fetching GitHub release {tag}")
+        try:
+            release = api_request("POST",
+                f"/repos/{REPO_OWNER}/{REPO_NAME}/releases", token,
+                {"tag_name": tag, "name": tag, "body": args.notes or f"Release {tag}",
+                 "draft": False, "prerelease": False})
+            ok(f"Release created: id={release['id']}")
+        except urllib.error.HTTPError as e:
+            if e.code == 422:
+                release = api_request("GET",
+                    f"/repos/{REPO_OWNER}/{REPO_NAME}/releases/tags/{tag}", token)
+                ok(f"Release already exists: id={release['id']}")
+            else:
+                raise
+        release_id = release["id"]
+        step("Uploading release assets")
+        release_dir = ROOT / "release"
+        assets_to_upload = [
+            release_dir / "latest.yml",
+            release_dir / f"Unreleased-Setup-{ver}.exe.blockmap",
+            release_dir / f"Unreleased-Setup-{ver}.exe",
+        ]
+        try:
+            existing = api_request("GET",
+                f"/repos/{REPO_OWNER}/{REPO_NAME}/releases/{release_id}/assets", token)
+            existing_map = {a["name"]: a["id"] for a in existing}
+        except Exception:
+            existing_map = {}
+        for filepath in assets_to_upload:
+            if not filepath.exists():
+                print(f"  WARNING: {filepath.name} not found, skipping")
+                continue
+            if filepath.name in existing_map:
+                print(f"  Deleting existing asset: {filepath.name}")
+                api_request("DELETE",
+                    f"/repos/{REPO_OWNER}/{REPO_NAME}/releases/assets/{existing_map[filepath.name]}",
+                    token)
+            upload_asset(release_id, filepath, token)
+        step("All done!")
+        print(f"\n  Release: https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/tag/{tag}\n")
+        return
 
     # -- Make sure we start on app branch -------------------------------------
     if git_branch() != "app":
