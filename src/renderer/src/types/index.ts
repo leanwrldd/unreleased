@@ -31,6 +31,38 @@ export interface FullTrack extends Track {
   fileSize?: number
 }
 
+
+export interface LibraryTrack {
+  id: string                  // 'local-' + filePath
+  filePath: string
+  ext: string                 // 'mp3', 'flac', etc.
+  title: string
+  artist: string
+  album: string
+  albumArtist: string
+  year: number | null
+  trackNumber: number | null
+  discNumber: number | null
+  composer: string
+  genre: string
+  duration: number
+  bitrate: number | null
+  sampleRate: number | null
+  fileSize: number
+  lastModified: number
+  hasAlbumArt: boolean
+  addedAt: number
+  // Loaded on demand
+  albumArt?: string | null    // base64 data URL
+}
+
+export interface LocalPlaylist {
+  id: string
+  name: string
+  trackIds: string[]          // LibraryTrack ids
+  createdAt: number
+}
+
 export interface Playlist {
   id: string
   name: string
@@ -52,7 +84,7 @@ export interface SyncedLyricLine {
   text: string
 }
 
-export type ViewType = 'api-tracker' | 'api-files' | 'api-categories' | 'editor' | 'admin' | 'liked' | 'playlists' | 'shared-playlist' | 'editor-profile' | 'docs' | 'wrld' | 'not-found'
+export type ViewType = 'api-tracker' | 'api-files' | 'api-categories' | 'editor' | 'admin' | 'liked' | 'playlists' | 'shared-playlist' | 'editor-profile' | 'docs' | 'wrld' | 'library' | 'not-found'
 
 export type SortField = 'default' | 'title' | 'artist' | 'album' | 'year' | 'genre' | 'duration'
 export type SortDir = 'asc' | 'desc'

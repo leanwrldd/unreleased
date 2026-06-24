@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { SearchCode, HardDrive, Settings, ShieldCheck, ListMusic, LogIn, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
+import { SearchCode, HardDrive, Settings, ShieldCheck, ListMusic, Library, LogIn, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
@@ -8,6 +8,7 @@ const LS_COLLAPSED = 'sidebar:collapsed'
 
 export default function Sidebar(): JSX.Element {
   const { activeView, setActiveView, setShowSettings, account, logoutAccount, setShowUserAuth } = useStore()
+  const isElectron = navigator.userAgent.includes('Electron')
   const isAdmin = !!account?.is_administrator
 
   const [collapsed, setCollapsed] = useState<boolean>(
@@ -23,6 +24,7 @@ export default function Sidebar(): JSX.Element {
   const items: { icon: React.ReactNode; label: string; view: ViewType }[] = [
     { icon: <SearchCode size={18} />, label: 'Tracker', view: 'api-tracker' },
     { icon: <HardDrive size={18} />, label: 'Files', view: 'api-files' },
+    ...(isElectron ? [{ icon: <Library size={18} />, label: 'Library', view: 'library' as const }] : []),
     { icon: <ListMusic size={18} />, label: 'Playlists', view: 'playlists' },
     { icon: <img src={logo} alt="WRLD" className="w-[22px] h-[22px] object-contain" />, label: 'WRLD', view: 'wrld' },
   ]

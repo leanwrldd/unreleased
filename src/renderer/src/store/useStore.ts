@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { ViewType, SortField, SortDir, Cols, FullTrack } from '../types'
+import { ViewType, SortField, SortDir, Cols, FullTrack, LibraryTrack, LocalPlaylist } from '../types'
 import * as userApi from '../lib/userApi'
 import type { AccountUser, PlaylistSummary } from '../lib/userApi'
 import { createQueueSlice, QueueSlice } from './queueSlice'
@@ -90,6 +90,15 @@ interface AppState {
   pendingEditorSongId: number | null
   pendingEditProposal: { id: number; songId: number; proposedData: Record<string, unknown>; editorNotes: string } | null
 
+
+  // Library (Electron only)
+  libraryTracks: LibraryTrack[]
+  libraryFolders: string[]
+  libraryScanning: boolean
+  libraryLastScanned: number | null
+  localPlaylists: LocalPlaylist[]
+  activeLocalPlaylistId: string | null
+
   // Downloads (Electron only)
   downloads: DownloadItem[]
   showDownloadManager: boolean
@@ -141,6 +150,26 @@ interface AppActions {
 
   setPendingEditorSongId: (id: number | null) => void
   setPendingEditProposal: (p: { id: number; songId: number; proposedData: Record<string, unknown>; editorNotes: string } | null) => void
+
+
+  setLibraryTracks: (tracks: LibraryTrack[]) => void
+  updateLibraryTrack: (id: string, updates: Partial<LibraryTrack>) => void
+  setLibraryFolders: (folders: string[]) => void
+  addLibraryFolder: (folder: string) => void
+  removeLibraryFolder: (folder: string) => void
+  setLibraryScanning: (scanning: boolean) => void
+  setLibraryLastScanned: (ts: number | null) => void
+  scanLibrary: () => Promise<void>
+
+  setLocalPlaylists: (playlists: LocalPlaylist[]) => void
+  createLocalPlaylist: (name: string) => void
+  deleteLocalPlaylist: (id: string) => void
+  renameLocalPlaylist: (id: string, name: string) => void
+  addToLocalPlaylist: (playlistId: string, trackId: string) => void
+  removeFromLocalPlaylist: (playlistId: string, trackId: string) => void
+  reorderLocalPlaylist: (playlistId: string, trackIds: string[]) => void
+  setActiveLocalPlaylistId: (id: string | null) => void
+  loadLibrary: () => Promise<void>
 
   addDownload: (item: DownloadItem) => void
   updateDownload: (id: string, updates: Partial<DownloadItem>) => void
@@ -358,6 +387,114 @@ export const useStore = create<AppStore>((set, get, store) => ({
   pendingEditProposal: null,
   setPendingEditorSongId: (pendingEditorSongId) => set({ pendingEditorSongId }),
   setPendingEditProposal: (pendingEditProposal) => set({ pendingEditProposal }),
+
+
+  // ── Library ───────────────────────────────────────────────────────────────
+  libraryTracks: [],
+  libraryFolders: ls.get<string[]>('libraryFolders') ?? [],
+  libraryScanning: false,
+  libraryLastScanned: ls.get<number>('libraryLastScanned') ?? null,
+  localPlaylists: [],
+  activeLocalPlaylistId: null,
+
+  setLibraryTracks: (libraryTracks) => set({ libraryTracks }),
+  updateLibraryTrack: (id, updates) => set((s) => ({
+    libraryTracks: s.libraryTracks.map((t) => t.id === id ? { ...t, ...updates } : t),
+  })),
+  setLibraryFolders: (libraryFolders) => {
+    set({ libraryFolders })
+    ls.set('libraryFolders', libraryFolders)
+  },
+  addLibraryFolder: (folder) => {
+    const { libraryFolders } = get()
+    if (libraryFolders.includes(folder)) return
+    const next = [...libraryFolders, folder]
+    set({ libraryFolders: next })
+    ls.set('libraryFolders', next)
+  },
+  removeLibraryFolder: (folder) => {
+    const next = get().libraryFolders.filter((f) => f !== folder)
+    set({ libraryFolders: next })
+    ls.set('libraryFolders', next)
+  },
+  setLibraryScanning: (libraryScanning) => set({ libraryScanning }),
+  setLibraryLastScanned: (ts) => {
+    set({ libraryLastScanned: ts })
+    ls.set('libraryLastScanned', ts)
+  },
+
+  scanLibrary: async () => {
+    const el = (window as any).electron
+    if (!el) return
+    const { libraryFolders } = get()
+    if (libraryFolders.length === 0) return
+    set({ libraryScanning: true })
+    try {
+      const result = await el.scanLibrary(libraryFolders)
+      if (result.error) { console.error('Scan error:', result.error); return }
+      const now = Date.now()
+      set({ libraryTracks: result.tracks, libraryLastScanned: now })
+      ls.set('libraryLastScanned', now)
+      await el.saveLibraryData({ tracks: result.tracks, folders: libraryFolders, lastScanned: now })
+    } catch(e) { console.error('scanLibrary error:', e) }
+    finally { set({ libraryScanning: false }) }
+  },
+
+  setLocalPlaylists: (localPlaylists) => set({ localPlaylists }),
+  createLocalPlaylist: (name) => {
+    const el = (window as any).electron
+    const playlist: LocalPlaylist = { id: `lp-${Date.now()}`, name, trackIds: [], createdAt: Date.now() }
+    const next = [...get().localPlaylists, playlist]
+    set({ localPlaylists: next, activeLocalPlaylistId: playlist.id })
+    el?.saveLocalPlaylists(next)
+  },
+  deleteLocalPlaylist: (id) => {
+    const el = (window as any).electron
+    const next = get().localPlaylists.filter((p) => p.id !== id)
+    const active = get().activeLocalPlaylistId
+    set({ localPlaylists: next, activeLocalPlaylistId: active === id ? null : active })
+    el?.saveLocalPlaylists(next)
+  },
+  renameLocalPlaylist: (id, name) => {
+    const el = (window as any).electron
+    const next = get().localPlaylists.map((p) => p.id === id ? { ...p, name } : p)
+    set({ localPlaylists: next })
+    el?.saveLocalPlaylists(next)
+  },
+  addToLocalPlaylist: (playlistId, trackId) => {
+    const el = (window as any).electron
+    const next = get().localPlaylists.map((p) =>
+      p.id === playlistId && !p.trackIds.includes(trackId)
+        ? { ...p, trackIds: [...p.trackIds, trackId] } : p
+    )
+    set({ localPlaylists: next })
+    el?.saveLocalPlaylists(next)
+  },
+  removeFromLocalPlaylist: (playlistId, trackId) => {
+    const el = (window as any).electron
+    const next = get().localPlaylists.map((p) =>
+      p.id === playlistId ? { ...p, trackIds: p.trackIds.filter((id) => id !== trackId) } : p
+    )
+    set({ localPlaylists: next })
+    el?.saveLocalPlaylists(next)
+  },
+  reorderLocalPlaylist: (playlistId, trackIds) => {
+    const el = (window as any).electron
+    const next = get().localPlaylists.map((p) => p.id === playlistId ? { ...p, trackIds } : p)
+    set({ localPlaylists: next })
+    el?.saveLocalPlaylists(next)
+  },
+  setActiveLocalPlaylistId: (activeLocalPlaylistId) => set({ activeLocalPlaylistId }),
+
+  loadLibrary: async () => {
+    const el = (window as any).electron
+    if (!el) return
+    try {
+      const [libData, playlists] = await Promise.all([el.loadLibraryData(), el.loadLocalPlaylists()])
+      if (libData?.tracks) set({ libraryTracks: libData.tracks })
+      if (playlists) set({ localPlaylists: playlists })
+    } catch(e) { console.error('loadLibrary error:', e) }
+  },
 
   // ── Downloads ─────────────────────────────────────────────────────────────
   downloads: [],

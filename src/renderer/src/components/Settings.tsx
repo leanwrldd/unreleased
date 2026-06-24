@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle,
   PenLine, BookOpen, Copy, Eye, EyeOff, ChevronDown, KeyRound, Globe, RefreshCw, DownloadCloud,
-  FolderOpen, Monitor, BellOff, Minus,
+  FolderOpen, FolderPlus, Monitor, BellOff, Minus, Loader2,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { getToken } from '../lib/userApi'
@@ -35,6 +35,7 @@ export default function Settings(): JSX.Element {
     playbackSpeed, setPlaybackSpeed,
     sleepTimerEnd, setSleepTimer,
     updateStatus,
+    libraryFolders, addLibraryFolder, removeLibraryFolder, scanLibrary, libraryScanning, libraryTracks, libraryLastScanned,
   } = useStore()
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
@@ -314,6 +315,52 @@ export default function Settings(): JSX.Element {
             </div>
           </section>
 
+
+          {/* Library Folders */}
+          {isElectron && (
+            <section>
+              <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest mb-4">Library Folders</h3>
+              <div className="space-y-2 mb-3">
+                {libraryFolders.length === 0 && (
+                  <p className="text-text-muted text-xs">No folders added yet.</p>
+                )}
+                {libraryFolders.map((folder) => (
+                  <div key={folder} className="flex items-center gap-2 bg-surface-overlay rounded-lg px-3 py-2 border border-[var(--border)]">
+                    <FolderOpen size={13} className="text-text-muted shrink-0" />
+                    <span className="flex-1 text-text-primary text-xs truncate" title={folder}>{folder}</span>
+                    <button
+                      onClick={() => removeLibraryFolder(folder)}
+                      className="text-text-muted hover:text-red-400 transition-colors text-xs px-1"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => { if (!el) return; const p = await el.pickFolder(); if (p) addLibraryFolder(p) }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-surface-overlay border border-[var(--border)] text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                >
+                  <FolderPlus size={13} /> Add Folder
+                </button>
+                <button
+                  onClick={() => scanLibrary()}
+                  disabled={libraryScanning || libraryFolders.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-accent/15 text-accent hover:bg-accent/25 disabled:opacity-40 transition-colors"
+                >
+                  {libraryScanning ? <Loader2 size={13} className="animate-spin" /> : null}
+                  {libraryScanning ? 'Scanning…' : 'Scan Now'}
+                </button>
+              </div>
+              {libraryLastScanned && (
+                <p className="text-text-muted text-[10px] mt-2">
+                  Last scanned: {new Date(libraryLastScanned).toLocaleString()} · {libraryTracks.length} tracks
+                </p>
+              )}
+            </section>
+          )}
+
           {/* App (Electron only) */}
           {isElectron && (
             <section>
@@ -386,7 +433,7 @@ export default function Settings(): JSX.Element {
               <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">About</h3>
             </div>
             <p className="text-text-muted text-xs mb-3">
-              unreleased v1.7.8 &mdash; powered by{' '}
+              unreleased v1.8.0 &mdash; powered by{' '}
               <a href="https://juicewrldapi.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                 juicewrldapi.com
               </a>

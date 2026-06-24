@@ -6,6 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.8.0',
+    date: '2026-06-24',
+    changes: [
+      { type: 'new', text: 'Library tab (desktop) -- scan local folders, browse albums grid or songs list, Apple Music style' },
+      { type: 'new', text: 'Metadata editor -- edit title, artist, album, year, track/disc #, composer, genre, lyrics, synced lyrics, and album art; writes tags to MP3 files' },
+      { type: 'new', text: 'Local playlists -- create, rename, delete playlists from your library; drag to reorder tracks; no login required' },
+      { type: 'improve', text: 'Downloads moved to top-right icon button; collapses to a single arrow icon with active-count badge' },
+    ],
+  },
+
+  {
     version: '1.7.9',
     date: '2026-06-24',
     changes: [
@@ -21,7 +32,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { type: 'new', text: 'Download manager -- tracks file, zip, and update downloads with progress' },
       { type: 'new', text: 'Local files toggle in Files view (desktop only) -- browse and play files from your computer' },
       { type: 'new', text: 'App settings: download folder, startup view, auto-update, minimize to tray' },
-      { type: 'fix', text: 'Update status no longer stays stuck on 'checking'' },
+      { type: 'fix', text: "Update status no longer stays stuck on 'checking'" },
       { type: 'new', text: 'Force-update button to reinstall latest release without version check' },
     ],
   },
