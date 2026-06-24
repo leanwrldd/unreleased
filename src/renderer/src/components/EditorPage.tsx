@@ -441,7 +441,7 @@ export default function EditorPage(): JSX.Element {
     <div className="flex-1 flex flex-col min-h-0">
 
       {/* Top bar */}
-      <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-[var(--border)]">
+      <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b border-[var(--border)]" style={(window as any).electron ? { paddingRight: '148px' } : undefined}>
         <span className="flex-1 font-bold text-sm text-text-primary">Edit song</span>
         <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${isAdmin ? 'bg-accent/20 text-accent' : 'bg-emerald-500/20 text-emerald-400'}`}>
           {isAdmin ? 'admin' : 'editor'}

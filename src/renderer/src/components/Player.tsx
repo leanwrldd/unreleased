@@ -73,6 +73,7 @@ export default function Player(): JSX.Element {
 
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false)
+  const [addToPlaylistPos, setAddToPlaylistPos] = useState<{ top: number; left: number } | null>(null)
   const [showSongInfo, setShowSongInfo] = useState(false)
   const [songInfoData, setSongInfoData] = useState<JWApiSong | null>(null)
   const contextMenuBtnRef = useRef<HTMLButtonElement>(null)
@@ -496,6 +497,14 @@ export default function Player(): JSX.Element {
 
   const handlePrev = (): void => {
     const audio = getActive()
+    // In radio mode the user can't go back — always restart current song
+    if (radioMode) {
+      cancelCF()
+      if (audio) { audio.currentTime = 0; audio.volume = volumeRef.current }
+      setCurrentTime(0)
+      setProgress(0)
+      return
+    }
     if (audio && audio.currentTime > 3) {
       cancelCF()
       audio.currentTime = 0
@@ -573,6 +582,21 @@ export default function Player(): JSX.Element {
     setPlaybackSpeed(SPEEDS[(idx + 1) % SPEEDS.length])
   }
   const speedLabel = playbackSpeed === 1 ? '1x' : `${playbackSpeed}x`
+
+
+  // Spacebar pause/play shortcut
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      if (e.code !== 'Space' && e.key !== ' ') return
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) return
+      if (!currentTrack || radioFmActive) return
+      e.preventDefault()
+      setIsPlaying(!isPlaying)
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [currentTrack, isPlaying, setIsPlaying, radioFmActive])
 
   // Cover art error state — reset when track changes
   const [coverArtError, setCoverArtError] = useState(false)
@@ -673,7 +697,7 @@ export default function Player(): JSX.Element {
             </button>
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              disabled={!currentTrack}
+              disabled={!currentTrack || radioFmActive}
               className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:scale-105 active:scale-95 transition-transform disabled:opacity-30"
             >
               {isPlaying
@@ -758,7 +782,16 @@ export default function Player(): JSX.Element {
                         {currentSongId != null && !['recording_session', 'unsurfaced'].includes(currentTrack?.genre ?? '') && (
                           <button
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-                            onClick={() => { setShowAddToPlaylist(true); setShowContextMenu(false) }}
+                            onClick={() => {
+                              if (contextMenuBtnRef.current) {
+                                const r = contextMenuBtnRef.current.getBoundingClientRect()
+                                // Estimate menu height ~340px; position above button with clamping
+                                const menuH = 340
+                                setAddToPlaylistPos({ top: Math.max(8, r.top - menuH - 8), left: Math.max(8, Math.min(r.left, window.innerWidth - 256)) })
+                              }
+                              setShowAddToPlaylist(true)
+                              setShowContextMenu(false)
+                            }}
                           >
                             <ListPlus size={14} /> Add to playlist
                           </button>
@@ -775,10 +808,11 @@ export default function Player(): JSX.Element {
                     </>
                   )}
 
-                  {showAddToPlaylist && currentSongId != null && (
-                    <div className="absolute bottom-7 left-0 z-50">
-                      <AddToPlaylistMenu songId={currentSongId} placement="top" onClose={() => setShowAddToPlaylist(false)} />
-                    </div>
+                  {showAddToPlaylist && currentSongId != null && addToPlaylistPos != null && createPortal(
+                    <div className="fixed z-[9999]" style={{ top: addToPlaylistPos.top, left: addToPlaylistPos.left }}>
+                      <AddToPlaylistMenu songId={currentSongId} anchorClass="relative" onClose={() => { setShowAddToPlaylist(false); setAddToPlaylistPos(null) }} />
+                    </div>,
+                    document.body
                   )}
                 </div>
               </div>
@@ -810,7 +844,7 @@ export default function Player(): JSX.Element {
 
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              disabled={!currentTrack}
+              disabled={!currentTrack || radioFmActive}
               className="w-9 h-9 rounded-full bg-white flex items-center justify-center hover:scale-105 active:scale-95 transition-transform disabled:opacity-30"
             >
               {isPlaying

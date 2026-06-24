@@ -6,6 +6,32 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.8.2',
+    date: '2026-06-24',
+    changes: [
+      { type: 'improve', text: 'Local playlists now appear in the Playlists page alongside API playlists, with the same card UI and a Local badge' },
+      { type: 'improve', text: 'Metadata editor redesigned to match the editor page style: compact field rows, change highlighting, and section dividers' },
+      { type: 'fix', text: 'Library songs now show cover art in the player after art loads' },
+      { type: 'new', text: 'Library song rows now have an expandable lyrics panel (reads embedded lyrics from file)' },
+      { type: 'fix', text: 'Close/minimize/maximize buttons no longer overlap app toolbar buttons in the Library and Editor views' },
+    ],
+  },
+
+  {
+    version: '1.8.1',
+    date: '2026-06-24',
+    changes: [
+      { type: 'fix', text: 'Tracker context menu no longer blinks when opening a second one' },
+      { type: 'fix', text: 'Go-backwards button now correctly restarts current song in radio mode' },
+      { type: 'fix', text: 'Clicking a history song in radio mode continues radio playback afterward' },
+      { type: 'improve', text: 'Tracker category tags are now color-coded: green (released), blue (unreleased), amber (unsurfaced), purple (sessions)' },
+      { type: 'fix', text: 'Play/pause button and spacebar are blocked while tuned in to 999 FM' },
+      { type: 'fix', text: 'Add to Playlist menu no longer clips out of bounds when triggered from a corner' },
+      { type: 'new', text: 'Spacebar now pauses and resumes playback (ignored when typing in an input)' },
+    ],
+  },
+
+  {
     version: '1.8.0',
     date: '2026-06-24',
     changes: [
@@ -511,6 +537,4 @@ export const CHANGELOG: ChangelogEntry[] = [
       { type: 'new', text: 'Metadata editor with lyrics and cover art' },
       { type: 'new', text: 'Dark / light theme' },
       { type: 'new', text: 'Frameless window with custom titlebar' },
-    ]
-  },
-]
+   

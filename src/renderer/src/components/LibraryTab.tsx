@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Music, Play, Shuffle, Search, Plus, MoreHorizontal, Edit2, Trash2, X,
-  ChevronRight, ChevronLeft, ListMusic, LayoutGrid, List,
-  FolderOpen, Clock, Loader2, Check, GripVertical,
+  ChevronLeft, ListMusic, LayoutGrid, List,
+  FolderOpen, Clock, Loader2, Check, GripVertical, ChevronDown, ChevronUp, FileText,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { LibraryTrack, LocalPlaylist } from '../types'
@@ -255,7 +255,11 @@ function SongRow({ track, index, queue, onEdit, onAddToPlaylist, showAlbum = tru
   const { playTrack } = useStore()
   const [menuOpen, setMenuOpen] = useState(false)
   const [hovered, setHovered] = useState(false)
+  const [lyricsOpen, setLyricsOpen] = useState(false)
+  const [lyrics, setLyrics] = useState<string | null>(null)
+  const [lyricsLoading, setLyricsLoading] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const el = (window as any).electron
 
   useEffect(() => {
     if (!menuOpen) return
@@ -270,62 +274,99 @@ function SongRow({ track, index, queue, onEdit, onAddToPlaylist, showAlbum = tru
     playTrack(thisTrack, qTracks)
   }
 
+  const toggleLyrics = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (lyricsOpen) { setLyricsOpen(false); return }
+    setLyricsOpen(true)
+    if (lyrics !== null || !el) return
+    setLyricsLoading(true)
+    try {
+      const meta = await el.readTrackMetadata(track.filePath)
+      setLyrics(meta?.lyrics || '')
+    } catch { setLyrics('') }
+    finally { setLyricsLoading(false) }
+  }
+
   return (
-    <div
-      className={`group flex items-center gap-3 px-4 py-2 hover:bg-[var(--surface-overlay)] rounded-lg transition-colors cursor-pointer ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onDoubleClick={handlePlay}
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-    >
-      {draggable && (
-        <GripVertical size={14} className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 shrink-0" />
-      )}
-      {/* Index / play button */}
-      <div className="w-5 shrink-0 flex items-center justify-center">
-        {hovered
-          ? <button onClick={handlePlay}><Play size={13} fill="currentColor" className="text-[var(--text-primary)]" /></button>
-          : <span className="text-[var(--text-muted)] text-xs">{index + 1}</span>
-        }
-      </div>
-      {/* Art */}
-      <div className="w-9 h-9 rounded overflow-hidden shrink-0">
-        <AlbumArtThumb track={track} size={36} />
-      </div>
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-[var(--text-primary)] text-sm truncate">{track.title}</p>
-        <p className="text-[var(--text-muted)] text-xs truncate">{track.artist || 'Unknown Artist'}</p>
-      </div>
-      {showAlbum && (
-        <span className="text-[var(--text-muted)] text-xs truncate max-w-[160px] hidden lg:block">{track.album}</span>
-      )}
-      <span className="text-[var(--text-muted)] text-xs shrink-0">{fmtDur(track.duration)}</span>
-      {/* Menu */}
-      <div className="relative shrink-0" ref={menuRef}>
-        <button
-          onClick={e => { e.stopPropagation(); setMenuOpen(v => !v) }}
-          className="p-1 rounded opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-        >
-          <MoreHorizontal size={14} />
-        </button>
-        {menuOpen && (
-          <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-xl py-1 w-44">
-            <button onClick={() => { handlePlay(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[var(--text-primary)] hover:bg-[var(--surface-overlay)]">
-              <Play size={12} /> Play now
-            </button>
-            <button onClick={() => { onEdit(track); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[var(--text-primary)] hover:bg-[var(--surface-overlay)]">
-              <Edit2 size={12} /> Edit info
-            </button>
-            <button onClick={() => { onAddToPlaylist(track); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[var(--text-primary)] hover:bg-[var(--surface-overlay)]">
-              <ListMusic size={12} /> Add to playlist
-            </button>
-          </div>
+    <div>
+      <div
+        className={`group flex items-center gap-3 px-4 py-2 hover:bg-[var(--surface-overlay)] rounded-lg transition-colors cursor-pointer ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onDoubleClick={handlePlay}
+        draggable={draggable}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+      >
+        {draggable && (
+          <GripVertical size={14} className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 shrink-0" />
         )}
+        {/* Index / play button */}
+        <div className="w-5 shrink-0 flex items-center justify-center">
+          {hovered
+            ? <button onClick={handlePlay}><Play size={13} fill="currentColor" className="text-[var(--text-primary)]" /></button>
+            : <span className="text-[var(--text-muted)] text-xs">{index + 1}</span>
+          }
+        </div>
+        {/* Art */}
+        <div className="w-9 h-9 rounded overflow-hidden shrink-0">
+          <AlbumArtThumb track={track} size={36} />
+        </div>
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <p className="text-[var(--text-primary)] text-sm truncate">{track.title}</p>
+          <p className="text-[var(--text-muted)] text-xs truncate">{track.artist || 'Unknown Artist'}</p>
+        </div>
+        {showAlbum && (
+          <span className="text-[var(--text-muted)] text-xs truncate max-w-[160px] hidden lg:block">{track.album}</span>
+        )}
+        <span className="text-[var(--text-muted)] text-xs shrink-0">{fmtDur(track.duration)}</span>
+        {/* Lyrics toggle */}
+        <button
+          onClick={toggleLyrics}
+          className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-colors shrink-0 ${lyricsOpen ? 'text-[var(--accent)] opacity-100' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+          title={lyricsOpen ? 'Hide lyrics' : 'Show lyrics'}
+        >
+          <FileText size={13} />
+        </button>
+        {/* Menu */}
+        <div className="relative shrink-0" ref={menuRef}>
+          <button
+            onClick={e => { e.stopPropagation(); setMenuOpen(v => !v) }}
+            className="p-1 rounded opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            <MoreHorizontal size={14} />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-xl py-1 w-44">
+              <button onClick={() => { handlePlay(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[var(--text-primary)] hover:bg-[var(--surface-overlay)]">
+                <Play size={12} /> Play now
+              </button>
+              <button onClick={() => { onEdit(track); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[var(--text-primary)] hover:bg-[var(--surface-overlay)]">
+                <Edit2 size={12} /> Edit info
+              </button>
+              <button onClick={() => { onAddToPlaylist(track); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[var(--text-primary)] hover:bg-[var(--surface-overlay)]">
+                <ListMusic size={12} /> Add to playlist
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+      {/* Expandable lyrics */}
+      {lyricsOpen && (
+        <div className="mx-4 mb-2 px-3 py-2.5 rounded-lg bg-[var(--surface-overlay)] border border-[var(--border)]">
+          {lyricsLoading ? (
+            <div className="flex items-center gap-2 text-[var(--text-muted)] text-xs">
+              <Loader2 size={12} className="animate-spin" /> Loading lyrics…
+            </div>
+          ) : lyrics ? (
+            <pre className="text-[var(--text-primary)] text-xs font-sans whitespace-pre-wrap leading-relaxed">{lyrics}</pre>
+          ) : (
+            <p className="text-[var(--text-muted)] text-xs italic">No lyrics found for this track.</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -556,6 +597,7 @@ export default function LibraryTab(): JSX.Element {
     scanLibrary, libraryFolders, loadLibrary,
     setShowSettings, playTrack,
   } = useStore()
+  const isElectron = !!(window as any).electron
 
   const [libView, setLibView] = useState<LibView>('albums')
   const [searchQ, setSearchQ] = useState('')
@@ -618,7 +660,7 @@ export default function LibraryTab(): JSX.Element {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar */}
-        <div className="shrink-0 flex items-center gap-3 px-5 py-3 border-b border-[var(--border)]" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <div className="shrink-0 flex items-center gap-3 px-5 py-3 border-b border-[var(--border)]" style={{ WebkitAppRegion: 'no-drag', paddingRight: isElectron ? '148px' : undefined } as React.CSSProperties}>
           {selectedAlbum && (
             <button onClick={() => setSelectedAlbum(null)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] transition-colors">
               <ChevronLeft size={16} />
@@ -739,4 +781,3 @@ export default function LibraryTab(): JSX.Element {
     </div>
   )
 }
-

@@ -24,17 +24,35 @@ interface MetaFields {
   albumArt: string | null
 }
 
-function Field({ label, value, onChange, multiline = false, hint }: {
-  label: string; value: string; onChange: (v: string) => void; multiline?: boolean; hint?: string
-}): JSX.Element {
-  const base = "w-full bg-[var(--surface-overlay)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-sm px-3 py-2 focus:outline-none focus:border-[var(--accent)] transition-colors placeholder:text-[var(--text-muted)]"
+// ── Section label (matches EditorPage style) ──────────────────────────────────
+
+function SectionLabel({ label }: { label: string }): JSX.Element {
   return (
-    <div>
-      <label className="block text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1">{label}</label>
-      {multiline
-        ? <textarea className={`${base} resize-none`} rows={4} value={value} onChange={e => onChange(e.target.value)} placeholder={hint} />
-        : <input className={base} value={value} onChange={e => onChange(e.target.value)} placeholder={hint} />
-      }
+    <div className="flex items-center gap-2.5 px-4 pt-5 pb-1.5">
+      <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] opacity-55 shrink-0 select-none">{label}</span>
+      <div className="flex-1 h-px bg-[var(--border)]" style={{ opacity: 0.5 }} />
+    </div>
+  )
+}
+
+// ── Field row (matches EditorPage FieldRow style) ─────────────────────────────
+
+function FieldRow({ label, value, original, onChange, placeholder, multiline = false, mono = false }: {
+  label: string; value: string; original: string
+  onChange: (v: string) => void; placeholder?: string; multiline?: boolean; mono?: boolean
+}): JSX.Element {
+  const changed = value !== original && !(value === '' && original === '')
+  const base = `flex-1 bg-transparent text-sm text-[var(--text-primary)] focus:outline-none placeholder:text-[var(--text-muted)] placeholder:opacity-25 min-w-0 border-b border-[var(--border)] pb-px focus:border-[var(--accent)] transition-colors \${mono ? 'font-mono text-xs' : ''}`
+  return (
+    <div className={`group grid items-baseline px-4 py-[7px] border-l-2 transition-all \${changed ? 'border-[var(--accent)]/70 bg-[var(--accent)]/[0.025]' : 'border-transparent hover:bg-white/[0.05]'}`} style={{ gridTemplateColumns: '84px 1fr' }}>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)] opacity-65 select-none truncate pt-px">{label}</span>
+      <div className="flex items-center gap-2 min-w-0">
+        {multiline
+          ? <textarea className={`\${base} resize-none leading-relaxed`} rows={5} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+          : <input className={base} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+        }
+        {changed && <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-[var(--accent)]/80" />}
+      </div>
     </div>
   )
 }
@@ -46,7 +64,7 @@ export default function MetadataEditor({ track, onClose, onSaved }: MetadataEdit
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showSynced, setShowSynced] = useState(false)
-  const [fields, setFields] = useState<MetaFields>({
+  const [original, setOriginal] = useState<MetaFields>({
     title: track.title, artist: track.artist, album: track.album,
     albumArtist: track.albumArtist, year: track.year ? String(track.year) : '',
     trackNumber: track.trackNumber ? String(track.trackNumber) : '',
@@ -54,26 +72,28 @@ export default function MetadataEditor({ track, onClose, onSaved }: MetadataEdit
     composer: track.composer, genre: track.genre,
     lyrics: '', syncedLyrics: '', albumArt: track.albumArt ?? null,
   })
+  const [fields, setFields] = useState<MetaFields>({ ...original })
 
   useEffect(() => {
     if (!el) { setLoading(false); return }
     el.readTrackMetadata(track.filePath).then((meta: Record<string, any> | null) => {
       if (meta && !meta.error) {
-        setFields(f => ({
-          ...f,
-          title: meta.title || f.title,
-          artist: meta.artist || f.artist,
-          album: meta.album || f.album,
-          albumArtist: meta.albumArtist || f.albumArtist,
-          year: meta.year ? String(meta.year) : f.year,
-          trackNumber: meta.trackNumber ? String(meta.trackNumber) : f.trackNumber,
-          discNumber: meta.discNumber ? String(meta.discNumber) : '',
-          composer: meta.composer || f.composer,
-          genre: meta.genre || f.genre,
+        const loaded: MetaFields = {
+          title: meta.title || track.title,
+          artist: meta.artist || track.artist,
+          album: meta.album || track.album,
+          albumArtist: meta.albumArtist || track.albumArtist,
+          year: meta.year ? String(meta.year) : (track.year ? String(track.year) : ''),
+          trackNumber: meta.trackNumber ? String(meta.trackNumber) : (track.trackNumber ? String(track.trackNumber) : ''),
+          discNumber: meta.discNumber ? String(meta.discNumber) : (track.discNumber ? String(track.discNumber) : ''),
+          composer: meta.composer || track.composer,
+          genre: meta.genre || track.genre,
           lyrics: meta.lyrics || '',
           syncedLyrics: meta.syncedLyrics || '',
-          albumArt: meta.albumArt || f.albumArt,
-        }))
+          albumArt: meta.albumArt || track.albumArt || null,
+        }
+        setOriginal(loaded)
+        setFields(loaded)
       }
       setLoading(false)
     }).catch(() => setLoading(false))
@@ -88,11 +108,15 @@ export default function MetadataEditor({ track, onClose, onSaved }: MetadataEdit
     if (dataUrl) set('albumArt', dataUrl)
   }
 
+  const changedCount = Object.keys(fields).filter(k => {
+    const key = k as keyof MetaFields
+    return fields[key] !== original[key] && !(fields[key] === '' && original[key] === '')
+  }).length
+
   const handleSave = async () => {
     if (!el) return
     if (track.ext !== 'mp3') {
       setError('Metadata writing is only supported for MP3 files. Tags were not saved to disk, but the display will update.')
-      // Update in-memory only
       updateLibraryTrack(track.id, {
         title: fields.title, artist: fields.artist, album: fields.album,
         albumArtist: fields.albumArtist,
@@ -138,14 +162,35 @@ export default function MetadataEditor({ track, onClose, onSaved }: MetadataEdit
     <div className="fixed inset-0 z-[500] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="relative w-full max-w-2xl max-h-[90vh] bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] shrink-0">
-          <div className="min-w-0">
-            <h2 className="text-[var(--text-primary)] font-semibold text-base truncate">Edit Info</h2>
-            <p className="text-[var(--text-muted)] text-xs truncate mt-0.5">{track.filePath.split(/[/\\]/).pop()}</p>
+
+        {/* Header — matches EditorPage top bar style */}
+        <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-[var(--border)]">
+          {/* Album art thumbnail */}
+          <div
+            className="w-9 h-9 rounded-lg overflow-hidden shrink-0 cursor-pointer group relative bg-[var(--surface-overlay)]"
+            onClick={handlePickArt}
+            title="Click to change album art"
+          >
+            {fields.albumArt
+              ? <img src={fields.albumArt} alt="" className="w-full h-full object-cover" />
+              : <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]"><Music size={16} /></div>
+            }
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Upload size={12} className="text-white" />
+            </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] transition-colors ml-3 shrink-0">
-            <X size={16} />
+          <div className="flex-1 min-w-0">
+            <p className="text-[var(--text-primary)] text-sm font-semibold truncate">{fields.title || track.title}</p>
+            <p className="text-[var(--text-muted)] text-xs truncate">{track.filePath.split(/[/\\]/).pop()}</p>
+          </div>
+          {changedCount > 0 && (
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--accent)]/20 text-[var(--accent)] shrink-0">
+              {changedCount} change{changedCount !== 1 ? 's' : ''}
+            </span>
+          )}
+          <span className="text-[var(--text-muted)] text-[10px] uppercase tracking-wider shrink-0">{track.ext.toUpperCase()}{track.bitrate ? ` · ${track.bitrate}k` : ''}</span>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] transition-colors shrink-0">
+            <X size={15} />
           </button>
         </div>
 
@@ -154,85 +199,76 @@ export default function MetadataEditor({ track, onClose, onSaved }: MetadataEdit
             <Loader2 size={24} className="animate-spin text-[var(--accent)]" />
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-5 flex gap-5">
-              {/* Album Art */}
-              <div className="shrink-0 flex flex-col items-center gap-2">
+          <div className="flex-1 overflow-y-auto min-h-0">
+
+            {/* Large album art + basic fields in two-column hero */}
+            <div className="flex gap-4 px-4 pt-4 pb-2">
+              {/* Album art */}
+              <div className="shrink-0 flex flex-col items-center gap-1.5">
                 <div
-                  className="w-36 h-36 rounded-xl bg-[var(--surface-overlay)] border border-[var(--border)] overflow-hidden cursor-pointer group relative"
+                  className="w-32 h-32 rounded-xl bg-[var(--surface-overlay)] border border-[var(--border)] overflow-hidden cursor-pointer group relative"
                   onClick={handlePickArt}
                   title="Click to change album art"
                 >
                   {fields.albumArt
                     ? <img src={fields.albumArt} alt="Album art" className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]"><Music size={32} /></div>
+                    : <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]"><Music size={28} /></div>
                   }
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Upload size={20} className="text-white" />
+                    <Upload size={18} className="text-white" />
                   </div>
                 </div>
-                <button onClick={handlePickArt} className="text-[11px] text-[var(--accent)] hover:underline">
-                  Change art
-                </button>
+                <button onClick={handlePickArt} className="text-[10px] text-[var(--accent)] hover:underline">Change art</button>
                 {fields.albumArt && (
-                  <button onClick={() => set('albumArt', null)} className="text-[11px] text-[var(--text-muted)] hover:text-red-400">
-                    Remove
-                  </button>
+                  <button onClick={() => set('albumArt', null)} className="text-[10px] text-[var(--text-muted)] hover:text-red-400">Remove</button>
                 )}
-                <div className="text-center mt-1">
-                  <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">{track.ext.toUpperCase()}</p>
-                  {track.bitrate && <p className="text-[10px] text-[var(--text-muted)]">{track.bitrate} kbps</p>}
-                  {track.sampleRate && <p className="text-[10px] text-[var(--text-muted)]">{(track.sampleRate / 1000).toFixed(1)} kHz</p>}
-                </div>
               </div>
-
-              {/* Fields */}
-              <div className="flex-1 min-w-0 space-y-3">
-                <Field label="Title" value={fields.title} onChange={v => set('title', v)} />
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Artist" value={fields.artist} onChange={v => set('artist', v)} />
-                  <Field label="Album Artist" value={fields.albumArtist} onChange={v => set('albumArtist', v)} />
-                </div>
-                <Field label="Album" value={fields.album} onChange={v => set('album', v)} />
-                <div className="grid grid-cols-3 gap-3">
-                  <Field label="Year" value={fields.year} onChange={v => set('year', v)} hint="2019" />
-                  <Field label="Track #" value={fields.trackNumber} onChange={v => set('trackNumber', v)} hint="1" />
-                  <Field label="Disc #" value={fields.discNumber} onChange={v => set('discNumber', v)} hint="1" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Genre" value={fields.genre} onChange={v => set('genre', v)} />
-                  <Field label="Composer" value={fields.composer} onChange={v => set('composer', v)} />
-                </div>
+              {/* Right side: title + artist stacked as FieldRows but without section padding */}
+              <div className="flex-1 min-w-0 pt-1 space-y-0.5">
+                <FieldRow label="Title"  value={fields.title}  original={original.title}  onChange={v => set('title', v)} />
+                <FieldRow label="Artist" value={fields.artist} original={original.artist} onChange={v => set('artist', v)} />
+                <FieldRow label="Album"  value={fields.album}  original={original.album}  onChange={v => set('album', v)} />
               </div>
             </div>
 
-            {/* Lyrics */}
-            <div className="px-5 pb-5 space-y-3">
-              <Field label="Lyrics" value={fields.lyrics} onChange={v => set('lyrics', v)} multiline />
-              <div>
-                <button
-                  className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider mb-1 hover:text-[var(--text-primary)] transition-colors"
-                  onClick={() => setShowSynced(v => !v)}
-                >
-                  Synced Lyrics (LRC)
-                  {showSynced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                </button>
-                {showSynced && (
-                  <textarea
-                    className="w-full bg-[var(--surface-overlay)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-xs font-mono px-3 py-2 focus:outline-none focus:border-[var(--accent)] transition-colors resize-none"
-                    rows={6}
-                    value={fields.syncedLyrics}
-                    onChange={e => set('syncedLyrics', e.target.value)}
-                    placeholder="[00:12.00]Line one&#10;[00:17.20]Line two"
-                  />
-                )}
-              </div>
+            <SectionLabel label="Credits" />
+            <FieldRow label="Alb. Artist" value={fields.albumArtist} original={original.albumArtist} onChange={v => set('albumArtist', v)} />
+            <FieldRow label="Composer"   value={fields.composer}    original={original.composer}    onChange={v => set('composer', v)} />
+            <FieldRow label="Genre"      value={fields.genre}       original={original.genre}       onChange={v => set('genre', v)} />
+
+            <SectionLabel label="Numbers" />
+            <FieldRow label="Year"    value={fields.year}        original={original.year}        onChange={v => set('year', v)}        placeholder="2019" />
+            <FieldRow label="Track #" value={fields.trackNumber} original={original.trackNumber} onChange={v => set('trackNumber', v)} placeholder="1" />
+            <FieldRow label="Disc #"  value={fields.discNumber}  original={original.discNumber}  onChange={v => set('discNumber', v)}  placeholder="1" />
+
+            <SectionLabel label="Lyrics" />
+            <FieldRow label="Lyrics" value={fields.lyrics} original={original.lyrics} onChange={v => set('lyrics', v)} multiline />
+
+            <div className="px-4 pb-2">
+              <button
+                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] opacity-55 hover:opacity-100 transition-opacity mt-3 mb-1.5"
+                onClick={() => setShowSynced(v => !v)}
+              >
+                Synced Lyrics (LRC)
+                {showSynced ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+              </button>
+              {showSynced && (
+                <textarea
+                  className="w-full bg-[var(--surface-overlay)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-xs font-mono px-3 py-2 focus:outline-none focus:border-[var(--accent)] transition-colors resize-none"
+                  rows={5}
+                  value={fields.syncedLyrics}
+                  onChange={e => set('syncedLyrics', e.target.value)}
+                  placeholder="[00:12.00]Line one&#10;[00:17.20]Line two"
+                />
+              )}
             </div>
+
+            <div className="h-4" />
           </div>
         )}
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-[var(--border)] shrink-0 flex items-center gap-3">
+        <div className="px-4 py-3 border-t border-[var(--border)] shrink-0 flex items-center gap-3">
           {error && (
             <div className="flex items-center gap-2 text-amber-400 text-xs flex-1 min-w-0">
               <AlertCircle size={13} className="shrink-0" />
@@ -252,7 +288,7 @@ export default function MetadataEditor({ track, onClose, onSaved }: MetadataEdit
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-              Save
+              Save{changedCount > 0 ? ` (\${changedCount})` : ''}
             </button>
           </div>
         </div>

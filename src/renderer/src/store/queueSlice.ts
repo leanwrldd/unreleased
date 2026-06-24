@@ -89,6 +89,12 @@ export interface QueueSlice {
   /** Go back one track (or restart if >3 s in). */
   prevTrack: () => Track | null
 
+  /**
+   * Jump to a specific track in the queue without touching radioMode.
+   * Used when clicking history items during radio.
+   */
+  jumpToTrack: (track: Track) => void
+
   toggleShuffle: () => void
   toggleRepeat: () => void
 
@@ -288,6 +294,14 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
     const track = queue[prevIdx]
     set({ queueIndex: prevIdx, currentTrack: track, currentTrackFull: null, isPlaying: true, progress: 0, currentTime: 0 })
     return track
+  },
+
+  // ── jumpToTrack ───────────────────────────────────────────────────────────────
+  jumpToTrack: (track) => {
+    const { queue } = get()
+    const idx = queue.findIndex((t) => t.id === track.id)
+    if (idx < 0) return
+    set({ queueIndex: idx, currentTrack: track, currentTrackFull: null, isPlaying: true, progress: 0, currentTime: 0 })
   },
 
   // ── toggleShuffle ──────────────────────────────────────────────────────────

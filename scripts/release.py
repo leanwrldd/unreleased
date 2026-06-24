@@ -21,6 +21,8 @@ Steps performed:
 
 import os
 import sys
+if hasattr(sys.stdout, 'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'): sys.stderr.reconfigure(encoding='utf-8')
 import json
 import time
 import argparse
@@ -30,19 +32,19 @@ import urllib.error
 import urllib.parse
 from pathlib import Path
 
-# ── Config ────────────────────────────────────────────────────────────────────
+# -- Config --------------------------------------------------------------------
 REPO_OWNER  = "leanwrldd"
 REPO_NAME   = "unreleased"
 API_BASE    = "https://api.github.com"
 UPLOAD_BASE = "https://uploads.github.com"
 ROOT        = Path(__file__).parent.parent
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# -- Helpers -------------------------------------------------------------------
 
 def step(msg: str) -> None:
-    print(f"\n\033[1;36m{'─'*60}\033[0m")
+    print(f"\n\033[1;36m{'-'*60}\033[0m")
     print(f"\033[1;36m  {msg}\033[0m")
-    print(f"\033[1;36m{'─'*60}\033[0m")
+    print(f"\033[1;36m{'-'*60}\033[0m")
 
 def ok(msg: str) -> None:
     print(f"  \033[32m[OK]\033[0m  {msg}")
@@ -84,7 +86,7 @@ def api_request(method: str, path: str, token: str, data=None):
     with urllib.request.urlopen(req) as resp:
         return json.loads(resp.read())
 
-# ── Streaming upload with progress ───────────────────────────────────────────
+# -- Streaming upload with progress -------------------------------------------
 
 class _ProgressFile:
     def __init__(self, path: Path):
@@ -131,7 +133,7 @@ def upload_asset(release_id: int, filepath: Path, token: str) -> None:
     finally:
         wrapper.close()
 
-# ── Version bump ─────────────────────────────────────────────────────────────
+# -- Version bump -------------------------------------------------------------
 
 def bump_version(new_ver: str) -> None:
     pkg_path = ROOT / "package.json"
@@ -146,7 +148,7 @@ def bump_version(new_ver: str) -> None:
     pkg_path.write_bytes(new_text.encode("utf-8"))
     ok(f"package.json version -> {new_ver}")
 
-# ── Git helpers ───────────────────────────────────────────────────────────────
+# -- Git helpers ---------------------------------------------------------------
 
 def git_branch() -> str:
     r = subprocess.run("git rev-parse --abbrev-ref HEAD", shell=True, cwd=ROOT,
@@ -156,7 +158,7 @@ def git_branch() -> str:
 def git_checkout(branch: str) -> None:
     run(f"git checkout {branch}")
 
-# ── Main ─────────────────────────────────────────────────────────────────────
+# -- Main ---------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(description="Full release automation")
@@ -170,16 +172,16 @@ def main():
     tag   = f"v{ver}"
     token = get_token()
 
-    # ── Make sure we start on app branch ─────────────────────────────────────
+    # -- Make sure we start on app branch -------------------------------------
     if git_branch() != "app":
         step("Switching to app branch")
         git_checkout("app")
 
-    # ── 1. Bump version ───────────────────────────────────────────────────────
+    # -- 1. Bump version -------------------------------------------------------
     step(f"Bumping version to {ver}")
     bump_version(ver)
 
-    # ── 2. Build (app branch) ─────────────────────────────────────────────────
+    # -- 2. Build (app branch) -------------------------------------------------
     if not args.skip_build:
         step("Building renderer (vite)")
         run(r"node_modules\.bin\vite.cmd build")
@@ -189,13 +191,13 @@ def main():
     else:
         ok("Skipping build (--skip-build)")
 
-    # ── 3. Commit + push app ──────────────────────────────────────────────────
+    # -- 3. Commit + push app --------------------------------------------------
     step("Committing and pushing app branch")
     run("git add -A")
     run(f'git commit -m "v{ver}"')
     run("git push origin app")
 
-    # ── 4. Sync + build + push web branch ────────────────────────────────────
+    # -- 4. Sync + build + push web branch ------------------------------------
     step("Syncing to web branch")
     git_checkout("web")
     run("git checkout app -- src/ package.json")
@@ -207,7 +209,7 @@ def main():
     # back to app
     git_checkout("app")
 
-    # ── 5. Create GitHub release ──────────────────────────────────────────────
+    # -- 5. Create GitHub release ----------------------------------------------
     step(f"Creating GitHub release {tag}")
     notes = args.notes or f"Release {tag}"
     try:
@@ -226,7 +228,7 @@ def main():
             raise
     release_id = release["id"]
 
-    # ── 6. Upload assets ──────────────────────────────────────────────────────
+    # -- 6. Upload assets ------------------------------------------------------
     if args.skip_upload:
         ok("Skipping asset upload (--skip-upload)")
     else:
@@ -258,7 +260,7 @@ def main():
                     token)
             upload_asset(release_id, filepath, token)
 
-    # ── Done ──────────────────────────────────────────────────────────────────
+    # -- Done ------------------------------------------------------------------
     step("All done!")
     print(f"\n  Release: https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/tag/{tag}\n")
 
