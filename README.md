@@ -1,8 +1,8 @@
-# unreleased — web
+﻿# unreleased — web
 
 A browser-based music player for Juice WRLD unreleased songs, powered by the [Juice WRLD API](https://juicewrldapi.com).
 
-![Version](https://img.shields.io/badge/version-1.8.6-blue)
+![Version](https://img.shields.io/badge/version-1.8.7-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -79,6 +79,15 @@ npm run preview
 ---
 
 ## Changelog
+
+### v1.8.7 (desktop only)
+
+- Fix window close/minimize/maximize buttons not responding
+- Cover art loads in local playlist rows and player without opening Library first
+- Synced lyrics now display in player for local files
+- Local playlist context menu: Play all, Shuffle, Add all to queue, Add all to playlist
+- Sortable columns in Library songs view (click Title, Album, Duration headers)
+- Removed lyrics toggle from library rows; synced lyrics visible by default in editor
 
 ### v1.8.6 (desktop only)
 

@@ -63,7 +63,7 @@ export default function MetadataEditor({ track, onClose, onSaved }: MetadataEdit
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showSynced, setShowSynced] = useState(false)
+  const [showSynced, setShowSynced] = useState(true)
   const [original, setOriginal] = useState<MetaFields>({
     title: track.title, artist: track.artist, album: track.album,
     albumArtist: track.albumArtist, year: track.year ? String(track.year) : '',

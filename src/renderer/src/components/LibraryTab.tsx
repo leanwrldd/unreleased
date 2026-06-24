@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Music, Play, Shuffle, Search, Plus, MoreHorizontal, Edit2, Trash2, X,
   ChevronLeft, ListMusic, LayoutGrid, List,
-  FolderOpen, Clock, Loader2, Check, GripVertical, ChevronDown, ChevronUp, FileText,
+  FolderOpen, Clock, Loader2, Check, GripVertical, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { LibraryTrack, LocalPlaylist } from '../types'
@@ -41,7 +41,7 @@ function libraryTrackToQueueTrack(t: LibraryTrack) {
 
 // ─── Album Art thumbnail ──────────────────────────────────────────────────────
 
-function AlbumArtThumb({ track, size = 48 }: { track: LibraryTrack; size?: number }): JSX.Element {
+export function AlbumArtThumb({ track, size = 48 }: { track: LibraryTrack; size?: number }): JSX.Element {
   const el = (window as any).electron
   const { updateLibraryTrack } = useStore()
   const [art, setArt] = useState<string | null>(track.albumArt ?? null)
@@ -264,9 +264,6 @@ function SongRow({ track, index, queue, onEdit, onAddToPlaylist, showAlbum = tru
   const { playTrack } = useStore()
   const [menuOpen, setMenuOpen] = useState(false)
   const [hovered, setHovered] = useState(false)
-  const [lyricsOpen, setLyricsOpen] = useState(false)
-  const [lyrics, setLyrics] = useState<string | null>(null)
-  const [lyricsLoading, setLyricsLoading] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const el = (window as any).electron
 
@@ -283,18 +280,6 @@ function SongRow({ track, index, queue, onEdit, onAddToPlaylist, showAlbum = tru
     playTrack(thisTrack, qTracks)
   }
 
-  const toggleLyrics = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (lyricsOpen) { setLyricsOpen(false); return }
-    setLyricsOpen(true)
-    if (lyrics !== null || !el) return
-    setLyricsLoading(true)
-    try {
-      const meta = await el.readTrackMetadata(track.filePath)
-      setLyrics(meta?.lyrics || '')
-    } catch { setLyrics('') }
-    finally { setLyricsLoading(false) }
-  }
 
   return (
     <div>
@@ -332,14 +317,6 @@ function SongRow({ track, index, queue, onEdit, onAddToPlaylist, showAlbum = tru
           <span className="text-[var(--text-muted)] text-xs truncate max-w-[160px] hidden lg:block">{track.album}</span>
         )}
         <span className="text-[var(--text-muted)] text-xs shrink-0">{fmtDur(track.duration)}</span>
-        {/* Lyrics toggle */}
-        <button
-          onClick={toggleLyrics}
-          className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-colors shrink-0 ${lyricsOpen ? 'text-[var(--accent)] opacity-100' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
-          title={lyricsOpen ? 'Hide lyrics' : 'Show lyrics'}
-        >
-          <FileText size={13} />
-        </button>
         {/* Menu */}
         <div className="relative shrink-0" ref={menuRef}>
           <button
@@ -363,20 +340,6 @@ function SongRow({ track, index, queue, onEdit, onAddToPlaylist, showAlbum = tru
           )}
         </div>
       </div>
-      {/* Expandable lyrics */}
-      {lyricsOpen && (
-        <div className="mx-4 mb-2 px-3 py-2.5 rounded-lg bg-[var(--surface-overlay)] border border-[var(--border)]">
-          {lyricsLoading ? (
-            <div className="flex items-center gap-2 text-[var(--text-muted)] text-xs">
-              <Loader2 size={12} className="animate-spin" /> Loading lyrics…
-            </div>
-          ) : lyrics ? (
-            <pre className="text-[var(--text-primary)] text-xs font-sans whitespace-pre-wrap leading-relaxed">{lyrics}</pre>
-          ) : (
-            <p className="text-[var(--text-muted)] text-xs italic">No lyrics found for this track.</p>
-          )}
-        </div>
-      )}
     </div>
   )
 }
@@ -618,6 +581,12 @@ export default function LibraryTab(): JSX.Element {
   const [editingTrack, setEditingTrack] = useState<LibraryTrack | null>(null)
   const [addToPlaylistTrack, setAddToPlaylistTrack] = useState<LibraryTrack | null>(null)
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null)
+  const [sortField, setSortField] = useState<'title' | 'artist' | 'album' | 'duration' | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const toggleSort = (field: 'title' | 'artist' | 'album' | 'duration') => {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(field); setSortDir('asc') }
+  }
 
   // Load persisted library on mount
   useEffect(() => { loadLibrary() }, [])
@@ -650,16 +619,28 @@ export default function LibraryTab(): JSX.Element {
     return albums.filter(a => a.name.toLowerCase().includes(q) || a.artist.toLowerCase().includes(q))
   }, [albums, searchQ])
 
+  const sortedTracks = useMemo(() => {
+    if (!sortField) return filteredTracks
+    return [...filteredTracks].sort((a, b) => {
+      let av: string | number = '', bv: string | number = ''
+      if (sortField === 'title') { av = a.title.toLowerCase(); bv = b.title.toLowerCase() }
+      else if (sortField === 'artist') { av = (a.artist || '').toLowerCase(); bv = (b.artist || '').toLowerCase() }
+      else if (sortField === 'album') { av = (a.album || '').toLowerCase(); bv = (b.album || '').toLowerCase() }
+      else { av = a.duration; bv = b.duration }
+      return sortDir === 'asc' ? (av < bv ? -1 : av > bv ? 1 : 0) : (av > bv ? -1 : av < bv ? 1 : 0)
+    })
+  }, [filteredTracks, sortField, sortDir])
+
 
   const playAll = () => {
-    if (!filteredTracks.length) return
-    const q = filteredTracks.map(libraryTrackToQueueTrack)
+    if (!sortedTracks.length) return
+    const q = sortedTracks.map(libraryTrackToQueueTrack)
     playTrack(q[0], q)
   }
 
   const shuffle = () => {
-    if (!filteredTracks.length) return
-    const q = [...filteredTracks].sort(() => Math.random() - 0.5).map(libraryTrackToQueueTrack)
+    if (!sortedTracks.length) return
+    const q = [...sortedTracks].sort(() => Math.random() - 0.5).map(libraryTrackToQueueTrack)
     playTrack(q[0], q)
   }
 
@@ -763,20 +744,26 @@ export default function LibraryTab(): JSX.Element {
         ) : (
           /* Songs list */
           <div className="flex-1 overflow-y-auto py-2 px-2">
-            {/* Header row */}
+            {/* Header row — click to sort */}
             <div className="flex items-center gap-3 px-4 py-1 mb-1">
               <div className="w-5 text-[10px] text-[var(--text-muted)] uppercase tracking-wider text-center">#</div>
               <div className="w-9 shrink-0" />
-              <div className="flex-1 text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Title</div>
-              <div className="hidden lg:block max-w-[160px] text-[10px] text-[var(--text-muted)] uppercase tracking-wider">Album</div>
-              <Clock size={11} className="text-[var(--text-muted)]" />
+              <button onClick={() => toggleSort('title')} className="flex-1 flex items-center gap-1 text-[10px] text-[var(--text-muted)] uppercase tracking-wider hover:text-[var(--text-primary)] transition-colors">
+                Title {sortField === 'title' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
+              </button>
+              <button onClick={() => toggleSort('album')} className="hidden lg:flex items-center gap-1 w-[160px] text-[10px] text-[var(--text-muted)] uppercase tracking-wider hover:text-[var(--text-primary)] transition-colors">
+                Album {sortField === 'album' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
+              </button>
+              <button onClick={() => toggleSort('duration')} className="flex items-center gap-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+                <Clock size={11} /> {sortField === 'duration' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
+              </button>
               <div className="w-5" />
             </div>
-            {filteredTracks.length === 0 ? (
+            {sortedTracks.length === 0 ? (
               <p className="text-[var(--text-muted)] text-sm text-center py-16">No songs found</p>
             ) : (
-              filteredTracks.map((t, i) => (
-                <SongRow key={t.id} track={t} index={i} queue={filteredTracks} onEdit={setEditingTrack} onAddToPlaylist={setAddToPlaylistTrack} />
+              sortedTracks.map((t, i) => (
+                <SongRow key={t.id} track={t} index={i} queue={sortedTracks} onEdit={setEditingTrack} onAddToPlaylist={setAddToPlaylistTrack} />
               ))
             )}
           </div>

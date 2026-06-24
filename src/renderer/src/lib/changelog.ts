@@ -1,10 +1,23 @@
-export interface ChangelogEntry {
+﻿export interface ChangelogEntry {
   version: string
   date: string
   changes: { type: 'new' | 'fix' | 'improve'; text: string }[]
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.8.7',
+    date: '2026-06-25',
+    changes: [
+      { type: 'fix',     text: 'Fixed window close/minimize/maximize buttons not responding' },
+      { type: 'fix',     text: 'Cover art now loads in local playlist rows and player without opening Library first' },
+      { type: 'fix',     text: 'Synced lyrics now display in the player for local files' },
+      { type: 'new',     text: 'Local playlist context menu: Play all, Shuffle, Add all to queue, Add all to playlist' },
+      { type: 'new',     text: 'Sortable columns in Library songs view (click Title, Album, or Duration header)' },
+      { type: 'improve', text: 'Removed lyrics toggle button from library track rows' },
+      { type: 'improve', text: 'Synced lyrics visible by default in the metadata editor' },
+    ],
+  },
   {
     version: '1.8.6',
     date: '2026-06-24',
@@ -580,4 +593,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       { type: 'new', text: 'Metadata editor with lyrics and cover art' },
       { type: 'new', text: 'Dark / light theme' },
       { type: 'new', text: 'Frameless window with custom titlebar' },
-   
+    ],
+  },
+]

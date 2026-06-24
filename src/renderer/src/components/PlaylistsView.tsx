@@ -1,9 +1,9 @@
-﻿import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   ListMusic, Play, Loader2, Plus, Trash2, Pencil, ArrowLeft,
   X, Check, Heart, Shuffle, Music2, Clock, GripVertical,
   ListPlus, Download, Share2, Archive, Info, FolderInput, MoreHorizontal,
-  Search, ChevronUp, ChevronDown, ImageOff, Globe, Lock, Link, ListEnd, HardDrive,
+  Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ImageOff, Globe, Lock, Link, ListEnd, HardDrive,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
@@ -13,6 +13,7 @@ import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 import { buildImageUrl, buildStreamUrl, JWAPI_BASE, apiFetch, JWApiSong, playlistCoverUrl } from '../lib/juicewrldApi'
 import { formatDuration } from '../lib/lyrics'
 import LikedSongsView from './LikedSongsView'
+import { AlbumArtThumb } from './LibraryTab'
 import SongInfoModal from './SongInfoModal'
 
 // ── PlaylistMosaic ────────────────────────────────────────────────────────────
@@ -172,7 +173,7 @@ function LocalPlaylistMosaic({ trackIds, libraryTracks, className = '' }: {
 
 export default function PlaylistsView(): JSX.Element {
   const { account, playlists, refreshPlaylists, playTrack, addToQueue, setShowUserAuth, likedTrackIds, setActiveView, setPendingEditorSongId,
-    localPlaylists, libraryTracks, loadLibrary, deleteLocalPlaylist, renameLocalPlaylist, updateLocalPlaylist } = useStore()
+    localPlaylists, libraryTracks, loadLibrary, deleteLocalPlaylist, renameLocalPlaylist, updateLocalPlaylist, addToLocalPlaylist } = useStore()
   const canEdit = !!(account?.is_editor || account?.is_administrator)
 
   const [showLiked, setShowLiked] = useState(false)
@@ -193,6 +194,7 @@ export default function PlaylistsView(): JSX.Element {
   const [localCardMenu, setLocalCardMenu] = useState<{ id: string; name: string; x: number; y: number } | null>(null)
   const [localRenaming, setLocalRenaming] = useState(false)
   const [localRenameVal, setLocalRenameVal] = useState('')
+  const [localCardMenuAddPl, setLocalCardMenuAddPl] = useState(false)
   const [showAddAllMenu, setShowAddAllMenu] = useState(false)
   const addAllMenuRef = useRef<HTMLDivElement>(null)
 
@@ -322,7 +324,7 @@ export default function PlaylistsView(): JSX.Element {
   // Close menus on outside click
   useEffect(() => {
     if (!trackMenu && !libMenu && !showAddAllMenu && !localCardMenu) return
-    const h = () => { setTrackMenu(null); setLibMenu(null); setShowAddAllMenu(false); setLocalCardMenu(null) }
+    const h = () => { setTrackMenu(null); setLibMenu(null); setShowAddAllMenu(false); setLocalCardMenu(null); setLocalCardMenuAddPl(false) }
     window.addEventListener('click', h)
     return () => window.removeEventListener('click', h)
   }, [trackMenu, libMenu, showAddAllMenu, localCardMenu])
@@ -634,10 +636,9 @@ export default function PlaylistsView(): JSX.Element {
                 >
                   <span className="text-center text-xs text-text-muted tabular-nums group-hover:hidden">{i + 1}</span>
                   <button className="hidden group-hover:flex items-center justify-center text-text-primary" onClick={() => playTrack(qt, localQTracks)}><Play size={14} fill="currentColor" /></button>
-                  {lt.albumArt
-                    ? <img src={lt.albumArt} alt="" className="w-10 h-10 rounded-md object-cover" />
-                    : <div className="w-10 h-10 rounded-md bg-surface-overlay flex items-center justify-center"><Music2 size={16} className="text-text-muted" /></div>
-                  }
+                  <div className="w-10 h-10 rounded-md overflow-hidden shrink-0">
+                    <AlbumArtThumb track={lt} size={40} />
+                  </div>
                   <div className="min-w-0">
                     <p className="text-text-primary text-sm font-medium truncate">{lt.title}</p>
                     <p className="text-text-muted text-xs truncate">{lt.artist || 'Unknown Artist'}{lt.album ? ` · ${lt.album}` : ''}</p>
@@ -1200,10 +1201,9 @@ export default function PlaylistsView(): JSX.Element {
                   <button className="hidden group-hover:flex items-center justify-center text-text-primary" onClick={() => playTrack(qt, localQTracks)}>
                     <Play size={14} fill="currentColor" />
                   </button>
-                  {lt.albumArt
-                    ? <img src={lt.albumArt} alt="" className="w-10 h-10 rounded-md object-cover" />
-                    : <div className="w-10 h-10 rounded-md bg-surface-overlay flex items-center justify-center"><Music2 size={16} className="text-text-muted" /></div>
-                  }
+                  <div className="w-10 h-10 rounded-md overflow-hidden shrink-0">
+                    <AlbumArtThumb track={lt} size={40} />
+                  </div>
                   <div className="min-w-0">
                     <p className="text-text-primary text-sm font-medium truncate">{lt.title}</p>
                     <p className="text-text-muted text-xs truncate">{lt.artist || 'Unknown Artist'}{lt.album ? ` · ${lt.album}` : ''}</p>
@@ -1323,17 +1323,58 @@ export default function PlaylistsView(): JSX.Element {
       {/* Local playlist card context menu */}
       {localCardMenu && (
         <div
-          className="fixed z-[200] bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[170px]"
-          style={{ left: Math.min(localCardMenu.x, window.innerWidth - 190), top: Math.min(localCardMenu.y, window.innerHeight - 160) }}
+          className="fixed z-[200] bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[190px]"
+          style={{ left: Math.min(localCardMenu.x, window.innerWidth - 210), top: Math.min(localCardMenu.y, window.innerHeight - 280) }}
           onClick={e => e.stopPropagation()}
         >
-          <MenuItem icon={Play} label="Open" onClick={() => { setLocalSelectedId(localCardMenu.id); setLocalCardMenu(null) }} />
-          <MenuItem icon={Pencil} label="Rename" onClick={() => {
-            setLocalSelectedId(localCardMenu.id)
-            setLocalCardMenu(null)
-          }} />
-          <div className="h-px bg-[var(--border)] my-1" />
-          <MenuItem icon={Trash2} label="Delete" destructive onClick={() => { deleteLocalPlaylist(localCardMenu.id); setLocalCardMenu(null) }} />
+          {!localCardMenuAddPl ? (
+            <>
+              <MenuItem icon={Play} label="Open" onClick={() => { setLocalSelectedId(localCardMenu.id); setLocalCardMenu(null); setLocalCardMenuAddPl(false) }} />
+              <MenuItem icon={Play} label="Play all" onClick={() => {
+                const lp = localPlaylists.find(p => p.id === localCardMenu.id)
+                if (lp) { const tracks = lp.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter(Boolean) as LibraryTrack[]; const q = tracks.map(libTrackToTrack); if (q.length) playTrack(q[0], q) }
+                setLocalCardMenu(null); setLocalCardMenuAddPl(false)
+              }} />
+              <MenuItem icon={Shuffle} label="Shuffle" onClick={() => {
+                const lp = localPlaylists.find(p => p.id === localCardMenu.id)
+                if (lp) { const tracks = lp.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter(Boolean) as LibraryTrack[]; const q = [...tracks].sort(() => Math.random() - 0.5).map(libTrackToTrack); if (q.length) playTrack(q[0], q) }
+                setLocalCardMenu(null); setLocalCardMenuAddPl(false)
+              }} />
+              <MenuItem icon={ListEnd} label="Add all to queue" onClick={() => {
+                const lp = localPlaylists.find(p => p.id === localCardMenu.id)
+                if (lp) lp.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter(Boolean).map(t => libTrackToTrack(t as LibraryTrack)).forEach(t => addToQueue(t))
+                setLocalCardMenu(null); setLocalCardMenuAddPl(false)
+              }} />
+              <button className="w-full flex items-center justify-between px-3 py-2 text-sm text-text-primary hover:bg-surface-overlay" onClick={() => setLocalCardMenuAddPl(true)}>
+                <span className="flex items-center gap-2 text-sm"><ListPlus size={14} /> Add all to playlist</span>
+                <ChevronRight size={12} className="text-text-muted" />
+              </button>
+              <div className="h-px bg-[var(--border)] my-1" />
+              <MenuItem icon={Pencil} label="Rename" onClick={() => { setLocalSelectedId(localCardMenu.id); setLocalCardMenu(null); setLocalCardMenuAddPl(false) }} />
+              <div className="h-px bg-[var(--border)] my-1" />
+              <MenuItem icon={Trash2} label="Delete" destructive onClick={() => { deleteLocalPlaylist(localCardMenu.id); setLocalCardMenu(null); setLocalCardMenuAddPl(false) }} />
+            </>
+          ) : (
+            <>
+              <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-muted hover:text-text-primary hover:bg-surface-overlay" onClick={() => setLocalCardMenuAddPl(false)}>
+                <ChevronLeft size={12} /> Back
+              </button>
+              <div className="h-px bg-[var(--border)] my-1" />
+              {localPlaylists.filter(p => p.id !== localCardMenu.id).length === 0
+                ? <p className="text-text-muted text-xs px-3 py-2">No other playlists</p>
+                : localPlaylists.filter(p => p.id !== localCardMenu.id).map(p => (
+                  <button key={p.id} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-overlay"
+                    onClick={() => {
+                      const lp = localPlaylists.find(x => x.id === localCardMenu.id)
+                      if (lp) lp.trackIds.filter(id => !p.trackIds.includes(id)).forEach(id => addToLocalPlaylist(p.id, id))
+                      setLocalCardMenu(null); setLocalCardMenuAddPl(false)
+                    }}>
+                    <ListMusic size={14} className="text-text-muted" /> {p.name}
+                  </button>
+                ))
+              }
+            </>
+          )}
         </div>
       )}
 

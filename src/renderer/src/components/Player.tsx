@@ -69,7 +69,7 @@ export default function Player(): JSX.Element {
     toggleLike,
     setActiveView,
     activeView,
-    playNext, account} = useStore()
+    playNext, account, updateLibraryTrack } = useStore()
 
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false)
@@ -236,6 +236,21 @@ export default function Player(): JSX.Element {
           })
         })
         .catch(() => {/* no lyrics — that's fine */})
+    } else {
+      // Local track — load lyrics + cover art from IPC
+      const el = (window as any).electron
+      if (el && currentTrack.path) {
+        el.readTrackMetadata(currentTrack.path).then((meta: Record<string, any> | null) => {
+          if (meta && !meta.error) {
+            setCurrentTrackFull(prev => prev ? { ...prev, lyrics: meta.lyrics || null, syncedLyrics: meta.syncedLyrics || null } : prev)
+          }
+        }).catch(() => {})
+        if (!currentTrack.imageUrl) {
+          el.readAlbumArt(currentTrack.path).then((a: string | null) => {
+            if (a) updateLibraryTrack(currentTrack.id, { albumArt: a })
+          }).catch(() => {})
+        }
+      }
     }
   }, [currentTrack?.id, currentTrackFull])
 
