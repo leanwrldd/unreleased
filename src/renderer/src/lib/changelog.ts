@@ -5,6 +5,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+    {
+    version: '1.8.3',
+    date: '2026-06-24',
+    changes: [
+      { type: 'fix',     text: 'Window controls no longer overlap Library toolbar buttons' },
+      { type: 'improve', text: 'Local playlists removed from Library sidebar — now exclusively in the Playlists tab' },
+      { type: 'new',     text: 'Local playlists are visible in the Playlists tab even when not logged in' },
+    ],
+  },
   {
     version: '1.8.2',
     date: '2026-06-24',

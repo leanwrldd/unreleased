@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+﻿import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   ListMusic, Play, Loader2, Plus, Trash2, Pencil, ArrowLeft,
   X, Check, Heart, Shuffle, Music2, Clock, GripVertical,
@@ -581,17 +581,104 @@ export default function PlaylistsView(): JSX.Element {
     )
   }
 
-  // ── Auth guard ─────────────────────────────────────────────────────────────
+  // ── Auth guard ─────────────────────────────────────────────────────────────────────────
 
   if (!account) {
+    // show local playlists + login prompt even when not logged in
+    if (localSelectedId !== null) {
+      const localPl = localPlaylists.find(p => p.id === localSelectedId)
+      if (!localPl) { setLocalSelectedId(null); return <div /> }
+      const localTracks = localPl.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter(Boolean) as LibraryTrack[]
+      const localQTracks: Track[] = localTracks.map(libTrackToTrack)
+      return (
+        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden">
+          <div className="px-6 pt-5 shrink-0">
+            <button onClick={() => setLocalSelectedId(null)} className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-sm transition-colors mb-4">
+              <ArrowLeft size={15} /> Playlists
+            </button>
+          </div>
+          <div className="relative px-6 pb-6 shrink-0">
+            <div className="relative z-10 flex gap-6 items-end">
+              <div className="shrink-0 rounded-xl shadow-2xl overflow-hidden bg-surface-overlay flex items-center justify-center" style={{ width: 180, height: 180 }}>
+                <LocalPlaylistMosaic trackIds={localPl.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
+              </div>
+              <div className="pb-2">
+                <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-1">Local Playlist</p>
+                <h1 className="text-text-primary text-3xl font-bold mb-1">{localPl.name}</h1>
+                <p className="text-text-muted text-sm">{localTracks.length} songs</p>
+              </div>
+            </div>
+            <div className="relative z-10 flex items-center gap-3 mt-5">
+              <button onClick={() => localQTracks.length && playTrack(localQTracks[0], localQTracks)} className="flex items-center gap-2 px-5 py-2.5 bg-accent text-white rounded-full text-sm font-semibold hover:bg-accent-hover transition-colors shadow-lg">
+                <Play size={16} fill="white" className="ml-0.5" /> Play
+              </button>
+              <button onClick={() => { const sh = [...localQTracks].sort(() => Math.random()-0.5); sh.length && playTrack(sh[0], sh) }} className="flex items-center gap-2 px-5 py-2.5 bg-surface-overlay text-text-primary rounded-full text-sm font-semibold hover:bg-surface-raised transition-colors border border-[var(--border)]">
+                <Shuffle size={16} /> Shuffle
+              </button>
+            </div>
+          </div>
+          <div className="border-t border-[var(--border)] mx-6 mb-3 shrink-0" />
+          <div className="px-2 pb-8">
+            <div className="grid items-center gap-3 px-4 pb-2 text-text-muted text-xs uppercase tracking-widest" style={{ gridTemplateColumns: '28px 40px 1fr 56px' }}>
+              <span>#</span><span /><span>Title</span><div className="flex justify-center"><Clock size={12} /></div>
+            </div>
+            {localTracks.map((lt, i) => {
+              const qt = libTrackToTrack(lt)
+              return (
+                <div key={lt.id} className="group grid items-center gap-3 px-4 py-2 rounded-lg hover:bg-surface-raised transition-colors cursor-default select-none"
+                  style={{ gridTemplateColumns: '28px 40px 1fr 56px' }}
+                  onDoubleClick={() => playTrack(qt, localQTracks)}
+                >
+                  <span className="text-center text-xs text-text-muted tabular-nums group-hover:hidden">{i + 1}</span>
+                  <button className="hidden group-hover:flex items-center justify-center text-text-primary" onClick={() => playTrack(qt, localQTracks)}><Play size={14} fill="currentColor" /></button>
+                  {lt.albumArt
+                    ? <img src={lt.albumArt} alt="" className="w-10 h-10 rounded-md object-cover" />
+                    : <div className="w-10 h-10 rounded-md bg-surface-overlay flex items-center justify-center"><Music2 size={16} className="text-text-muted" /></div>
+                  }
+                  <div className="min-w-0">
+                    <p className="text-text-primary text-sm font-medium truncate">{lt.title}</p>
+                    <p className="text-text-muted text-xs truncate">{lt.artist || 'Unknown Artist'}{lt.album ? ` · ${lt.album}` : ''}</p>
+                  </div>
+                  <span className="text-text-muted text-xs tabular-nums text-center">
+                    {lt.duration ? (() => { const m = Math.floor(lt.duration / 60); const s = Math.floor(lt.duration % 60); return `${m}:${s.toString().padStart(2,'0')}` })() : '--:--'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )
+    }
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
-        <ListMusic size={40} className="text-text-muted mb-4" />
-        <h2 className="text-text-primary text-lg font-semibold mb-1">Playlists</h2>
-        <p className="text-text-muted text-sm mb-5 max-w-xs">Log in to create playlists that stay in sync wherever you listen.</p>
-        <button onClick={() => setShowUserAuth(true)} className="px-5 py-2.5 rounded-xl bg-accent/15 hover:bg-accent/25 text-accent text-sm font-semibold transition-colors">
-          Log in
-        </button>
+      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden">
+        <div className="px-5 pt-5 pb-8">
+          <h1 className="text-text-primary text-xl font-bold mb-1">Your Library</h1>
+          <p className="text-text-muted text-sm mb-6">Local playlists</p>
+          {localPlaylists.length === 0 ? (
+            <p className="text-text-muted text-sm">No local playlists yet. Add music to your library first.</p>
+          ) : (
+            <div className="grid gap-4 mb-8" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+              {localPlaylists.map(lp => (
+                <button key={lp.id} onClick={() => setLocalSelectedId(lp.id)} className="group text-left relative">
+                  <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
+                    <LocalPlaylistMosaic trackIds={lp.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
+                  </div>
+                  <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-md">
+                    <HardDrive size={9} /> Local
+                  </span>
+                  <p className="text-text-primary text-sm font-semibold truncate">{lp.name}</p>
+                  <p className="text-text-muted text-xs mt-0.5">{lp.trackIds.length} {lp.trackIds.length === 1 ? 'track' : 'tracks'}</p>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-col items-center text-center gap-3 py-6 border-t border-[var(--border)]">
+            <p className="text-text-muted text-sm max-w-xs">Log in to create synced playlists and access your full library.</p>
+            <button onClick={() => setShowUserAuth(true)} className="px-5 py-2.5 rounded-xl bg-accent/15 hover:bg-accent/25 text-accent text-sm font-semibold transition-colors">
+              Log in
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
