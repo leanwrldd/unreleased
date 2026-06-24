@@ -1,4 +1,4 @@
-/**
+﻿/**
  * queueSlice.ts — all queue and playback logic in one place.
  *
  * Responsibilities:
@@ -414,38 +414,48 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       .catch(() => set({ queueLoadingMore: false }))
   },
 
-  // ── Radio pre-fetch ────────────────────────────────────────────────────────
+  // ── Radio pre-fetch ────────────────────────────────────────────────────────────
   _prefetchRadioTrack: () => {
-    apiFetch<RadioResponse>('/radio/random/')
-      .then((data) => {
-        if (!get().radioMode) return  // radio was turned off while fetching
-        const track = songToTrack(data.song)
-        const wasWaiting = get()._radioWaiting
+    const { radioFilter } = get()
 
-        set({ radioNext: track, _radioWaiting: false })
+    const handleTrack = (track: Track): void => {
+      if (!get().radioMode) return
+      const wasWaiting = get()._radioWaiting
+      set({ radioNext: track, _radioWaiting: false })
+      if (wasWaiting) {
+        const { queue } = get()
+        const newQueue = [...queue.slice(-(RADIO_HISTORY_LIMIT - 1)), track]
+        set({ queue: newQueue, queueIndex: newQueue.length - 1, currentTrack: track, currentTrackFull: null, isPlaying: true, radioNext: null, progress: 0, currentTime: 0 })
+        get()._prefetchRadioTrack()
+      }
+    }
 
-        if (wasWaiting) {
-          // Player was waiting for this track — advance and play immediately
-          const { queue } = get()
-          const newQueue = [...queue.slice(-(RADIO_HISTORY_LIMIT - 1)), track]
-          set({
-            queue: newQueue,
-            queueIndex: newQueue.length - 1,
-            currentTrack: track,
-            currentTrackFull: null,
-            isPlaying: true,
-            radioNext: null,
-            progress: 0,
-            currentTime: 0,
-          })
-          get()._prefetchRadioTrack()
-        }
+    const handleError = (): void => {
+      if (get().radioMode) setTimeout(() => get()._prefetchRadioTrack(), 3000)
+    }
+
+    if (radioFilter && (radioFilter.category || radioFilter.era || radioFilter.search)) {
+      const pageSize = 50
+      const totalPages = Math.max(1, Math.ceil(radioFilter.total / pageSize))
+      const randomPage = Math.floor(Math.random() * totalPages) + 1
+      apiFetch<JWApiPaginatedResponse>('/songs/', {
+        searchall: radioFilter.search || undefined,
+        category: radioFilter.category || undefined,
+        era: radioFilter.era || undefined,
+        page: randomPage,
+        page_size: pageSize,
       })
-      .catch(() => {
-        // Retry once on failure
-        if (get().radioMode) {
-          setTimeout(() => get()._prefetchRadioTrack(), 3000)
-        }
-      })
+        .then((data) => {
+          if (!get().radioMode) return
+          const playable = data.results.filter((s: JWApiSong) => !!s.path)
+          if (playable.length === 0) { handleError(); return }
+          handleTrack(songToTrack(playable[Math.floor(Math.random() * playable.length)]))
+        })
+        .catch(handleError)
+    } else {
+      apiFetch<RadioResponse>('/radio/random/')
+        .then((data) => handleTrack(songToTrack(data.song)))
+        .catch(handleError)
+    }
   },
 })

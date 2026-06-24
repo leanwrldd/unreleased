@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+﻿import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Play,
@@ -69,7 +69,7 @@ export default function Player(): JSX.Element {
     toggleLike,
     setActiveView,
     activeView,
-    playNext, account} = useStore()
+    playNext, account, updateLibraryTrack } = useStore()
 
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false)
@@ -236,6 +236,24 @@ export default function Player(): JSX.Element {
           })
         })
         .catch(() => {/* no lyrics — that's fine */})
+    } else {
+      // Local track — load lyrics + cover art from IPC
+      const el = (window as any).electron
+      if (el && currentTrack.path) {
+        el.readTrackMetadata(currentTrack.path).then((meta: Record<string, any> | null) => {
+          if (meta && !meta.error) {
+            setCurrentTrackFull(prev => prev ? { ...prev, lyrics: meta.lyrics || null, syncedLyrics: meta.syncedLyrics || null } : prev)
+          }
+        }).catch(() => {})
+        if (!currentTrack.imageUrl) {
+          el.readAlbumArt(currentTrack.path).then((a: string | null) => {
+            if (a) {
+              updateLibraryTrack(currentTrack.id, { albumArt: a })
+              setCurrentTrackFull(prev => prev ? { ...prev, albumArt: a } : prev)
+            }
+          }).catch(() => {})
+        }
+      }
     }
   }, [currentTrack?.id, currentTrackFull])
 
@@ -289,12 +307,8 @@ export default function Player(): JSX.Element {
     const rawArt = radioFmActive
       ? radioFmMatchedSong?.imageUrl
       : (currentTrackFull?.albumArt ?? currentTrack?.imageUrl)
-    // Resolve relative image paths
-    const artSrc = rawArt
-      ? rawArt.startsWith('http')
-        ? rawArt
-        : `https://juicewrldapi.com${rawArt}`
-      : undefined
+    // Only pass HTTP URLs to MediaMetadata — data URIs crash Windows media transport
+    const artSrc = rawArt?.startsWith('http') ? rawArt : undefined
     navigator.mediaSession.metadata = new MediaMetadata({
       title,
       artist,
@@ -645,7 +659,7 @@ export default function Player(): JSX.Element {
       />
 
       {/* ── Mobile player ── */}
-      <div className="md:hidden bg-surface border-t border-[var(--border)] shrink-0">
+      <div className="md:hidden bg-surface border-t border-[var(--border)] shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {/* Thin progress bar */}
         {radioFmActive ? (
           <div className="h-[2px] bg-red-900/40 relative">

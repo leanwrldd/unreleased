@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+﻿import React, { useEffect } from 'react'
 import { useStore } from './store/useStore'
 import { setToken, getToken } from './lib/userApi'
 import { ViewType } from './types'
@@ -140,21 +140,18 @@ export default function App(): JSX.Element {
 
   return (
     <div className="flex flex-col h-dvh bg-surface overflow-hidden">
-      {isElectron && (
-        <>
-          {/* Title bar — flow element pushes content down + drag region */}
-          <div
-            className="shrink-0 h-7 select-none"
-            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-          />
-          {/* Window controls overlay */}
-          <WindowControls />
-        </>
-      )}
+      {isElectron && <WindowControls />}
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-hidden flex">
-          <ErrorBoundary>
+        <main className="flex-1 overflow-hidden flex flex-col">
+          {isElectron && (
+            <div
+              className="shrink-0 h-7 select-none mr-[132px]"
+              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+            />
+          )}
+          <div className="flex-1 overflow-hidden flex">
+            <ErrorBoundary>
             {activeView === 'api-tracker' ? <ApiTrackerView />
               : activeView === 'api-files' ? <ApiFilesView />
               : activeView === 'api-categories' ? <ApiCategoryView />
@@ -170,8 +167,9 @@ export default function App(): JSX.Element {
               : activeView === 'not-found' ? <NotFoundView />
               : <ApiTrackerView />}
           </ErrorBoundary>
-          {showNowPlaying && activeView !== 'wrld' && <ErrorBoundary><NowPlaying /></ErrorBoundary>}
-          {showQueue && <ErrorBoundary><QueuePanel /></ErrorBoundary>}
+            {showNowPlaying && activeView !== 'wrld' && <ErrorBoundary><NowPlaying /></ErrorBoundary>}
+            {showQueue && <ErrorBoundary><QueuePanel /></ErrorBoundary>}
+          </div>
         </main>
       </div>
       <Player />

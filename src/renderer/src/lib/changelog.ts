@@ -1,10 +1,51 @@
-export interface ChangelogEntry {
+﻿export interface ChangelogEntry {
   version: string
   date: string
   changes: { type: 'new' | 'fix' | 'improve'; text: string }[]
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '1.8.8',
+    date: '2026-06-25',
+    changes: [
+      { type: 'fix',     text: 'Radio mode now respects active category/era filter when prefetching tracks' },
+      { type: 'fix',     text: 'Tracker search now persists when switching tabs instead of resetting' },
+      { type: 'fix',     text: 'Mobile browser address bar no longer hides player controls, nav tabs, or song info close button' },
+      { type: 'fix',     text: 'Context menus now clamp to stay fully on-screen' },
+      { type: 'fix',     text: 'Shuffle queue no longer reorders on each song; advances linearly through pre-shuffled queue' },
+      { type: 'fix',     text: 'Local files grid view toggle now works correctly' },
+      { type: 'fix',     text: 'Window close/minimize/maximize buttons now respond correctly' },
+      { type: 'fix',     text: 'App updates no longer log the user out' },
+      { type: 'new',     text: 'Local playlist cards now support right-click context menu' },
+      { type: 'new',     text: 'Metadata editor lyrics section redesigned with Lyrics / Synced Lyrics tabs' },
+      { type: 'improve', text: 'Local playlist context menu button always visible on mobile' },
+    ],
+  },
+  {
+    version: '1.8.7',
+    date: '2026-06-25',
+    changes: [
+      { type: 'fix',     text: 'Fixed window close/minimize/maximize buttons not responding' },
+      { type: 'fix',     text: 'Cover art now loads in local playlist rows and player without opening Library first' },
+      { type: 'fix',     text: 'Synced lyrics now display in the player for local files' },
+      { type: 'new',     text: 'Local playlist context menu: Play all, Shuffle, Add all to queue, Add all to playlist' },
+      { type: 'new',     text: 'Sortable columns in Library songs view (click Title, Album, or Duration header)' },
+      { type: 'improve', text: 'Removed lyrics toggle button from library track rows' },
+      { type: 'improve', text: 'Synced lyrics visible by default in the metadata editor' },
+    ],
+  },
+  {
+    version: '1.8.6',
+    date: '2026-06-24',
+    changes: [
+      { type: 'fix',     text: 'Fixed black screen / crash when playing local files with cover art' },
+      { type: 'fix',     text: 'Library cover art now loads and updates correctly for all albums' },
+      { type: 'fix',     text: 'Login loading spinner no longer gets stuck after popup closes' },
+      { type: 'fix',     text: 'Playlist context menu (···) now works correctly on hover' },
+      { type: 'improve', text: 'Sidebar now extends to the top of the window in the desktop app' },
+    ],
+  },
   {
     version: '1.8.5',
     date: '2026-06-24',
@@ -569,4 +610,6 @@ export const CHANGELOG: ChangelogEntry[] = [
       { type: 'new', text: 'Metadata editor with lyrics and cover art' },
       { type: 'new', text: 'Dark / light theme' },
       { type: 'new', text: 'Frameless window with custom titlebar' },
-   
+    ],
+  },
+]
