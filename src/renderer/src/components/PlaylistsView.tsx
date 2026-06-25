@@ -676,7 +676,7 @@ export default function PlaylistsView(): JSX.Element {
                   </span>
                   <button
                     className="absolute top-1.5 right-1.5 md:opacity-0 md:group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
-                    onClick={e => { e.stopPropagation(); setLocalCardMenu({ id: lp.id, name: lp.name, x: e.clientX, y: e.clientY }) }}
+                    onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setLocalCardMenu({ id: lp.id, name: lp.name, x: e.clientX, y: e.clientY }) }}
                   >
                     <MoreHorizontal size={13} />
                   </button>
@@ -1308,7 +1308,7 @@ export default function PlaylistsView(): JSX.Element {
               {/* Context menu button */}
               <button
                 className="absolute top-1.5 right-1.5 md:opacity-0 md:group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
-                onClick={e => { e.stopPropagation(); setLocalCardMenu({ id: lp.id, name: lp.name, x: e.clientX, y: e.clientY }) }}
+                onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setLocalCardMenu({ id: lp.id, name: lp.name, x: e.clientX, y: e.clientY }) }}
               >
                 <MoreHorizontal size={13} />
               </button>
@@ -1322,11 +1322,10 @@ export default function PlaylistsView(): JSX.Element {
       </div>
 
       {/* Local playlist card context menu */}
-      {localCardMenu && createPortal(
-
+      {localCardMenu && (
         <div
-          className="fixed z-[200] bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[190px]"
-          style={{ left: Math.min(localCardMenu.x, window.innerWidth - 210), top: Math.max(8, Math.min(localCardMenu.y, window.innerHeight - 280)) }}
+          className="fixed z-50 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[210px]"
+          style={{ left: Math.min(localCardMenu.x, window.innerWidth - 230), top: Math.min(localCardMenu.y, window.innerHeight - 320) }}
           onClick={e => e.stopPropagation()}
         >
           {!localCardMenuAddPl ? (
@@ -1378,7 +1377,7 @@ export default function PlaylistsView(): JSX.Element {
             </>
           )}
         </div>
-, document.body)}
+)}
 
       {/* Library card context menu */}
       {libMenu && (
