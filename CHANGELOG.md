@@ -6,6 +6,17 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.8.8] - 2026-06-26
+
+- **New** Context menus: Add to Library option — downloads song for offline/local playback to ~/Music/JuiceWRLD Library/
+- **New** Add to Playlist menu: shows a check icon next to playlists that already contain the song
+- **New** Player bar: right-click opens the context menu
+- **New** Player bar: Edit metadata option for local tracks
+- **Fix** Tracker: songs now always display their primary name (song.name) instead of alternative/variant titles
+- **Fix** WrldView: synced lyrics now animate in when the active line changes
+- **Fix** Local playlists: context menus were invisible due to overflow clipping — fixed with portal rendering
+
+---
 ## [1.7.3] — 2026-06-22
 
 - **Fix** Mobile lock screen now shows track title, artist, and cover art via Media Session API

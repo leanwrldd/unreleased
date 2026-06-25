@@ -1,8 +1,8 @@
-# unreleased — web
+﻿# unreleased — web
 
 A browser-based music player for Juice WRLD unreleased songs, powered by the [Juice WRLD API](https://juicewrldapi.com).
 
-![Version](https://img.shields.io/badge/version-1.5.9-blue)
+![Version](https://img.shields.io/badge/version-1.8.8-blue)
 ![React](https://img.shields.io/badge/React-18-61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF)
@@ -73,17 +73,63 @@ npm run preview
 
 ## To-dos
 
-- Add synced lyrics from API
-- Add synced lyrics editor
-- Rework compilation UI
 - Add "similar songs" feature
 - Add CDQ remasters of unsurfaced songs
-- Add submission / contribute page
-- Add editor dashboard (lyrics coverage stats, etc.)
 
 ---
 
 ## Changelog
+
+### v1.8.8 (beta)
+- **Fix**: Radio mode now respects active category/era filter
+- **Fix**: Tracker search persists when switching tabs
+- **Fix**: Mobile browser address bar no longer hides player controls or nav tabs
+- **Fix**: Context menus clamp to stay fully on-screen
+- **Fix**: Shuffle queue no longer reorders on each song
+- **Fix**: Local files grid view toggle now works
+- **Fix**: Window controls (close/min/max) now respond correctly
+- **Fix**: App updates no longer log the user out
+- **New**: Local playlist cards support right-click context menu
+- **New**: Metadata editor redesigned with Lyrics / Synced tabs
+- **Improve**: Local playlist context menu button always visible on mobile
+
+### v1.8.7 (desktop only)
+
+- Fix window close/minimize/maximize buttons not responding
+- Cover art loads in local playlist rows and player without opening Library first
+- Synced lyrics now display in player for local files
+- Local playlist context menu: Play all, Shuffle, Add all to queue, Add all to playlist
+- Sortable columns in Library songs view (click Title, Album, Duration headers)
+- Removed lyrics toggle from library rows; synced lyrics visible by default in editor
+
+### v1.8.6 (desktop only)
+
+- Fix black screen crash when playing local files with loaded cover art
+- Fix library cover art loading for all albums (reworked loading system)
+- Fix login spinner stuck after Discord popup closes without completing
+- Fix playlist context menu (···) not working on API playlists
+- Sidebar now extends to the top of the window (visual polish)
+
+### v1.8.5
+
+- Fix React hooks error in local playlist detail view
+- Fix library track metadata and cover art not loading (local files)
+- Remove visible border from title bar spacing
+- Add ··· context menu button to API playlist cards
+
+## v1.8.4
+- Fix: Added visual separation between the title bar and app content
+- Fix: Library cover art now updates correctly after lazy-loading
+- New: Right-click context menu on library track rows
+- New: Context menus on local playlist cards (rename, delete)
+- New: Local playlists support custom cover images
+- Improve: Metadata editor lyrics redesigned with full-width editor
+- Improve: Discord login opens a popup window in the desktop app
+
+### v1.8.3
+- **Fix** Window controls overlap in Library toolbar
+- **Improve** Local playlists moved exclusively to Playlists tab
+- **New** Local playlists visible without login
 
 See [CHANGELOG.md](./CHANGELOG.md) for the full history.
 ### v1.7.1 - 2026-06-20
