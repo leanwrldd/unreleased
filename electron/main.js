@@ -437,6 +437,70 @@ ipcMain.handle('write-track-metadata', async (_, filePath, metadata) => {
     return { success: true }
   } catch(e) { return { error: e.message } }
 })
+ipcMain.handle('download-to-library', async (_, { url, songName, artist, songPath }) => {
+  // Determine save folder: Music/JuiceWRLD Library
+  const libraryFolder = path.join(app.getPath('music'), 'JuiceWRLD Library')
+  try { fs.mkdirSync(libraryFolder, { recursive: true }) } catch {}
+
+  // Build filename from songPath (keeps original extension)
+  const ext = path.extname(songPath || '').toLowerCase() || '.mp3'
+  const baseName = (songName || 'track').replace(/[/\\:*?"<>|]/g, '_').trim()
+  const savePath = path.join(libraryFolder, baseName + ext)
+
+  // Download
+  try {
+    await downloadFile(url, savePath)
+  } catch (e) {
+    return { error: 'Download failed: ' + e.message }
+  }
+
+  // Parse metadata
+  let mm
+  try { mm = require('music-metadata') } catch { return { error: 'music-metadata not installed' } }
+  let trackMeta = {}
+  try {
+    const meta = await mm.parseFile(savePath, { duration: true, skipCovers: true })
+    const c = meta.common
+    const f = meta.format
+    const stat = fs.statSync(savePath)
+    trackMeta = {
+      id: 'local-' + savePath,
+      filePath: savePath,
+      ext: ext.slice(1),
+      title: c.title || songName || baseName,
+      artist: (c.artists || []).join(', ') || c.artist || artist || '',
+      album: c.album || '',
+      albumArtist: c.albumartist || '',
+      year: c.year || null,
+      trackNumber: c.track?.no || null,
+      discNumber: c.disk?.no || null,
+      composer: (c.composer || []).join(', '),
+      genre: (c.genre || []).join(', '),
+      duration: f.duration || 0,
+      bitrate: f.bitrate ? Math.round(f.bitrate / 1000) : null,
+      sampleRate: f.sampleRate || null,
+      fileSize: stat.size,
+      lastModified: stat.mtimeMs,
+      hasAlbumArt: (c.picture && c.picture.length > 0) ? true : false,
+      addedAt: Date.now(),
+    }
+  } catch (e) {
+    return { error: 'Metadata read failed: ' + e.message }
+  }
+
+  // Add to library-data.json
+  const libData = loadLibraryData()
+  const existingIdx = libData.tracks.findIndex(t => t.id === trackMeta.id)
+  if (existingIdx >= 0) {
+    libData.tracks[existingIdx] = trackMeta
+  } else {
+    libData.tracks.push(trackMeta)
+  }
+  saveLibraryData(libData)
+
+  return { track: trackMeta }
+})
+
 
 ipcMain.handle('open-discord-login', (_, authorizeUrl) => {
   return new Promise((resolve) => {

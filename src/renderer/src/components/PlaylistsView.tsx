@@ -1321,7 +1321,8 @@ export default function PlaylistsView(): JSX.Element {
       </div>
 
       {/* Local playlist card context menu */}
-      {localCardMenu && (
+      {localCardMenu && createPortal(
+
         <div
           className="fixed z-[200] bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[190px]"
           style={{ left: Math.min(localCardMenu.x, window.innerWidth - 210), top: Math.max(8, Math.min(localCardMenu.y, window.innerHeight - 280)) }}
@@ -1376,7 +1377,7 @@ export default function PlaylistsView(): JSX.Element {
             </>
           )}
         </div>
-      )}
+, document.body)}
 
       {/* Library card context menu */}
       {libMenu && (

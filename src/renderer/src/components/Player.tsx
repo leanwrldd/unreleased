@@ -21,6 +21,7 @@ import {
   ListEnd,
   Info,
   Pencil,
+  HardDrive,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { formatDuration } from '../lib/lyrics'
@@ -85,6 +86,9 @@ export default function Player(): JSX.Element {
   const { radioFmActive, radioFmNowPlaying, radioFmMatchedSong } = useStore()
   const { libraryTracks } = useStore()
   const [editingLocalTrack, setEditingLocalTrack] = useState<LibraryTrack | null>(null)
+  const [addingToLib, setAddingToLib] = useState(false)
+  const [addedToLib, setAddedToLib] = useState(false)
+  const isElectron = !!(window as any).electron
 
 
   // FM elapsed time — ticks locally between WS updates
@@ -619,7 +623,7 @@ export default function Player(): JSX.Element {
 
   // Cover art error state — reset when track changes
   const [coverArtError, setCoverArtError] = useState(false)
-  useEffect(() => { setCoverArtError(false) }, [currentTrack?.id])
+  useEffect(() => { setCoverArtError(false); setAddedToLib(false); setAddingToLib(false) }, [currentTrack?.id])
 
   // Output device picker
   const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([])
@@ -664,7 +668,7 @@ export default function Player(): JSX.Element {
       />
 
       {/* ── Mobile player ── */}
-      <div className="md:hidden bg-surface border-t border-[var(--border)] shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="md:hidden bg-surface border-t border-[var(--border)] shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} onContextMenu={(e) => { e.preventDefault(); if (currentTrack) setShowContextMenu(v => !v) }}>
         {/* Thin progress bar */}
         {radioFmActive ? (
           <div className="h-[2px] bg-red-900/40 relative">
@@ -731,7 +735,7 @@ export default function Player(): JSX.Element {
       </div>
 
       {/* ── Desktop player ── */}
-      <div className="hidden md:flex h-[90px] bg-surface border-t border-[var(--border)] items-center px-4 gap-4 shrink-0">
+      <div className="hidden md:flex h-[90px] bg-surface border-t border-[var(--border)] items-center px-4 gap-4 shrink-0" onContextMenu={(e) => { e.preventDefault(); if (currentTrack) setShowContextMenu(v => !v) }}>
         {/* Track info */}
         <div className="flex items-center gap-3 w-72 min-w-0 shrink-0">
           <button
@@ -832,6 +836,28 @@ export default function Player(): JSX.Element {
                             }}
                           >
                             <Pencil size={14} /> Edit metadata
+                          </button>
+                        )}
+                        {currentSongId != null && isElectron && (
+                          <button
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                            onClick={async () => {
+                              if (addingToLib || addedToLib || !currentTrack) return
+                              setAddingToLib(true); setShowContextMenu(false)
+                              try {
+                                const url = 'https://juicewrldapi.com/juicewrld/files/download/?path=' + encodeURIComponent(currentTrack.path || '')
+                                await (window as any).electron.ipcRenderer.invoke('download-to-library', {
+                                  url,
+                                  songName: currentTrack.title,
+                                  artist: currentTrack.artist,
+                                  songPath: currentTrack.path
+                                })
+                                setAddedToLib(true)
+                              } finally { setAddingToLib(false) }
+                            }}
+                          >
+                            {addingToLib ? <Loader2 size={14} className="animate-spin" /> : addedToLib ? <Check size={14} className="text-accent" /> : <HardDrive size={14} />}
+                            {addedToLib ? 'Added to library' : addingToLib ? 'Adding...' : 'Add to library'}
                           </button>
                         )}
                       </div>

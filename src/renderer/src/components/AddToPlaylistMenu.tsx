@@ -20,6 +20,7 @@ export default function AddToPlaylistMenu({ songId, onClose, onAdded, placement 
   const [newName, setNewName] = useState('')
   const [busyId, setBusyId] = useState<number | 'new' | null>(null)
   const [doneId, setDoneId] = useState<number | null>(null)
+  const [contained, setContained] = useState<Set<number>>(new Set())
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -29,6 +30,20 @@ export default function AddToPlaylistMenu({ songId, onClose, onAdded, placement 
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [onClose])
+
+  // Check which playlists already contain this song
+  useEffect(() => {
+    if (!account || playlists.length === 0) return
+    Promise.all(
+      playlists.map(p =>
+        userApi.getPlaylist(p.id)
+          .then(d => ({ id: p.id, has: (d.items ?? []).some(it => it.song.id === songId) }))
+          .catch(() => ({ id: p.id, has: false }))
+      )
+    ).then(results => {
+      setContained(new Set(results.filter(r => r.has).map(r => r.id)))
+    })
+  }, [playlists, songId, account])
 
   if (!account) {
     return (
@@ -49,6 +64,7 @@ export default function AddToPlaylistMenu({ songId, onClose, onAdded, placement 
     try {
       await userApi.addToPlaylist(playlistId, songId)
       setDoneId(playlistId)
+      setContained(prev => new Set([...prev, playlistId]))
       await refreshPlaylists()
       onAdded?.()
     } catch {} finally {
@@ -80,18 +96,25 @@ export default function AddToPlaylistMenu({ songId, onClose, onAdded, placement 
         {playlists.length === 0 && (
           <p className="px-3 py-2 text-xs text-text-muted">No playlists yet.</p>
         )}
-        {playlists.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => addTo(p.id)}
-            disabled={busyId === p.id}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-          >
-            <ListMusic size={14} className="shrink-0 text-text-muted" />
-            <span className="flex-1 truncate">{p.name}</span>
-            {busyId === p.id ? <Loader2 size={13} className="animate-spin" /> : doneId === p.id ? <Check size={14} className="text-accent" /> : null}
-          </button>
-        ))}
+        {playlists.map((p) => {
+          const alreadyIn = contained.has(p.id)
+          return (
+            <button
+              key={p.id}
+              onClick={() => addTo(p.id)}
+              disabled={busyId === p.id}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+            >
+              <ListMusic size={14} className={`shrink-0 ${alreadyIn ? 'text-accent' : 'text-text-muted'}`} />
+              <span className="flex-1 truncate">{p.name}</span>
+              {busyId === p.id
+                ? <Loader2 size={13} className="animate-spin shrink-0" />
+                : (doneId === p.id || alreadyIn)
+                  ? <Check size={14} className="text-accent shrink-0" />
+                  : null}
+            </button>
+          )
+        })}
       </div>
       <div className="border-t border-[var(--border)] p-2">
         {creating ? (
