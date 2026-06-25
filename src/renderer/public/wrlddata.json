@@ -1,0 +1,198 @@
+﻿{
+  "albums": [
+    {
+      "id": 1,
+      "name": "Goodbye & Good Riddance",
+      "versions": [
+        {
+          "name": "Standard Edition",
+          "year": 2018,
+          "cover_url": "https://juicewrldapi.com/juicewrld/files/cover-art/?path=Released/Goodbye%20%26%20Good%20Riddance/cover.jpg",
+          "songs": [
+            { "name": "All Girls Are the Same", "id": 1 },
+            { "name": "Lucid Dreams", "id": 2 },
+            { "name": "Wishing Well", "id": 3 },
+            { "name": "Lean wit Me", "id": 4 },
+            { "name": "Scared of Love", "id": 5 },
+            { "name": "Nobody", "id": 6 },
+            { "name": "Maze", "id": 7 },
+            { "name": "Used to", "id": 8 },
+            { "name": "Candle in the Wind", "id": 9 },
+            { "name": "Legends", "id": 10 }
+          ]
+        },
+        {
+          "name": "Deluxe Edition",
+          "year": 2018,
+          "cover_url": "https://juicewrldapi.com/juicewrld/files/cover-art/?path=Released/Goodbye%20%26%20Good%20Riddance%20(Deluxe)/cover.jpg",
+          "songs": [
+            { "name": "All Girls Are the Same", "id": 1 },
+            { "name": "Lucid Dreams", "id": 2 },
+            { "name": "Wishing Well", "id": 3 },
+            { "name": "Lean wit Me", "id": 4 },
+            { "name": "Scared of Love", "id": 5 },
+            { "name": "Nobody", "id": 6 },
+            { "name": "Maze", "id": 7 },
+            { "name": "Used to", "id": 8 },
+            { "name": "Candle in the Wind", "id": 9 },
+            { "name": "Legends", "id": 10 },
+            { "name": "Fine China", "id": 11 },
+            { "name": "Numb", "id": 12 },
+            { "name": "Hurt Me", "id": 13 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Death Race for Love",
+      "versions": [
+        {
+          "name": "Standard Edition",
+          "year": 2019,
+          "cover_url": "https://juicewrldapi.com/juicewrld/files/cover-art/?path=Released/Death%20Race%20For%20Love/cover.jpg",
+          "songs": [
+            { "name": "Empty", "id": 14 },
+            { "name": "Robbery", "id": 15 },
+            { "name": "Hear Me Calling", "id": 16 },
+            { "name": "Maze", "id": 17 },
+            { "name": "The Bees Knees", "id": 18 },
+            { "name": "Fast", "id": 19 },
+            { "name": "HeMotions", "id": 20 },
+            { "name": "Syphilis", "id": 21 },
+            { "name": "Black & White", "id": 22 },
+            { "name": "Rider", "id": 23 },
+            { "name": "No Jutsu", "id": 24 },
+            { "name": "Ring Ring", "id": 25 },
+            { "name": "Who Shot Cupid?", "id": 26 },
+            { "name": "Intro", "id": 27 },
+            { "name": "Flaws and Sins", "id": 28 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Legends Never Die",
+      "versions": [
+        {
+          "name": "Standard Edition",
+          "year": 2020,
+          "cover_url": "https://juicewrldapi.com/juicewrld/files/cover-art/?path=Released/Legends%20Never%20Die/cover.jpg",
+          "songs": [
+            { "name": "Righteous", "id": 29 },
+            { "name": "Conversations", "id": 30 },
+            { "name": "Wishing Well", "id": 31 },
+            { "name": "Hate the Other Side", "id": 32 },
+            { "name": "Bad Energy", "id": 33 },
+            { "name": "Tell Me U Luv Me", "id": 34 },
+            { "name": "Life's a Mess", "id": 35 },
+            { "name": "Smile", "id": 36 },
+            { "name": "Titanic", "id": 37 },
+            { "name": "Come & Go", "id": 38 },
+            { "name": "Screw Juice", "id": 39 },
+            { "name": "Blood on My Jeans", "id": 40 },
+            { "name": "Kids Are Alright", "id": 41 },
+            { "name": "Man of the Year", "id": 42 },
+            { "name": "Legends Never Die", "id": 43 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Fighting Demons",
+      "versions": [
+        {
+          "name": "Standard Edition",
+          "year": 2021,
+          "cover_url": "https://juicewrldapi.com/juicewrld/files/cover-art/?path=Released/Fighting%20Demons/cover.jpg",
+          "songs": [
+            { "name": "ATM", "id": 44 },
+            { "name": "already dead", "id": 45 },
+            { "name": "Cigarettes", "id": 46 },
+            { "name": "Burn", "id": 47 },
+            { "name": "Go Hard", "id": 48 },
+            { "name": "Feline", "id": 49 },
+            { "name": "Relocate", "id": 50 },
+            { "name": "Head High", "id": 51 },
+            { "name": "Doom", "id": 52 },
+            { "name": "Friends", "id": 53 },
+            { "name": "Up Up and Away", "id": 54 },
+            { "name": "Real Love Interlude", "id": 55 },
+            { "name": "Fighting Demons", "id": 56 }
+          ]
+        },
+        {
+          "name": "Deluxe Edition",
+          "year": 2022,
+          "cover_url": "https://juicewrldapi.com/juicewrld/files/cover-art/?path=Released/Fighting%20Demons%20(Deluxe)/cover.jpg",
+          "songs": [
+            { "name": "ATM", "id": 44 },
+            { "name": "already dead", "id": 45 },
+            { "name": "Cigarettes", "id": 46 },
+            { "name": "Burn", "id": 47 },
+            { "name": "Go Hard", "id": 48 },
+            { "name": "Feline", "id": 49 },
+            { "name": "Relocate", "id": 50 },
+            { "name": "Head High", "id": 51 },
+            { "name": "Doom", "id": 52 },
+            { "name": "Friends", "id": 53 },
+            { "name": "Up Up and Away", "id": 54 },
+            { "name": "Real Love Interlude", "id": 55 },
+            { "name": "Fighting Demons", "id": 56 },
+            { "name": "Lace It", "id": 57 },
+            { "name": "Rockstar in His Prime", "id": 58 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "The Party Never Ends",
+      "versions": [
+        {
+          "name": "Standard Edition",
+          "year": 2023,
+          "cover_url": "https://juicewrldapi.com/juicewrld/files/cover-art/?path=Released/The%20Party%20Never%20Ends/cover.jpg",
+          "songs": [
+            { "name": "Fearless", "id": 59 },
+            { "name": "Before the Party Ends", "id": 60 },
+            { "name": "Star Crossed", "id": 61 },
+            { "name": "Godzilla", "id": 62 },
+            { "name": "Blind", "id": 63 },
+            { "name": "Let You Down", "id": 64 },
+            { "name": "Forever", "id": 65 },
+            { "name": "Uh Oh", "id": 66 },
+            { "name": "Tequila Shots", "id": 67 },
+            { "name": "Deserve You", "id": 68 },
+            { "name": "Bad Boy", "id": 69 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Too Much Too Little",
+      "versions": [
+        {
+          "name": "Standard Edition",
+          "year": 2024,
+          "cover_url": "https://juicewrldapi.com/juicewrld/files/cover-art/?path=Released/Too%20Much%20Too%20Little/cover.jpg",
+          "songs": [
+            { "name": "You'll Never Know", "id": 70 },
+            { "name": "Too Much", "id": 71 },
+            { "name": "Hurt Me Bad", "id": 72 },
+            { "name": "Lace It", "id": 73 },
+            { "name": "Best Interest", "id": 74 },
+            { "name": "Nah Nah", "id": 75 },
+            { "name": "Into Your Arms", "id": 76 },
+            { "name": "Red Snow", "id": 77 },
+            { "name": "Angel", "id": 78 },
+            { "name": "Outside Today", "id": 79 }
+          ]
+        }
+      ]
+    }
+  ]
+}
