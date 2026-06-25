@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Search, Play, Loader2, Music2, X,
   LayoutList, LayoutGrid, Info, Download, ListPlus, PanelLeft,
@@ -249,7 +249,7 @@ function SongContextMenu({
     >
       {/* Song header */}
       <div className="px-3 py-2 border-b border-[var(--border)] mb-1">
-        <p className="text-text-primary text-xs font-semibold truncate">{state.song.track_titles?.[0] || state.song.name}</p>
+        <p className="text-text-primary text-xs font-semibold truncate">{state.song.name}</p>
         <p className="text-text-muted text-[10px] truncate">{state.song.credited_artists || 'Juice WRLD'}</p>
       </div>
 
@@ -338,6 +338,26 @@ function SongContextMenu({
             <>
               <div className="my-1 border-t border-[var(--border)]" />
               <MenuItem icon={<Download size={14} />} label="Download" onClick={() => { downloadSong(state.song); onClose() }} />
+              {el && (
+                <MenuItem
+                  icon={addingToLib ? <Loader2 size={14} className="animate-spin" /> : addedToLib ? <Check size={14} className="text-accent" /> : <HardDrive size={14} />}
+                  label={addedToLib ? 'Added to library' : addingToLib ? 'Adding...' : 'Add to library'}
+                  onClick={async () => {
+                    if (addingToLib || addedToLib) return
+                    setAddingToLib(true)
+                    try {
+                      const url = 'https://juicewrldapi.com/juicewrld/files/download/?path=' + encodeURIComponent(state.song.path!)
+                      const result = await el.ipcRenderer.invoke('download-to-library', {
+                        url,
+                        songName: state.song.name,
+                        artist: state.song.credited_artists || 'Juice WRLD',
+                        songPath: state.song.path
+                      })
+                      if (!result.error) setAddedToLib(true)
+                    } finally { setAddingToLib(false) }
+                  }}
+                />
+              )}
             </>
           )}
         </>
@@ -388,8 +408,8 @@ function SongRow({
   onContextMenu: (song: JWApiSong, e: React.MouseEvent) => void
 }): JSX.Element {
   const track = songToTrack(song)
-  const title = song.track_titles?.[0] || song.name
-  const altTitles = song.track_titles?.slice(1) ?? []
+  const title = song.name
+  const altTitles = song.track_titles ?? []
   const canPlay = !!song.path
 
   return (
@@ -487,7 +507,7 @@ function SongCard({
   onContextMenu: (song: JWApiSong, e: React.MouseEvent) => void
 }): JSX.Element {
   const track = songToTrack(song)
-  const title = song.track_titles?.[0] || song.name
+  const title = song.name
   const canPlay = !!song.path
 
   return (
