@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState } from 'react'
+﻿import { useEffect, useRef, useMemo, useState } from 'react'
 import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, LocateFixed, ChevronDown } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
@@ -129,8 +129,8 @@ export default function WrldView(): JSX.Element {
   useEffect(() => { setVoteDismissed(false) }, [radioFmVote?.track, radioFmVote?.kind])
 
   const fmLabel    = radioFmActive
-    ? (radioFmIsLive ? '999 FM Ãƒâ€šÃ‚Â· LIVE' : '999 FM Ãƒâ€šÃ‚Â· OFF')
-    : radioFmIsLive === false ? '999 FM Ãƒâ€šÃ‚Â· OFF' : '999 FM'
+    ? (radioFmIsLive ? '999 FM · LIVE' : '999 FM · OFF')
+    : radioFmIsLive === false ? '999 FM · OFF' : '999 FM'
   const fmDisabled = radioFmIsLive === false && !radioFmActive
   const hasContent = radioFmActive || !!currentTrack
 
@@ -182,8 +182,8 @@ export default function WrldView(): JSX.Element {
           </div>
           {radioFmVote.track && <p className="text-white/80 text-sm font-medium">{radioFmVote.track}</p>}
           <p className="text-white/30 text-xs">
-            {radioFmVote.yes ?? 0} yes Ãƒâ€šÃ‚Â· {radioFmVote.no ?? 0} no
-            {radioFmVote.votes_needed != null && <span> Ãƒâ€šÃ‚Â· need {radioFmVote.votes_needed}</span>}
+            {radioFmVote.yes ?? 0} yes · {radioFmVote.no ?? 0} no
+            {radioFmVote.votes_needed != null && <span> · need {radioFmVote.votes_needed}</span>}
           </p>
           <div className="flex gap-2">
             <button onClick={() => getActiveRadioClient()?.castVote('yes')}
