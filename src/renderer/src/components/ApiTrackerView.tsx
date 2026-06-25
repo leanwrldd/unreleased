@@ -187,6 +187,9 @@ function SongContextMenu({
   const [doneId, setDoneId] = useState<number | null>(null)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
+  const [addingToLib, setAddingToLib] = useState(false)
+  const [addedToLib, setAddedToLib] = useState(false)
+  const el = (window as any).electron
 
   useEffect(() => {
     const handle = (e: MouseEvent): void => {
