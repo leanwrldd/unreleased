@@ -182,6 +182,7 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       radioMode: false,
       radioNext: null,
       _radioWaiting: false,
+      radioFmActive: false,
       progress: 0,
       currentTime: 0,
     })
@@ -207,6 +208,7 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       radioFilter: filter,
       radioNext: null,
       _radioWaiting: false,
+      radioFmActive: false,
       progress: 0,
       currentTime: 0,
     })

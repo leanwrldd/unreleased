@@ -57,7 +57,7 @@ export default function LyricsDisplay(): JSX.Element {
     return (
       <div
         ref={containerRef}
-        className="h-full overflow-y-auto py-16 px-8 space-y-3"
+        className="h-full overflow-y-auto py-16 px-8 space-y-4"
         style={{ scrollbarWidth: 'none' } as React.CSSProperties}
       >
         <style>{`::-webkit-scrollbar { display: none; }`}</style>
@@ -66,15 +66,14 @@ export default function LyricsDisplay(): JSX.Element {
           const isPast = i < currentLineIdx
 
           if (!line.text) {
-            return <div key={i} className="h-3" />
+            return <div key={i} className="h-4" />
           }
 
           const lineStyle: React.CSSProperties = {
-            transformOrigin: 'left center',
-            transform: isActive ? 'scale(1)' : 'scale(0.88)',
-            opacity: isActive ? 1 : isPast ? 0.45 : 0.35,
+            opacity: isActive ? 1 : isPast ? 0.35 : 0.2,
             color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
-            transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, color 0.4s ease',
+            filter: (!isActive && !isPast) ? 'blur(1px)' : 'blur(0px)',
+            transition: 'opacity 0.35s ease, color 0.35s ease, filter 0.35s ease',
           }
 
           return (

@@ -592,12 +592,13 @@ function SongCard({
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function ApiTrackerView(): JSX.Element {
   const {
-    playTrack, addToQueue, account,
+    playTrack, startRadio, addToQueue, account, shuffle,
     apiTrackerCategory, setApiTrackerCategory,
     apiTrackerEra, setApiTrackerEra,
     setActiveView, setApiFilesPath, setPendingEditorSongId,
   } = useStore(useShallow(s => ({
-    playTrack: s.playTrack, addToQueue: s.addToQueue, account: s.account,
+    playTrack: s.playTrack, startRadio: s.startRadio, addToQueue: s.addToQueue,
+    account: s.account, shuffle: s.shuffle,
     apiTrackerCategory: s.apiTrackerCategory, setApiTrackerCategory: s.setApiTrackerCategory,
     apiTrackerEra: s.apiTrackerEra, setApiTrackerEra: s.setApiTrackerEra,
     setActiveView: s.setActiveView, setApiFilesPath: s.setApiFilesPath,
@@ -809,6 +810,15 @@ export default function ApiTrackerView(): JSX.Element {
 
   const handlePlay = useCallback((song: JWApiSong) => {
     const track = songToTrack(song)
+    // If shuffle is already on, start radio mode from this track instead of
+    // loading the visible page into the queue.
+    if (shuffle) {
+      const rf = (!orderField && hasMore)
+        ? { category, era, search: debouncedSearch, total: count }
+        : null
+      startRadio(track, rf)
+      return
+    }
     const playable = sortedSongs.filter((s) => !!s.path)
     const context = playable.map(songToTrack)
     const needsLazy = !orderField && hasMore
@@ -816,7 +826,7 @@ export default function ApiTrackerView(): JSX.Element {
       category, era, search: debouncedSearch,
       page: page + 1, hasMore: true, total: count,
     } : null, 'tracker')
-  }, [playTrack, sortedSongs, category, era, debouncedSearch, count, hasMore, orderField, page])
+  }, [playTrack, startRadio, shuffle, sortedSongs, category, era, debouncedSearch, count, hasMore, orderField, page])
 
   const handleInfo = useCallback((song: JWApiSong) => { setSelectedSong(song) }, [])
   const handleQueue = useCallback((track: Track) => { addToQueue(track) }, [addToQueue])

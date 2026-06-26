@@ -15,7 +15,7 @@ function formatDuration(seconds: number): string {
 }
 
 export default function LikedSongsView(): JSX.Element {
-  const { account, playTrack, addToQueue, likedTrackIds, toggleLike, setShowUserAuth, playlists, refreshPlaylists, setActiveView, setPendingEditorSongId } = useStore()
+  const { account, playTrack, addToQueue, toggleLike, setShowUserAuth, playlists, refreshPlaylists, setActiveView, setPendingEditorSongId } = useStore()
   const canEdit = !!(account?.is_editor || account?.is_administrator)
   const [tracks, setTracks] = useState<Track[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,7 +45,8 @@ export default function LikedSongsView(): JSX.Element {
     return () => window.removeEventListener('click', close)
   }, [ctxMenu])
 
-  const visible = tracks.filter((t) => likedTrackIds.includes(t.id))
+  // tracks is already fetched from the API (getFavorites), no need to filter by localStorage
+  const visible = tracks
 
   if (!account) {
     return (
@@ -121,7 +122,7 @@ export default function LikedSongsView(): JSX.Element {
                     <MoreHorizontal size={16} />
                   </button>
                   <button
-                    onClick={() => toggleLike(track.id)}
+                    onClick={() => { setTracks(prev => prev.filter(t => t.id !== track.id)); toggleLike(track.id) }}
                     className="p-1.5 text-accent shrink-0"
                     title="Remove from Liked Songs"
                   >
@@ -189,7 +190,7 @@ export default function LikedSongsView(): JSX.Element {
             <Download size={14} className="text-text-muted" /> Download
           </button>
         )}
-        <button onClick={() => { toggleLike(ctxMenu.track.id); setCtxMenu(null) }}
+        <button onClick={() => { setTracks(prev => prev.filter(t => t.id !== ctxMenu.track.id)); toggleLike(ctxMenu.track.id); setCtxMenu(null) }}
           className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-red-400 hover:bg-surface-overlay transition-colors">
           <Heart size={14} /> Unlike
         </button>
