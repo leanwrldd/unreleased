@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { SearchCode, HardDrive, Settings, ShieldCheck, ListMusic, Library, LogIn, LogOut, ChevronLeft, ChevronRight, Disc } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
@@ -14,6 +14,18 @@ export default function Sidebar(): JSX.Element {
   const [collapsed, setCollapsed] = useState<boolean>(
     () => localStorage.getItem(LS_COLLAPSED) === 'true'
   )
+  // showExpanded trails collapsed: hides immediately on collapse, appears
+  // after ~120ms on expand so content doesn't pop in before the sidebar widens.
+  const [showExpanded, setShowExpanded] = useState<boolean>(!collapsed)
+
+  useEffect(() => {
+    if (collapsed) {
+      setShowExpanded(false)
+    } else {
+      const t = setTimeout(() => setShowExpanded(true), 120)
+      return () => clearTimeout(t)
+    }
+  }, [collapsed])
 
   const toggle = (): void => {
     const next = !collapsed
@@ -40,7 +52,7 @@ export default function Sidebar(): JSX.Element {
       {/* Logo */}
       <div className={`pt-5 pb-4 flex flex-col items-center gap-1 shrink-0 ${collapsed ? 'px-2' : 'px-5'}`}>
         <img src={logo} alt="unreleased" className={`object-contain transition-all ${collapsed ? 'h-8 w-8' : 'h-32 w-auto'}`} />
-        {!collapsed && (
+        {showExpanded && (
           <span
             className="text-text-primary text-sm uppercase select-none"
             style={{ fontFamily: "'Josefin Sans', sans-serif", fontWeight: 300, letterSpacing: '0.35em' }}
@@ -70,7 +82,7 @@ export default function Sidebar(): JSX.Element {
             }`}
           >
             {icon}
-            {!collapsed && <span className="flex-1 text-left">{label}</span>}
+            {showExpanded && <span className="flex-1 text-left">{label}</span>}
           </button>
         ))}
       </nav>
@@ -91,11 +103,11 @@ export default function Sidebar(): JSX.Element {
                   {(account.display_name || account.discord_username || '?').charAt(0).toUpperCase()}
                 </div>
               )}
-              {!collapsed && (
+              {showExpanded && (
                 <span className="min-w-0 truncate text-text-secondary text-sm font-medium">{account.display_name || account.discord_username}</span>
               )}
             </button>
-            {!collapsed && (
+            {showExpanded && (
               <button onClick={() => logoutAccount()} title="Log out" className="text-text-muted hover:text-text-primary transition-colors shrink-0">
                 <LogOut size={16} />
               </button>
@@ -108,7 +120,7 @@ export default function Sidebar(): JSX.Element {
             className={`flex items-center w-full py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'}`}
           >
             <LogIn size={18} />
-            {!collapsed && <span>Log in</span>}
+            {showExpanded && <span>Log in</span>}
           </button>
         )}
         {isAdmin && (
@@ -122,7 +134,7 @@ export default function Sidebar(): JSX.Element {
             }`}
           >
             <ShieldCheck size={18} />
-            {!collapsed && <span>Admin</span>}
+            {showExpanded && <span>Admin</span>}
           </button>
         )}
         <button
@@ -131,7 +143,7 @@ export default function Sidebar(): JSX.Element {
           className={`flex items-center w-full py-2 rounded text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'}`}
         >
           <Settings size={18} />
-          {!collapsed && <span>Settings</span>}
+          {showExpanded && <span>Settings</span>}
         </button>
 
         {/* Collapse toggle */}
@@ -141,7 +153,7 @@ export default function Sidebar(): JSX.Element {
           className={`flex items-center w-full py-2 rounded text-sm font-medium text-text-muted hover:text-text-primary hover:bg-surface-raised transition-colors ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'}`}
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          {!collapsed && <span>Collapse</span>}
+          {showExpanded && <span>Collapse</span>}
         </button>
       </div>
     </aside>

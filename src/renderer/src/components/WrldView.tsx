@@ -3,7 +3,7 @@ import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, LocateFixed
 import { useStore } from '../store/useStore'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
 import { seekAudio } from './Player'
-import { buildImageUrl, apiFetch, songToTrack, JWAPI_BASE } from '../lib/juicewrldApi'
+import { buildImageUrl, apiFetch, songToTrack, JWAPI_BASE, playlistCoverUrl } from '../lib/juicewrldApi'
 import { getActiveRadioClient } from '../lib/radioSocketService'
 import type { JWApiSong } from '../lib/juicewrldApi'
 import * as userApi from '../lib/userApi'
@@ -704,8 +704,8 @@ export default function WrldView(): JSX.Element {
                     <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)} title={pl.name}
                       className="flex flex-col gap-1.5 text-left group/pl">
                       <div className="w-full aspect-square rounded-xl overflow-hidden ring-1 ring-white/[0.06] group-hover/pl:ring-white/25 transition-all shadow-md">
-                        {(pl.cover_image_url || pl.cover_image)
-                          ? <img src={pl.cover_image_url ?? pl.cover_image ?? ''} className="w-full h-full object-cover" />
+                        {playlistCoverUrl(pl)
+                          ? <img src={playlistCoverUrl(pl)} className="w-full h-full object-cover" />
                           : <div className="w-full h-full bg-white/[0.06] flex items-center justify-center">
                               <Music size={18} className="text-white/15" />
                             </div>}
