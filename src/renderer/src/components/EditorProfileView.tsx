@@ -1,7 +1,198 @@
-import { useEffect, useState, useMemo } from 'react'
-import { Loader2, Trophy, FileEdit, ChevronLeft, Pencil, Trash2, RefreshCw } from 'lucide-react'
+import { useEffect, useState, useMemo, useRef } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { Loader2, Trophy, FileEdit, ChevronLeft, Pencil, Trash2, RefreshCw, Plus, X, Check, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 import { useStore } from '../store/useStore'
-import { getMyProposals, getLeaderboard, withdrawProposal, SongEditProposal, ProposalStatus } from '../lib/userApi'
+import { getMyProposals, getLeaderboard, withdrawProposal, createProposal, SongEditProposal, ProposalStatus } from '../lib/userApi'
+import { apiFetch, JWApiEra } from '../lib/juicewrldApi'
+
+const CATEGORIES = [
+  { value: 'released', label: 'Released' },
+  { value: 'unreleased', label: 'Unreleased' },
+  { value: 'unsurfaced', label: 'Unsurfaced' },
+  { value: 'recording_session', label: 'Session' },
+]
+const CAT_PILL: Record<string, string> = {
+  released: 'bg-emerald-500 text-white',
+  unreleased: 'bg-accent text-white',
+  unsurfaced: 'bg-yellow-500 text-black',
+  recording_session: 'bg-zinc-500 text-white',
+}
+
+// Defined outside AddSongModal so its reference is stable across re-renders.
+// If defined inside, React sees a new component type every render and unmounts/remounts
+// the input DOM nodes, destroying focus.
+function Field({ label, value, onChange, placeholder, mono = false }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; mono?: boolean
+}): JSX.Element {
+  return (
+    <div className="grid grid-cols-[80px_1fr] gap-x-3 items-baseline px-4 py-[7px] border-l-2 transition-all border-transparent hover:bg-white/[0.04]">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-60 select-none truncate pt-px">{label}</span>
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder || '—'}
+        className={`flex-1 bg-transparent text-sm text-text-primary focus:outline-none placeholder:text-text-muted placeholder:opacity-25 min-w-0 border-b border-[var(--border)] pb-px focus:border-accent transition-colors ${mono ? 'font-mono' : ''}`} />
+    </div>
+  )
+}
+
+function AddSongModal({ onClose, onSubmitted }: { onClose: () => void; onSubmitted: () => void }): JSX.Element {
+  const [name,    setName]    = useState('')
+  const [artists, setArtists] = useState('')
+  const [cat,     setCat]     = useState('')
+  const [album,   setAlbum]   = useState('')
+  const [eraId,   setEraId]   = useState('')
+  const [prod,     setProd]     = useState('')
+  const [engineer, setEngineer] = useState('')
+  const [location, setLocation] = useState('')
+  const [leakType, setLeakType] = useState('')
+  const [recDate,  setRecDate]  = useState('')
+  const [relDate,  setRelDate]  = useState('')
+  const [notes,    setNotes]    = useState('')
+  const [edNotes, setEdNotes] = useState('')
+  const [showMore, setShowMore] = useState(false)
+  const [eras, setEras] = useState<JWApiEra[]>([])
+  const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle')
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    apiFetch<JWApiEra[] | { results: JWApiEra[] }>('/eras/')
+      .then(d => setEras(Array.isArray(d) ? d : (d as { results: JWApiEra[] }).results ?? []))
+      .catch(() => undefined)
+  }, [])
+
+  const proposed: Record<string, unknown> = {}
+  if (name)    proposed.name                = name
+  if (artists) proposed.credited_artists    = artists
+  if (album)   proposed.album              = album
+  if (cat)     proposed.category           = cat
+  if (eraId)   proposed.era_id             = Number(eraId)
+  if (prod)     proposed.producers     = prod
+  if (engineer) proposed.engineer      = engineer
+  if (location) proposed.location      = location
+  if (leakType) proposed.leak_type     = leakType
+  if (recDate)  proposed.record_dates  = recDate
+  if (relDate) proposed.release_date       = relDate
+  if (notes)   proposed.notes              = notes
+
+  const handleSubmit = async (): Promise<void> => {
+    if (!name.trim() || submitState === 'submitting') return
+    setSubmitState('submitting'); setSubmitError(null)
+    try {
+      await createProposal({ song: null, change_type: 'create', title: name.trim(), proposed_data: proposed, editor_notes: edNotes })
+      setSubmitState('submitted')
+      setTimeout(() => { onSubmitted(); onClose() }, 1200)
+    } catch (e) {
+      setSubmitState('error')
+      setSubmitError(e instanceof Error ? e.message : 'Submission failed')
+      setTimeout(() => setSubmitState('idle'), 4000)
+    }
+  }
+
+  return (
+    <div ref={overlayRef} className="fixed inset-0 z-50 flex items-end justify-center" onClick={e => { if (e.target === overlayRef.current) onClose() }}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-[var(--surface)] rounded-t-2xl shadow-2xl border border-[var(--border)] border-b-0 animate-slide-up flex flex-col max-h-[88dvh]">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 pt-5 pb-4 border-b border-[var(--border)] shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-accent/15 border border-accent/20 flex items-center justify-center shrink-0">
+            <Plus size={15} className="text-accent" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-text-primary font-bold text-sm">Propose new song</p>
+            <p className="text-text-muted text-xs opacity-60 mt-0.5">Admins review and add it to the database</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-[var(--surface-overlay)] transition-colors shrink-0">
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Scrollable fields */}
+        <div className="flex-1 overflow-y-auto min-h-0 py-2">
+          <Field label="Title *" value={name} onChange={setName} placeholder="Song title" />
+          <Field label="Artists" value={artists} onChange={setArtists} placeholder="Juice WRLD ft. …" />
+          <Field label="Album" value={album} onChange={setAlbum} placeholder="Album name" />
+
+          {/* Category pills */}
+          <div className="px-4 py-2 border-l-2 border-transparent">
+            <div className="grid grid-cols-[80px_1fr] gap-x-3 items-start">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-60 select-none pt-1.5">Category</span>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {CATEGORIES.map(c => (
+                  <button key={c.value} onClick={() => setCat(prev => prev === c.value ? '' : c.value)}
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all ${
+                      cat === c.value ? CAT_PILL[c.value] : 'bg-[var(--surface-overlay)] text-text-muted hover:text-text-primary border border-[var(--border)]'
+                    }`}>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Era select */}
+          {eras.length > 0 && (
+            <div className="grid grid-cols-[80px_1fr] gap-x-3 items-baseline px-4 py-[7px] border-l-2 border-transparent">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-60 select-none truncate pt-px">Era</span>
+              <select value={eraId} onChange={e => setEraId(e.target.value)}
+                className="flex-1 text-sm focus:outline-none appearance-none cursor-pointer min-w-0 border-b border-[var(--border)] pb-px"
+                style={{ background: 'var(--surface)', color: 'var(--text-primary)' }}>
+                <option value="" style={{ background: 'var(--surface)', color: 'var(--text-primary)' }}>—</option>
+                {eras.map(e => <option key={e.id} value={String(e.id)} style={{ background: 'var(--surface)', color: 'var(--text-primary)' }}>{e.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          <button onClick={() => setShowMore(v => !v)}
+            className="flex items-center gap-1.5 w-full px-4 pt-3 pb-1 text-[11px] text-text-muted opacity-60 hover:opacity-80 transition-colors select-none">
+            {showMore ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+            {showMore ? 'Fewer fields' : 'More fields'}
+          </button>
+
+          {showMore && (
+            <>
+              <Field label="Producers" value={prod}     onChange={setProd}     placeholder="Producer names" />
+              <Field label="Engineer"  value={engineer} onChange={setEngineer} placeholder="Engineer name" />
+              <Field label="Location"  value={location} onChange={setLocation} placeholder="Recording location" />
+              <Field label="Leak type" value={leakType} onChange={setLeakType} placeholder="e.g. Stem, Master, Video…" />
+              <Field label="Recorded"  value={recDate}  onChange={setRecDate}  placeholder="YYYY-MM-DD" mono />
+              <Field label="Released"  value={relDate}  onChange={setRelDate}  placeholder="YYYY-MM-DD" mono />
+              <div className="px-4 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-60 mb-1.5">Additional info</p>
+                <textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any other notes…"
+                  className="w-full bg-[var(--surface-overlay)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted placeholder:opacity-25" />
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 border-t border-[var(--border)] px-5 py-4 space-y-3">
+          <input value={edNotes} onChange={e => setEdNotes(e.target.value)} placeholder="Editor notes (optional)…"
+            className="w-full bg-[var(--surface-overlay)] border border-[var(--border)] rounded-xl px-3 py-2 text-xs text-text-primary placeholder:text-text-muted placeholder:opacity-30 focus:outline-none focus:border-accent/40 transition-colors" />
+          {submitError && (
+            <div className="flex items-center gap-2 text-red-400 text-xs">
+              <AlertCircle size={12} className="shrink-0" /> {submitError}
+            </div>
+          )}
+          <button onClick={handleSubmit} disabled={!name.trim() || submitState === 'submitting' || submitState === 'submitted'}
+            className={`w-full py-2.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+              submitState === 'submitted' ? 'bg-emerald-500/20 text-emerald-400' :
+              submitState === 'error'     ? 'bg-red-500/20 text-red-400' :
+              !name.trim()                ? 'bg-[var(--surface-overlay)] text-text-muted opacity-40 cursor-not-allowed' :
+              'bg-accent text-white hover:bg-accent/90 shadow-lg shadow-accent/20'
+            }`}>
+            {submitState === 'submitting' && <Loader2 size={14} className="animate-spin" />}
+            {submitState === 'submitted'  && <Check size={14} />}
+            {submitState === 'error'      && <AlertCircle size={14} />}
+            {submitState === 'idle'       && 'Submit proposal'}
+            {submitState === 'submitting' && 'Submitting…'}
+            {submitState === 'submitted'  && 'Submitted!'}
+            {submitState === 'error'      && 'Try again'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 type LeaderboardEntry = {
   rank: number
@@ -37,7 +228,12 @@ function changeTypeLabel(type: string): string {
 }
 
 export default function EditorProfileView(): JSX.Element {
-  const { account, setActiveView, setPendingEditorSongId, setPendingEditProposal } = useStore()
+  const { account, setActiveView, setPendingEditorSongId, setPendingEditProposal } = useStore(useShallow(s => ({
+    account: s.account,
+    setActiveView: s.setActiveView,
+    setPendingEditorSongId: s.setPendingEditorSongId,
+    setPendingEditProposal: s.setPendingEditProposal,
+  })))
 
   const [proposals, setProposals] = useState<SongEditProposal[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
@@ -47,6 +243,7 @@ export default function EditorProfileView(): JSX.Element {
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
+  const [showAddSong, setShowAddSong] = useState(false)
 
   const handleDelete = async (id: number): Promise<void> => {
     setDeletingId(id)
@@ -104,14 +301,25 @@ export default function EditorProfileView(): JSX.Element {
           >
             <ChevronLeft size={14} /> Back
           </button>
-          <button
-            onClick={() => setRefreshKey(k => k + 1)}
-            disabled={refreshing}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-[var(--surface-raised)] transition-colors disabled:opacity-40"
-            title="Refresh"
-          >
-            <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {(account?.is_editor || account?.is_administrator) && (
+              <button
+                onClick={() => setShowAddSong(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent/15 hover:bg-accent/25 text-accent text-xs font-semibold transition-colors"
+                title="Propose a new song"
+              >
+                <Plus size={12} /> New song
+              </button>
+            )}
+            <button
+              onClick={() => setRefreshKey(k => k + 1)}
+              disabled={refreshing}
+              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-[var(--surface-raised)] transition-colors disabled:opacity-40"
+              title="Refresh"
+            >
+              <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-3.5">
@@ -308,6 +516,13 @@ export default function EditorProfileView(): JSX.Element {
         </div>
 
       </div>
+
+      {showAddSong && (
+        <AddSongModal
+          onClose={() => setShowAddSong(false)}
+          onSubmitted={() => setRefreshKey(k => k + 1)}
+        />
+      )}
     </div>
   )
 }

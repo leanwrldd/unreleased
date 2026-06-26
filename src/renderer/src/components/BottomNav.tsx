@@ -1,4 +1,4 @@
-import { SearchCode, Settings, ShieldCheck, ListMusic } from 'lucide-react'
+import { SearchCode, Settings, ShieldCheck, ListMusic, Disc } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
@@ -11,6 +11,7 @@ export default function BottomNav(): JSX.Element {
     { icon: <SearchCode size={24} />, label: 'Tracker', view: 'api-tracker' },
     { icon: <img src={logo} alt="WRLD" className="w-8 h-8 object-contain" />, label: 'WRLD', view: 'wrld' },
     { icon: <ListMusic size={24} />, label: 'Playlists', view: 'playlists' },
+    { icon: <Disc size={24} />, label: 'Albums', view: 'albums-admin' },
   ]
 
   return (
