@@ -691,6 +691,27 @@ export default function EditorPage(): JSX.Element {
   )
 }
 
+/* ── AppField — hoisted to module scope so React never remounts inputs ──────── */
+function AppField({ label, value, onChange, rows, placeholder, hint }: {
+  label: string; value: string; onChange: (v: string) => void
+  rows?: number; placeholder?: string; hint?: string
+}): JSX.Element {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted opacity-65">{label}</label>
+        {hint && <span className="text-[10px] text-text-muted opacity-55">{hint}</span>}
+      </div>
+      {(rows ?? 1) > 1
+        ? <textarea rows={rows} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+            className="w-full bg-surface-overlay border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/40 resize-none placeholder:text-text-muted placeholder:opacity-30 transition-colors" />
+        : <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+            className="w-full bg-surface-overlay border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/40 placeholder:text-text-muted placeholder:opacity-30 transition-colors" />
+      }
+    </div>
+  )
+}
+
 /* ── Application view ─────────────────────────────────────────────────────── */
 function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
   application: EditorApplication | null
@@ -740,24 +761,6 @@ function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
         {application.review_notes && <p className="text-text-muted text-sm max-w-[220px] italic leading-relaxed">"{application.review_notes}"</p>}
       </div>
       <button onClick={onSignOut} className="text-xs text-text-muted opacity-65 hover:text-text-muted transition-colors mt-1">Sign out</button>
-    </div>
-  )
-
-  const AppField = ({ label, value, onChange, rows, placeholder, hint }: {
-    label: string; value: string; onChange: (v: string) => void
-    rows?: number; placeholder?: string; hint?: string
-  }): JSX.Element => (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <label className="text-[11px] font-bold uppercase tracking-wider text-text-muted opacity-65">{label}</label>
-        {hint && <span className="text-[10px] text-text-muted opacity-55">{hint}</span>}
-      </div>
-      {(rows ?? 1) > 1
-        ? <textarea rows={rows} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-            className="w-full bg-surface-overlay border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/40 resize-none placeholder:text-text-muted placeholder:opacity-30 transition-colors" />
-        : <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-            className="w-full bg-surface-overlay border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent/40 placeholder:text-text-muted placeholder:opacity-30 transition-colors" />
-      }
     </div>
   )
 

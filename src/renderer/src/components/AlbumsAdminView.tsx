@@ -3,7 +3,7 @@ import {
   Plus, Trash2, Save, Download, Check, X,
   Search, Loader2, ChevronLeft, ChevronRight, Pencil, Music, Image as ImageIcon,
 } from 'lucide-react'
-import { apiFetch } from '../lib/juicewrldApi'
+import { apiFetch, buildImageUrl } from '../lib/juicewrldApi'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -134,8 +134,11 @@ function SongSearch({ onPick, onClose }: { onPick: (s: WrldSong) => void; onClos
               onClick={() => { onPick({ name: s.track_titles?.[0] || s.name, id: s.id }); onClose() }}
               className={`w-full text-left px-4 py-2.5 hover:bg-[var(--surface-overlay)] transition-colors flex items-center gap-3 ${i > 0 ? 'border-t border-[var(--border)]' : ''}`}
             >
-              <div className="w-7 h-7 rounded-md bg-[var(--surface-overlay)] flex items-center justify-center shrink-0">
-                <Music size={12} className="text-[var(--text-muted)]" />
+              <div className="w-7 h-7 rounded-md bg-[var(--surface-overlay)] flex items-center justify-center shrink-0 overflow-hidden">
+                {buildImageUrl(s.image_url)
+                  ? <img src={buildImageUrl(s.image_url)} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  : <Music size={12} className="text-[var(--text-muted)]" />
+                }
               </div>
               <div className="min-w-0">
                 <p className="text-sm text-[var(--text-primary)] truncate font-medium">
@@ -341,10 +344,10 @@ function AlbumDetail({
               {/* Version tabs */}
               <div className="flex items-center gap-2 flex-wrap mt-1">
                 {album.versions.map((v, i) => (
-                  <div key={i} className="flex items-center gap-1 group/vtab">
+                  <div key={i} className="group/vtab">
                     <button
                       onClick={() => setVIdx(i)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ${
                         vIdx === i
                           ? 'bg-[var(--accent)] text-white shadow-sm'
                           : 'bg-[var(--surface-overlay)] text-[var(--text-secondary)] hover:bg-[var(--surface-highest)]'
@@ -360,15 +363,16 @@ function AlbumDetail({
                         className={`text-xs font-semibold ${vIdx === i ? 'text-white' : 'text-[var(--text-secondary)]'}`}
                         inputClassName="text-xs w-28"
                       />
+                      {album.versions.length > 1 && (
+                        <span
+                          role="button"
+                          onClick={e => { e.stopPropagation(); deleteVersion(i) }}
+                          className={`flex items-center justify-center w-3 h-3 rounded-full opacity-0 group-hover/vtab:opacity-70 hover:!opacity-100 transition-all ${vIdx === i ? 'hover:bg-white/20' : 'hover:bg-red-500/20 hover:text-red-400'}`}
+                        >
+                          <X size={8} />
+                        </span>
+                      )}
                     </button>
-                    {album.versions.length > 1 && (
-                      <button
-                        onClick={() => deleteVersion(i)}
-                        className="w-4 h-4 rounded-full bg-[var(--surface-overlay)] text-[var(--text-muted)] hover:bg-red-500/20 hover:text-red-400 flex items-center justify-center opacity-0 group-hover/vtab:opacity-100 transition-all"
-                      >
-                        <X size={9} />
-                      </button>
-                    )}
                   </div>
                 ))}
                 <button
@@ -608,31 +612,5 @@ export default function AlbumsAdminView(): JSX.Element {
         </div>
       </div>
     </div>
-  )
-}
-
-// ── Save button ────────────────────────────────────────────────────────────────
-
-function SaveButton({ saving, saved, onSave }: {
-  saving: boolean; saved: boolean; onSave: () => void
-}) {
-  return (
-    <button
-      onClick={onSave}
-      disabled={saving}
-      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-60 ${
-        saved
-          ? 'bg-green-500/15 text-green-500'
-          : 'bg-[var(--accent)] text-white hover:opacity-90'
-      }`}
-    >
-      {saving
-        ? <Loader2 size={14} className="animate-spin" />
-        : saved
-        ? <Check size={14} />
-        : isElectron ? <Save size={14} /> : <Download size={14} />
-      }
-      {saving ? 'Saving…' : saved ? 'Saved!' : isElectron ? 'Save' : 'Export'}
-    </button>
   )
 }
