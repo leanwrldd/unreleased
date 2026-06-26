@@ -82,8 +82,10 @@ function WindowControls(): JSX.Element {
 
 export default function App(): JSX.Element {
   const { showNowPlaying, showQueue, showSettings, activeView, theme, accentColor, loadAccount, completeDiscordLogin, showUserAuth, setShowUserAuth, loadLibrary } = useStore()
-  // Seed auth token from env in local dev — always override so the token stays fresh
+  // Seed auth token from env in local dev only — import.meta.env.DEV is false in production
+  // builds, so this never runs for real users even if the token is baked into the bundle.
   useEffect(() => {
+    if (!import.meta.env.DEV) return
     const devToken = import.meta.env.VITE_AUTH_TOKEN as string | undefined
     if (devToken) { setToken(devToken); loadAccount() }
   }, [])
