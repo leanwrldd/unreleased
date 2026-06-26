@@ -62,7 +62,7 @@ function WindowControls(): JSX.Element {
     el?.isMaximized().then((v: boolean) => setMaximized(v))
   }, [])
 
-  const btn = "flex items-center justify-center w-11 h-7 text-white/60 hover:text-white transition-colors"
+  const btn = "flex items-center justify-center w-11 h-7 text-text-muted hover:text-text-primary transition-colors"
   return (
     <div className="fixed top-0 right-0 z-[10000] flex" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
       <button className={btn} onClick={() => el?.minimizeWindow()} title="Minimize">

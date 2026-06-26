@@ -686,7 +686,7 @@ export default function Player(): JSX.Element {
         <div className="flex items-center px-3 py-2 gap-3 h-14">
           <button
             className="w-10 h-10 rounded bg-surface-overlay shrink-0 overflow-hidden"
-            onClick={() => setShowNowPlaying(!showNowPlaying)}
+            onClick={() => radioFmActive ? setActiveView('wrld') : setShowNowPlaying(!showNowPlaying)}
           >
             {radioFmActive ? (
               radioFmMatchedSong?.imageUrl
@@ -715,6 +715,11 @@ export default function Player(): JSX.Element {
             </p>
           </div>
           <div className="flex items-center gap-0.5 shrink-0">
+            {!radioFmActive && (
+              <button onClick={toggleShuffle} className={`p-1.5 transition-colors ${shuffle ? 'text-accent' : 'text-text-muted hover:text-text-primary'}`}>
+                <Shuffle size={15} />
+              </button>
+            )}
             <button onClick={handlePrev} disabled={radioFmActive} className="p-2 text-text-secondary hover:text-text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
               <SkipBack size={18} fill="currentColor" />
             </button>
@@ -730,6 +735,11 @@ export default function Player(): JSX.Element {
             <button onClick={handleNext} disabled={radioFmActive} className="p-2 text-text-secondary hover:text-text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
               <SkipForward size={18} fill="currentColor" />
             </button>
+            {!radioFmActive && (
+              <button onClick={toggleRepeat} className={`p-1.5 transition-colors ${repeat !== 'none' ? 'text-accent' : 'text-text-muted hover:text-text-primary'}`}>
+                {repeat === 'one' ? <Repeat1 size={15} /> : <Repeat size={15} />}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -740,8 +750,8 @@ export default function Player(): JSX.Element {
         <div className="flex items-center gap-3 w-72 min-w-0 shrink-0">
           <button
             className="w-14 h-14 rounded-md bg-surface-overlay shrink-0 overflow-hidden hover:ring-2 ring-accent transition-all"
-            onClick={() => setShowNowPlaying(!showNowPlaying)}
-            title="Now Playing"
+            onClick={() => radioFmActive ? setActiveView('wrld') : setShowNowPlaying(!showNowPlaying)}
+            title={radioFmActive ? '999FM' : 'Now Playing'}
           >
             {radioFmActive ? (
               radioFmMatchedSong?.imageUrl
@@ -783,10 +793,37 @@ export default function Player(): JSX.Element {
                     className="p-1 rounded text-text-muted hover:text-text-primary transition-colors"
                     onClick={() => setShowContextMenu((v) => !v)}
                     title="More options"
-                    disabled={!currentTrack}
+                    disabled={!currentTrack && !radioFmActive}
                   >
                     <MoreHorizontal size={13} />
                   </button>
+
+                  {showContextMenu && radioFmActive && radioFmNowPlaying && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowContextMenu(false)} />
+                      <div className="absolute bottom-7 left-0 z-50 w-48 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 overflow-hidden">
+                        <div className="px-3 py-2 border-b border-[var(--border)] mb-1">
+                          <p className="text-text-primary text-xs font-semibold truncate">{radioFmNowPlaying.title}</p>
+                          <p className="text-text-muted text-[10px] truncate">{radioFmNowPlaying.artist}</p>
+                        </div>
+                        {radioFmNowPlaying.song_id != null && (
+                          <button
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                            onClick={() => {
+                              setShowContextMenu(false)
+                              setSongInfoData(null)
+                              setShowSongInfo(true)
+                              apiFetch<JWApiSong>(`/songs/${radioFmNowPlaying.song_id}/`)
+                                .then((song) => setSongInfoData(song))
+                                .catch(() => setShowSongInfo(false))
+                            }}
+                          >
+                            <Info size={14} /> Song info
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
 
                   {showContextMenu && currentTrack && (
                     <>
