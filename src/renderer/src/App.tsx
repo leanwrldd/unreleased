@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { useStore } from './store/useStore'
 import { setToken, getToken } from './lib/userApi'
 import { ViewType } from './types'
@@ -34,6 +34,7 @@ import NotFoundView from './components/NotFoundView'
 import DocsPage from './components/DocsPage'
 import RadioFmPlayer from './components/RadioFmPlayer'
 import WrldView from './components/WrldView'
+import AlbumsAdminView from './components/AlbumsAdminView'
 import UserAuthModal from './components/UserAuthModal'
 import Player from './components/Player'
 import NowPlaying from './components/NowPlaying'
@@ -164,6 +165,7 @@ export default function App(): JSX.Element {
               : activeView === 'docs' ? <DocsPage />
               : activeView === 'wrld' ? <WrldView />
               : activeView === 'library' ? <LibraryTab />
+: activeView === 'albums-admin' ? <AlbumsAdminView />
               : activeView === 'not-found' ? <NotFoundView />
               : <ApiTrackerView />}
           </ErrorBoundary>

@@ -77,7 +77,9 @@ type SortField = 'default' | 'title' | 'artist' | 'duration'
 interface SortState { field: SortField; dir: 'asc' | 'desc' }
 
 interface TrackMenuState { track: Track; songId: number; i: number; x: number; y: number; showPlaylists: boolean }
-interface LibMenuState   { playlist: PlaylistSummary; x: number; y: number; showPlaylists: boolean; renaming?: boolean; renameVal?: string }
+type CardMenuState =
+  | { kind: 'api';   playlist: PlaylistSummary; x: number; y: number; showPlaylists: boolean; renaming?: boolean; renameVal?: string }
+  | { kind: 'local'; playlist: LocalPlaylist;   x: number; y: number; showPlaylists: boolean; renaming?: boolean; renameVal?: string }
 
 // ── Tracklist skeleton ────────────────────────────────────────────────────────
 
@@ -191,8 +193,7 @@ export default function PlaylistsView(): JSX.Element {
 
   // Context menus
   const [trackMenu, setTrackMenu] = useState<TrackMenuState | null>(null)
-  const [libMenu, setLibMenu] = useState<LibMenuState | null>(null)
-  const [localMenu, setLocalMenu] = useState<{ playlist: LocalPlaylist; x: number; y: number; showPlaylists: boolean; renaming?: boolean; renameVal?: string } | null>(null)
+  const [cardMenu, setCardMenu] = useState<CardMenuState | null>(null)
   const [localRenaming, setLocalRenaming] = useState(false)
   const [localRenameVal, setLocalRenameVal] = useState('')
   const [showAddAllMenu, setShowAddAllMenu] = useState(false)
@@ -323,11 +324,11 @@ export default function PlaylistsView(): JSX.Element {
 
   // Close menus on outside click
   useEffect(() => {
-    if (!trackMenu && !libMenu && !showAddAllMenu && !localMenu) return
-    const h = () => { setTrackMenu(null); setLibMenu(null); setShowAddAllMenu(false); setLocalMenu(null) }
+    if (!trackMenu && !cardMenu && !showAddAllMenu) return
+    const h = () => { setTrackMenu(null); setCardMenu(null); setShowAddAllMenu(false) }
     setTimeout(() => window.addEventListener('click', h), 0)
     return () => window.removeEventListener('click', h)
-  }, [trackMenu, libMenu, showAddAllMenu, localMenu])
+  }, [trackMenu, cardMenu, showAddAllMenu])
 
 
   const loadDetail = useCallback(async (id: number, shared = false) => {
@@ -663,7 +664,7 @@ export default function PlaylistsView(): JSX.Element {
           ) : (
             <div className="grid gap-4 mb-8" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
               {localPlaylists.map(lp => (
-                <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setLocalMenu({ playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}>
+                <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCardMenu({ kind: 'local', playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}>
                   <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
                     {lp.coverImage
                       ? <img src={lp.coverImage} alt="" className="w-full h-full object-cover" />
@@ -675,7 +676,7 @@ export default function PlaylistsView(): JSX.Element {
                   </span>
                   <button
                     className="absolute top-1.5 right-1.5 md:opacity-0 md:group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
-                    onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setLocalMenu({ playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                    onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setCardMenu({ kind: 'local', playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
                   >
                     <MoreHorizontal size={13} />
                   </button>
@@ -1223,7 +1224,7 @@ export default function PlaylistsView(): JSX.Element {
   // ── Playlist library ───────────────────────────────────────────────────────
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden" onClick={() => setLibMenu(null)}>
+    <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden" onClick={() => setCardMenu(null)}>
       <div className="px-5 pt-5 pb-8">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -1257,7 +1258,7 @@ export default function PlaylistsView(): JSX.Element {
           {playlists.map(p => (
             <div key={p.id} className="group text-left relative cursor-pointer"
               onClick={() => setSelectedId(p.id)}
-              onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setLibMenu({ playlist: p, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+              onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCardMenu({ kind: 'api', playlist: p, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
             >
               <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
                 {covers[p.id] === undefined ? (
@@ -1282,7 +1283,7 @@ export default function PlaylistsView(): JSX.Element {
               {/* Context menu button */}
               <button
                 className="absolute top-1.5 right-1.5 md:opacity-0 md:group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
-                onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setLibMenu({ playlist: p, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setCardMenu({ kind: 'api', playlist: p, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
               >
                 <MoreHorizontal size={13} />
               </button>
@@ -1293,7 +1294,7 @@ export default function PlaylistsView(): JSX.Element {
 
           {/* Local playlists */}
           {localPlaylists.map(lp => (
-            <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setLocalMenu({ playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}>
+            <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCardMenu({ kind: 'local', playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}>
               <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
                 {lp.coverImage
                   ? <img src={lp.coverImage} alt="" className="w-full h-full object-cover" />
@@ -1307,7 +1308,7 @@ export default function PlaylistsView(): JSX.Element {
               {/* Context menu button */}
               <button
                 className="absolute top-1.5 right-1.5 md:opacity-0 md:group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
-                onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setLocalMenu({ playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setCardMenu({ kind: 'local', playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
               >
                 <MoreHorizontal size={13} />
               </button>
@@ -1320,81 +1321,90 @@ export default function PlaylistsView(): JSX.Element {
         {playlists.length === 0 && localPlaylists.length === 0 && <p className="text-text-muted text-sm mt-4">No playlists yet — create one to get started.</p>}
       </div>
 
-      {/* Local playlist card context menu */}
-      {localMenu && (
+      {/* Unified playlist card context menu */}
+      {cardMenu && (
         <div
           className="fixed z-50 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[210px]"
-          style={{ left: Math.min(localMenu.x, window.innerWidth - 230), top: Math.min(localMenu.y, window.innerHeight - 320) }}
+          style={{ left: Math.min(cardMenu.x, window.innerWidth - 230), top: Math.min(cardMenu.y, window.innerHeight - 320) }}
           onClick={e => e.stopPropagation()}
         >
-          {localMenu.renaming ? (
+          {cardMenu.renaming ? (
+            /* ── Inline rename input (shared by both kinds) ── */
             <div className="px-3 py-2 flex gap-2" onClick={e => e.stopPropagation()}>
               <input
                 autoFocus
-                value={localMenu.renameVal ?? localMenu.playlist.name}
-                onChange={e => setLocalMenu(prev => prev ? { ...prev, renameVal: e.target.value } : null)}
-                onKeyDown={e => {
+                value={cardMenu.renameVal ?? cardMenu.playlist.name}
+                onChange={e => setCardMenu(prev => prev ? { ...prev, renameVal: e.target.value } : null)}
+                onKeyDown={async e => {
                   if (e.key === 'Enter') {
-                    const val = localMenu.renameVal?.trim() || localMenu.playlist.name
-                    renameLocalPlaylist(localMenu.playlist.id, val)
-                    setLocalMenu(null)
+                    const val = cardMenu.renameVal?.trim() || cardMenu.playlist.name
+                    if (cardMenu.kind === 'local') {
+                      renameLocalPlaylist(cardMenu.playlist.id, val)
+                    } else {
+                      await userApi.renamePlaylist(cardMenu.playlist.id, val)
+                      await refreshPlaylists()
+                    }
+                    setCardMenu(null)
                   } else if (e.key === 'Escape') {
-                    setLocalMenu(prev => prev ? { ...prev, renaming: false } : null)
+                    setCardMenu(prev => prev ? { ...prev, renaming: false } : null)
                   }
                 }}
                 className="flex-1 bg-surface-overlay rounded-lg px-2.5 py-1.5 text-sm text-text-primary focus:outline-none border border-[var(--border)]"
               />
               <button
-                onClick={() => {
-                  const val = localMenu.renameVal?.trim() || localMenu.playlist.name
-                  renameLocalPlaylist(localMenu.playlist.id, val)
-                  setLocalMenu(null)
+                onClick={async () => {
+                  const val = cardMenu.renameVal?.trim() || cardMenu.playlist.name
+                  if (cardMenu.kind === 'local') {
+                    renameLocalPlaylist(cardMenu.playlist.id, val)
+                  } else {
+                    await userApi.renamePlaylist(cardMenu.playlist.id, val)
+                    await refreshPlaylists()
+                  }
+                  setCardMenu(null)
                 }}
                 className="px-2.5 py-1.5 rounded-lg bg-accent text-white text-xs font-medium"
               >Save</button>
             </div>
-          ) : (
+          ) : cardMenu.kind === 'local' ? (
+            /* ── Local playlist menu ── */
             <>
-              <MenuItem icon={Play} label="Open" onClick={() => { setLocalSelectedId(localMenu.playlist.id); setLocalMenu(null) }} />
+              <MenuItem icon={Play} label="Open" onClick={() => { setLocalSelectedId(cardMenu.playlist.id); setCardMenu(null) }} />
               <MenuItem
                 icon={Shuffle}
                 label="Play all"
                 onClick={() => {
-                  const tracks = localMenu.playlist.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter(Boolean) as LibraryTrack[]
+                  const tracks = cardMenu.playlist.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter(Boolean) as LibraryTrack[]
                   const q = tracks.map(libTrackToTrack)
                   if (q.length) playTrack(q[0], q)
-                  setLocalMenu(null)
+                  setCardMenu(null)
                 }}
               />
               <MenuItem
                 icon={ListEnd}
                 label="Add all to queue"
                 onClick={() => {
-                  localMenu.playlist.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter(Boolean).map(t => libTrackToTrack(t as LibraryTrack)).forEach(t => addToQueue(t))
-                  setLocalMenu(null)
+                  cardMenu.playlist.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter(Boolean).map(t => libTrackToTrack(t as LibraryTrack)).forEach(t => addToQueue(t))
+                  setCardMenu(null)
                 }}
               />
               <div className="border-t border-[var(--border)] my-1" />
-              <MenuItem
-                icon={Pencil}
-                label="Rename"
-                onClick={() => setLocalMenu(prev => prev ? { ...prev, renaming: true, renameVal: prev.playlist.name } : null)}
-              />
+              <MenuItem icon={Pencil} label="Rename" onClick={() => setCardMenu(prev => prev ? { ...prev, renaming: true, renameVal: prev.playlist.name } : null)} />
               <button
                 className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-sm text-text-primary transition-colors hover:bg-surface-overlay"
-                onClick={e => { e.stopPropagation(); setLocalMenu(prev => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null) }}
+                onClick={e => { e.stopPropagation(); setCardMenu(prev => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null) }}
               >
                 <span className="flex items-center gap-2.5"><FolderInput size={14} className="text-text-muted" />Add all to playlist</span>
                 <span className="text-text-muted text-xs">›</span>
               </button>
-              {localMenu.showPlaylists && (
+              {cardMenu.showPlaylists && (
                 <div className="border-t border-[var(--border)] max-h-40 overflow-y-auto">
-                  {localPlaylists.filter(p => p.id !== localMenu.playlist.id).length === 0 ? (
+                  {localPlaylists.filter(p => p.id !== cardMenu.playlist.id).length === 0 ? (
                     <p className="px-3.5 py-2 text-xs text-text-muted">No other playlists</p>
-                  ) : localPlaylists.filter(p => p.id !== localMenu.playlist.id).map(p => (
+                  ) : localPlaylists.filter(p => p.id !== cardMenu.playlist.id).map(p => (
                     <button key={p.id} onClick={() => {
-                      setLocalMenu(null)
-                      localMenu.playlist.trackIds.filter(id => !p.trackIds.includes(id)).forEach(id => addToLocalPlaylist(p.id, id))
+                      const src = cardMenu.playlist as LocalPlaylist
+                      setCardMenu(null)
+                      src.trackIds.filter(id => !p.trackIds.includes(id)).forEach(id => addToLocalPlaylist(p.id, id))
                     }} className="w-full text-left px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors truncate">
                       {p.name}
                     </button>
@@ -1407,70 +1417,33 @@ export default function PlaylistsView(): JSX.Element {
                 label="Delete playlist"
                 destructive
                 onClick={() => {
-                  deleteLocalPlaylist(localMenu.playlist.id)
-                  if (localSelectedId === localMenu.playlist.id) setLocalSelectedId(null)
-                  setLocalMenu(null)
+                  deleteLocalPlaylist(cardMenu.playlist.id)
+                  if (localSelectedId === cardMenu.playlist.id) setLocalSelectedId(null)
+                  setCardMenu(null)
                 }}
               />
             </>
-          )}
-        </div>
-      )}
-      {libMenu && (
-        <div
-          className="fixed z-50 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[210px]"
-          style={{ left: Math.min(libMenu.x, window.innerWidth - 230), top: Math.min(libMenu.y, window.innerHeight - 320) }}
-          onClick={e => e.stopPropagation()}
-        >
-          {/* Inline rename input */}
-          {libMenu.renaming ? (
-            <div className="px-3 py-2 flex gap-2" onClick={e => e.stopPropagation()}>
-              <input
-                autoFocus
-                value={libMenu.renameVal ?? libMenu.playlist.name}
-                onChange={e => setLibMenu(prev => prev ? { ...prev, renameVal: e.target.value } : null)}
-                onKeyDown={async e => {
-                  if (e.key === 'Enter') {
-                    const val = libMenu.renameVal?.trim() || libMenu.playlist.name
-                    await userApi.renamePlaylist(libMenu.playlist.id, val)
-                    await refreshPlaylists()
-                    setLibMenu(null)
-                  } else if (e.key === 'Escape') {
-                    setLibMenu(prev => prev ? { ...prev, renaming: false } : null)
-                  }
-                }}
-                className="flex-1 bg-surface-overlay rounded-lg px-2.5 py-1.5 text-sm text-text-primary focus:outline-none border border-[var(--border)]"
-              />
-              <button
-                onClick={async () => {
-                  const val = libMenu.renameVal?.trim() || libMenu.playlist.name
-                  await userApi.renamePlaylist(libMenu.playlist.id, val)
-                  await refreshPlaylists()
-                  setLibMenu(null)
-                }}
-                className="px-2.5 py-1.5 rounded-lg bg-accent text-white text-xs font-medium"
-              >Save</button>
-            </div>
           ) : (
+            /* ── API playlist menu ── */
             <>
-              <MenuItem icon={Play} label="Open" onClick={() => { setSelectedId(libMenu.playlist.id); setLibMenu(null) }} />
+              <MenuItem icon={Play} label="Open" onClick={() => { setSelectedId(cardMenu.playlist.id); setCardMenu(null) }} />
               <MenuItem
                 icon={Shuffle}
                 label="Play all"
                 onClick={async () => {
-                  const d = await userApi.getPlaylist(libMenu.playlist.id)
+                  const d = await userApi.getPlaylist(cardMenu.playlist.id)
                   const tracks = d.items.map(i => userApi.liteSongToTrack(i.song))
-                  if (tracks.length) { playTrack(tracks[0], tracks) }
-                  setLibMenu(null)
+                  if (tracks.length) playTrack(tracks[0], tracks)
+                  setCardMenu(null)
                 }}
               />
               <MenuItem
                 icon={ListEnd}
                 label="Add all to queue"
                 onClick={async () => {
-                  const d = await userApi.getPlaylist(libMenu.playlist.id)
+                  const d = await userApi.getPlaylist(cardMenu.playlist.id)
                   d.items.forEach(i => addToQueue(userApi.liteSongToTrack(i.song)))
-                  setLibMenu(null)
+                  setCardMenu(null)
                 }}
               />
               <div className="border-t border-[var(--border)] my-1" />
@@ -1479,47 +1452,41 @@ export default function PlaylistsView(): JSX.Element {
                 label="Copy share link"
                 onClick={async () => {
                   try {
-                    if (!libMenu.playlist.is_public) {
-                      await userApi.updatePlaylist(libMenu.playlist.id, { is_public: true })
-                      await refreshPlaylists()
-                    }
-                    await navigator.clipboard.writeText(
-                      `${window.location.origin}/playlists?id=${libMenu.playlist.id}&view=shared`
-                    )
+                    const p = cardMenu.playlist as PlaylistSummary
+                    if (!p.is_public) { await userApi.updatePlaylist(p.id, { is_public: true }); await refreshPlaylists() }
+                    await navigator.clipboard.writeText(`${window.location.origin}/playlists?id=${p.id}&view=shared`)
                   } catch {}
-                  setLibMenu(null)
+                  setCardMenu(null)
                 }}
               />
               <MenuItem
-                icon={libMenu.playlist.is_public ? Globe : Lock}
-                label={libMenu.playlist.is_public ? 'Make private' : 'Make public'}
+                icon={(cardMenu.playlist as PlaylistSummary).is_public ? Globe : Lock}
+                label={(cardMenu.playlist as PlaylistSummary).is_public ? 'Make private' : 'Make public'}
                 onClick={async () => {
-                  await userApi.updatePlaylist(libMenu.playlist.id, { is_public: !libMenu.playlist.is_public })
+                  const p = cardMenu.playlist as PlaylistSummary
+                  await userApi.updatePlaylist(p.id, { is_public: !p.is_public })
                   await refreshPlaylists()
-                  setLibMenu(null)
+                  setCardMenu(null)
                 }}
               />
               <div className="border-t border-[var(--border)] my-1" />
-              <MenuItem
-                icon={Pencil}
-                label="Rename"
-                onClick={() => setLibMenu(prev => prev ? { ...prev, renaming: true, renameVal: prev.playlist.name } : null)}
-              />
+              <MenuItem icon={Pencil} label="Rename" onClick={() => setCardMenu(prev => prev ? { ...prev, renaming: true, renameVal: prev.playlist.name } : null)} />
               <button
                 className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-sm text-text-primary transition-colors hover:bg-surface-overlay"
-                onClick={e => { e.stopPropagation(); setLibMenu(prev => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null) }}
+                onClick={e => { e.stopPropagation(); setCardMenu(prev => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null) }}
               >
                 <span className="flex items-center gap-2.5"><FolderInput size={14} className="text-text-muted" />Add all to playlist</span>
                 <span className="text-text-muted text-xs">›</span>
               </button>
-              {libMenu.showPlaylists && (
+              {cardMenu.showPlaylists && (
                 <div className="border-t border-[var(--border)] max-h-40 overflow-y-auto">
-                  {playlists.filter(p => p.id !== libMenu.playlist.id).length === 0 ? (
+                  {playlists.filter(p => p.id !== cardMenu.playlist.id).length === 0 ? (
                     <p className="px-3.5 py-2 text-xs text-text-muted">No other playlists</p>
-                  ) : playlists.filter(p => p.id !== libMenu.playlist.id).map(p => (
+                  ) : playlists.filter(p => p.id !== cardMenu.playlist.id).map(p => (
                     <button key={p.id} onClick={async () => {
-                      setLibMenu(null)
-                      const srcDetail = await userApi.getPlaylist(libMenu.playlist.id)
+                      const srcId = cardMenu.playlist.id
+                      setCardMenu(null)
+                      const srcDetail = await userApi.getPlaylist(srcId)
                       await Promise.all(srcDetail.items.map(item => userApi.addToPlaylist(p.id, item.song.id).catch(() => {})))
                       await refreshPlaylists()
                     }} className="w-full text-left px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors truncate">
@@ -1534,10 +1501,11 @@ export default function PlaylistsView(): JSX.Element {
                 label="Delete playlist"
                 destructive
                 onClick={async () => {
-                  await userApi.deletePlaylist(libMenu.playlist.id)
-                  if (selectedId === libMenu.playlist.id) setSelectedId(null)
+                  const id = cardMenu.playlist.id
+                  setCardMenu(null)
+                  await userApi.deletePlaylist(id)
+                  if (selectedId === id) setSelectedId(null)
                   await refreshPlaylists()
-                  setLibMenu(null)
                 }}
               />
             </>

@@ -1,9 +1,9 @@
-const { app, BrowserWindow, shell, dialog, Menu, Tray, ipcMain } = require('electron')
+﻿const { app, BrowserWindow, shell, dialog, Menu, Tray, ipcMain } = require('electron')
 const { autoUpdater } = require('electron-updater')
 const path = require('path')
 const fs = require('fs')
 
-const isDev = process.env.NODE_ENV === 'development'
+const isDev = !app.isPackaged || process.env.NODE_ENV === 'development'
 
 app.setAppUserModelId('Unreleased')
 Menu.setApplicationMenu(null)
@@ -436,6 +436,18 @@ ipcMain.handle('write-track-metadata', async (_, filePath, metadata) => {
     if (result === false) return { error: 'Failed to write tags' }
     return { success: true }
   } catch(e) { return { error: e.message } }
+})
+
+ipcMain.handle('load-wrlddata', async () => {
+  const filePath = path.join(app.getAppPath(), 'src', 'renderer', 'public', 'wrlddata.json')
+  try { return JSON.parse(fs.readFileSync(filePath, 'utf8')) } catch { return null }
+})
+
+ipcMain.handle('save-wrlddata', async (_, data) => {
+  if (app.isPackaged) return { error: 'Read-only in production' }
+  const filePath = path.join(app.getAppPath(), 'src', 'renderer', 'public', 'wrlddata.json')
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8')
+  return { ok: true }
 })
 ipcMain.handle('download-to-library', async (_, { url, songName, artist, songPath }) => {
   // Determine save folder: Music/JuiceWRLD Library

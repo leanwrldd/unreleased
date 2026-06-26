@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
-  Search, Play, Loader2, Music2, X,
+  Search, Play, Loader2, Music2, X, Check,
   LayoutList, LayoutGrid, Info, Download, ListPlus, PanelLeft,
-  ChevronUp, ChevronDown, MoreHorizontal, Folder, Pencil, Plus, ListMusic,
+  ChevronUp, ChevronDown, MoreHorizontal, Folder, Pencil, Plus, ListMusic, HardDrive,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { useShallow } from 'zustand/react/shallow'

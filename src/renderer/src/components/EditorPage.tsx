@@ -207,7 +207,6 @@ export default function EditorPage(): JSX.Element {
   const [showMore,     setShowMore]     = useState(false)
   const [editingPropId, setEditingPropId] = useState<number | null>(null)
 
-
   const baseline = (s: JWApiSong | null): Record<string, unknown> => {
     if (!s) return {}
     return {

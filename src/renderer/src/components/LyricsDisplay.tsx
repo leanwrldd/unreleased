@@ -1,10 +1,15 @@
-import { useEffect, useRef, useMemo } from 'react'
+import React, { useEffect, useRef, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
 import { useStore } from '../store/useStore'
 import { seekAudio } from './Player'
 
 export default function LyricsDisplay(): JSX.Element {
-  const { currentTrackFull, currentTime, account } = useStore()
+  const { currentTrackFull, account } = useStore(useShallow(s => ({
+    currentTrackFull: s.currentTrackFull,
+    account: s.account,
+  })))
+
   const containerRef = useRef<HTMLDivElement>(null)
   const activeRef = useRef<HTMLDivElement>(null)
 
@@ -19,9 +24,13 @@ export default function LyricsDisplay(): JSX.Element {
     return []
   }, [rawLyrics, isSynced])
 
-  const currentLineIdx = isSynced ? getCurrentLineIndex(syncedLines, currentTime) : -1
+  // Selector returns the line INDEX so Zustand only re-renders when the line changes,
+  // not on every audio tick. This is what caused the blinking.
+  const currentLineIdx = useStore(s => {
+    if (!isSynced || syncedLines.length === 0) return -1
+    return getCurrentLineIndex(syncedLines, s.currentTime)
+  })
 
-  // Auto-scroll to active line
   useEffect(() => {
     if (activeRef.current && containerRef.current) {
       activeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -48,31 +57,33 @@ export default function LyricsDisplay(): JSX.Element {
     return (
       <div
         ref={containerRef}
-        className="h-full overflow-y-auto py-16 px-8 space-y-4"
-        style={{ scrollbarWidth: 'none' }}
+        className="h-full overflow-y-auto py-16 px-8 space-y-3"
+        style={{ scrollbarWidth: 'none' } as React.CSSProperties}
       >
         <style>{`::-webkit-scrollbar { display: none; }`}</style>
         {syncedLines.map((line, i) => {
-          const state =
-            i === currentLineIdx ? 'active' : i < currentLineIdx ? 'past' : 'future'
+          const isActive = i === currentLineIdx
+          const isPast = i < currentLineIdx
 
-          // Empty line = visual spacer between verses
           if (!line.text) {
-            return <div key={i} className="h-4" />
+            return <div key={i} className="h-3" />
+          }
+
+          const lineStyle: React.CSSProperties = {
+            transformOrigin: 'left center',
+            transform: isActive ? 'scale(1)' : 'scale(0.88)',
+            opacity: isActive ? 1 : isPast ? 0.45 : 0.35,
+            color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+            transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, color 0.4s ease',
           }
 
           return (
             <div
               key={i}
-              ref={i === currentLineIdx ? activeRef : undefined}
+              ref={isActive ? activeRef : undefined}
               onClick={() => seekAudio(line.time)}
-              className={`lyric-line text-left leading-relaxed cursor-pointer transition-opacity hover:opacity-100 ${
-                state === 'active'
-                  ? 'text-text-primary text-2xl font-bold'
-                  : state === 'past'
-                  ? 'text-text-muted text-xl opacity-60'
-                  : 'text-text-secondary text-xl opacity-50'
-              }`}
+              className="lyric-line text-left leading-snug cursor-pointer font-bold text-2xl"
+              style={lineStyle}
             >
               {line.text}
             </div>
@@ -83,7 +94,6 @@ export default function LyricsDisplay(): JSX.Element {
     )
   }
 
-  // Plain text lyrics
   return (
     <div className="h-full overflow-y-auto py-8 px-8">
       <pre className="text-text-secondary text-sm leading-8 whitespace-pre-wrap font-sans">

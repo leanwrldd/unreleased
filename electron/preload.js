@@ -33,6 +33,10 @@ contextBridge.exposeInMainWorld('electron', {
   loadLocalPlaylists: ()          => ipcRenderer.invoke('load-local-playlists'),
   saveLocalPlaylists: (playlists) => ipcRenderer.invoke('save-local-playlists', playlists),
 
+  // WrldData (albums JSON)
+  loadWrldData: ()       => ipcRenderer.invoke('load-wrlddata'),
+  saveWrldData: (data)   => ipcRenderer.invoke('save-wrlddata', data),
+
   // Update status events (returns cleanup fn)
   onUpdateStatus: (cb) => {
     const fn = (_, d) => cb(d)

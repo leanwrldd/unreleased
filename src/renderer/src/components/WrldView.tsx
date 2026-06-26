@@ -1,12 +1,18 @@
-﻿import { useEffect, useRef, useMemo, useState } from 'react'
-import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, LocateFixed, ChevronDown } from 'lucide-react'
+import { useEffect, useRef, useMemo, useState } from 'react'
+import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, LocateFixed, ChevronDown, ChevronLeft, Play } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
 import { seekAudio } from './Player'
-import { buildImageUrl, apiFetch } from '../lib/juicewrldApi'
+import { buildImageUrl, apiFetch, songToTrack, JWAPI_BASE } from '../lib/juicewrldApi'
 import { getActiveRadioClient } from '../lib/radioSocketService'
 import type { JWApiSong } from '../lib/juicewrldApi'
 import * as userApi from '../lib/userApi'
+
+// ── WrldData types ────────────────────────────────────────────────────────────
+
+interface WrldSong { name: string; id: number }
+interface WrldVersion { name: string; year: number; cover_url: string; songs: WrldSong[] }
+interface WrldAlbum { id: number; name: string; versions: WrldVersion[] }
 
 export default function WrldView(): JSX.Element {
   const {
@@ -15,6 +21,7 @@ export default function WrldView(): JSX.Element {
     radioFmVote, radioFmUpNext, radioFmQueuePreview,
     radioFmMatchedSong,
     playlists,
+    playTrack,
   } = useStore()
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -29,6 +36,33 @@ export default function WrldView(): JSX.Element {
   const [textIsDark, setTextIsDark]          = useState(false)
   const suggestTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const proposeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Albums state ─────────────────────────────────────────────────────────────
+  const [wrldAlbums, setWrldAlbums] = useState<WrldAlbum[]>([])
+  const [selectedAlbumId, setSelectedAlbumId] = useState<number | null>(null)
+  const [selectedVersionIdx, setSelectedVersionIdx] = useState(0)
+  const [playingAlbumSongId, setPlayingAlbumSongId] = useState<number | null>(null)
+
+  useEffect(() => {
+    fetch('/wrlddata.json')
+      .then(r => r.json())
+      .then(d => setWrldAlbums(d.albums ?? []))
+      .catch(() => {})
+  }, [])
+
+  const handlePlayAlbumSong = async (songId: number) => {
+    setPlayingAlbumSongId(songId)
+    try {
+      const res = await fetch(`${JWAPI_BASE}/songs/${songId}/`)
+      if (res.ok) {
+        const song: JWApiSong = await res.json()
+        playTrack(songToTrack(song))
+      }
+    } catch {}
+    setPlayingAlbumSongId(null)
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (suggestTimer.current) clearTimeout(suggestTimer.current)
@@ -124,7 +158,6 @@ export default function WrldView(): JSX.Element {
     { value: 'unreleased', label: 'Unreleased' },
     { value: 'playlists', label: 'Playlists' },
   ]
-  // Reset to auto-follow when the track or lyrics change
   useEffect(() => { setAutoFollow(true) }, [rawLyrics])
   useEffect(() => { setVoteDismissed(false) }, [radioFmVote?.track, radioFmVote?.kind])
 
@@ -132,16 +165,13 @@ export default function WrldView(): JSX.Element {
     ? (radioFmIsLive ? '999 FM · LIVE' : '999 FM · OFF')
     : radioFmIsLive === false ? '999 FM · OFF' : '999 FM'
   const fmDisabled = radioFmIsLive === false && !radioFmActive
-  const hasContent = radioFmActive || !!currentTrack
 
   const displayTitle  = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.title  : currentTrack?.title
   const displayArtist = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.artist : currentTrack?.artist
   const displayAlbum  = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.album  : currentTrack?.album
 
-  /* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Shared sub-components ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */
-
   const ArtBox = ({ mobile }: { mobile: boolean }) => (
-          <div
+    <div
       className={mobile
         ? 'w-14 h-14 rounded-xl overflow-hidden shrink-0 shadow-lg'
         : 'rounded-3xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)] w-full'}
@@ -224,12 +254,12 @@ export default function WrldView(): JSX.Element {
               <input
                 type="text" value={suggestQuery}
                 onChange={(e) => setSuggestQuery(e.target.value)}
-                placeholder="Search songsÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦"
+                placeholder="Search songs…"
                 className="w-full bg-white/5 text-white/80 text-sm rounded-xl py-2 pl-8 pr-3 border border-white/10 focus:outline-none focus:border-white/25 transition-colors"
                 style={{ colorScheme: 'dark' }}
               />
             </div>
-            {suggestLoading && <p className="text-white/25 text-xs pl-1">SearchingÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</p>}
+            {suggestLoading && <p className="text-white/25 text-xs pl-1">Searching…</p>}
             {suggestResults.length > 0 && (
               <div className="flex flex-col -mx-1">
                 {suggestResults.map(song => (
@@ -294,9 +324,7 @@ export default function WrldView(): JSX.Element {
       )
     }
 
-    // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Synced lyrics ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
     if (isSynced && syncedLines.length > 0) {
-      // centerIdx: live when auto-following, frozen+scrollable when manual
       const centerIdx = autoFollow ? currentLineIdx : manualCenter
       const winStart  = Math.max(0, centerIdx - 2)
       const winEnd    = Math.min(syncedLines.length - 1, centerIdx + 2)
@@ -361,7 +389,6 @@ export default function WrldView(): JSX.Element {
       )
     }
 
-    // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Plain lyrics ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
     return (
       <div className={`flex-1 overflow-y-auto ${padded ? 'py-16 pr-16 pl-8' : 'py-4 px-4 md:py-8 md:pr-12 md:pl-6'}`} style={{ scrollbarWidth: 'none' }}>
         <pre className="text-xs md:text-sm leading-6 md:leading-7 whitespace-pre-wrap font-sans" style={{ color: txtSec }}>{rawLyrics}</pre>
@@ -369,12 +396,140 @@ export default function WrldView(): JSX.Element {
     )
   }
 
-  /* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Render ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */
+  // ── Albums notch content ──────────────────────────────────────────────────────
+
+  const AlbumsGrid = () => (
+    <div className="grid grid-cols-2 gap-2.5 pb-2">
+      {wrldAlbums.map(album => {
+        const primaryVersion = album.versions[0]
+        return (
+          <button
+            key={album.id}
+            onClick={() => { setSelectedAlbumId(album.id); setSelectedVersionIdx(0) }}
+            className="flex flex-col gap-1.5 text-left group/album"
+          >
+            <div className="relative w-full aspect-square rounded-xl overflow-hidden shadow-lg ring-1 ring-white/[0.06] group-hover/album:ring-white/25 transition-all duration-200">
+              <img
+                src={primaryVersion.cover_url}
+                alt={album.name}
+                className="w-full h-full object-cover transition-transform duration-300 group-hover/album:scale-[1.04]"
+              />
+              {/* Play overlay */}
+              <div className="absolute inset-0 bg-black/0 group-hover/album:bg-black/30 transition-colors duration-200 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-white/0 group-hover/album:bg-white flex items-center justify-center transition-all duration-200 opacity-0 group-hover/album:opacity-100 shadow-xl translate-y-1 group-hover/album:translate-y-0">
+                  <Play size={10} className="text-black ml-0.5" fill="black" />
+                </div>
+              </div>
+            </div>
+            <div className="px-0.5">
+              <p className="text-white/85 text-[10px] font-semibold leading-tight line-clamp-2">{album.name}</p>
+              <p className="text-white/35 text-[9px] mt-0.5 tabular-nums">{primaryVersion.year}</p>
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  const AlbumDetail = ({ albumId }: { albumId: number }) => {
+    const album = wrldAlbums.find(a => a.id === albumId)
+    if (!album) return null
+    const version = album.versions[selectedVersionIdx] ?? album.versions[0]
+
+    return (
+      <div className="flex flex-col gap-3">
+        {/* Back button */}
+        <button
+          onClick={() => setSelectedAlbumId(null)}
+          className="flex items-center gap-1.5 text-[10px] text-white/40 hover:text-white/75 transition-colors -ml-0.5 self-start"
+        >
+          <ChevronLeft size={11} />
+          <span>Albums</span>
+        </button>
+
+        {/* Cover art */}
+        <div className="w-full aspect-square rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+          <img src={version.cover_url} alt={album.name} className="w-full h-full object-cover" />
+        </div>
+
+        {/* Album info */}
+        <div>
+          <p className="text-white/95 text-xs font-bold leading-snug">{album.name}</p>
+          <p className="text-white/40 text-[10px] mt-0.5">Juice WRLD · {version.year}</p>
+        </div>
+
+        {/* Version tabs */}
+        {album.versions.length > 1 && (
+          <div className="flex gap-1.5">
+            {album.versions.map((v, i) => (
+              <button
+                key={i}
+                onClick={() => setSelectedVersionIdx(i)}
+                className={`px-2.5 py-1 rounded-lg text-[9px] font-semibold transition-all duration-150 ${
+                  selectedVersionIdx === i
+                    ? 'bg-white/15 text-white/95 ring-1 ring-white/20'
+                    : 'bg-white/[0.04] text-white/35 hover:bg-white/10 hover:text-white/65'
+                }`}
+              >
+                {v.name.includes('Deluxe') ? 'Deluxe' : 'Standard'}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Divider */}
+        <div className="h-px bg-white/[0.07]" />
+
+        {/* Track list */}
+        <div className="flex flex-col -mx-1.5">
+          {version.songs.map((song, idx) => {
+            const isActive = currentTrack?.id === `jw-${song.id}`
+            const isLoading = playingAlbumSongId === song.id
+
+            return (
+              <button
+                key={`${song.id}-${idx}`}
+                onClick={() => handlePlayAlbumSong(song.id)}
+                className="flex items-center gap-2 px-2 py-[5px] rounded-lg hover:bg-white/[0.07] active:bg-white/10 transition-colors group/song text-left"
+              >
+                {/* Track number / playing indicator */}
+                <div className="w-5 shrink-0 flex items-center justify-center">
+                  {isLoading ? (
+                    <div className="w-2.5 h-2.5 rounded-full border border-white/30 border-t-white/80 animate-spin" />
+                  ) : isActive ? (
+                    <span className="text-[var(--accent)] text-[9px]">▶</span>
+                  ) : (
+                    <>
+                      <span className="text-white/25 text-[10px] tabular-nums group-hover/song:hidden">{idx + 1}</span>
+                      <Play size={9} className="text-white/50 hidden group-hover/song:block" fill="currentColor" />
+                    </>
+                  )}
+                </div>
+
+                {/* Song name */}
+                <span
+                  className={`text-[11px] truncate transition-colors leading-tight ${
+                    isActive
+                      ? 'text-[var(--accent)] font-semibold'
+                      : 'text-white/70 group-hover/song:text-white/95'
+                  }`}
+                >
+                  {song.name}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="relative flex flex-col md:flex-row flex-1 h-full w-full overflow-hidden">
 
-      {/* 999 FM toggle ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â top-right on mobile, top-left on desktop */}
+      {/* 999 FM toggle */}
       <button
         onClick={() => setRadioFmActive(!radioFmActive)}
         disabled={fmDisabled}
@@ -406,7 +561,7 @@ export default function WrldView(): JSX.Element {
             <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/20 dark:from-black/40 dark:via-transparent dark:to-black/70" />
           </div>
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Mobile layout ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* Mobile layout */}
           <div className="md:hidden relative z-10 flex flex-col h-full">
 
             {/* Header: art + title */}
@@ -416,7 +571,7 @@ export default function WrldView(): JSX.Element {
                 {displayTitle  && <p className="font-bold text-sm leading-tight truncate" style={{ color: txtPri }}>{displayTitle}</p>}
                 {displayArtist && <p className="text-xs mt-0.5 truncate" style={{ color: txtSec }}>{displayArtist}</p>}
                 {displayAlbum  && <p className="text-xs mt-0.5 truncate" style={{ color: txtTer }}>{displayAlbum}</p>}
-                {radioFmActive && !radioFmNowPlaying && <p className="text-xs mt-0.5" style={{ color: txtTer }}>Tuning inÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</p>}
+                {radioFmActive && !radioFmNowPlaying && <p className="text-xs mt-0.5" style={{ color: txtTer }}>Tuning in…</p>}
               </div>
             </div>
 
@@ -443,7 +598,7 @@ export default function WrldView(): JSX.Element {
             }
           </div>
 
-          {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Desktop layout ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
+          {/* Desktop layout */}
           <div className="hidden md:flex relative z-10 flex-1 h-full overflow-hidden">
 
             {/* Left column */}
@@ -454,11 +609,11 @@ export default function WrldView(): JSX.Element {
                 {displayTitle  && <p className="font-bold text-xl leading-tight" style={{ color: txtPri }}>{displayTitle}</p>}
                 {displayArtist && <p className="text-sm mt-1" style={{ color: txtSec }}>{displayArtist}</p>}
                 {displayAlbum  && <p className="text-xs mt-0.5" style={{ color: txtTer }}>{displayAlbum}</p>}
-                {radioFmActive && !radioFmNowPlaying && <p className="text-sm mt-1" style={{ color: txtTer }}>Tuning inÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦</p>}
+                {radioFmActive && !radioFmNowPlaying && <p className="text-sm mt-1" style={{ color: txtTer }}>Tuning in…</p>}
               </div>
             </div>
 
-            {/* Divider ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â FM only */}
+            {/* Divider — FM only */}
             {radioFmActive && <div className="w-px bg-white/10 shrink-0 my-10" />}
 
             {/* Right column */}
@@ -485,61 +640,98 @@ export default function WrldView(): JSX.Element {
 
       </>
 
-      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Notch menu ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
-          <div className="group absolute right-0 top-0 bottom-0 z-20 flex items-center">
-            {/* Expanded panel ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â slides in on hover */}
-            <div className="overflow-hidden max-w-0 group-hover:max-w-[160px] transition-[max-width] duration-200 ease-out">
-              <div className="w-36 opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-75
-                bg-black/80 backdrop-blur-xl rounded-l-2xl border-l border-t border-b border-white/[0.08]
-                flex flex-col gap-0 pt-2 pb-2 px-2">
+      {/* ── Notch menu ── */}
+      <div className="group absolute right-0 top-0 bottom-0 z-20 flex items-center">
 
-                {/* Category selector */}
-                <div className="relative mb-1.5 px-0.5">
-                  <button
-                    onClick={() => setNotchDropdownOpen(o => !o)}
-                    className="w-full flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/10 transition-colors"
-                  >
-                    <span className="text-white/45 text-[10px] font-medium truncate leading-none">{NOTCH_LABELS[notchCategory]}</span>
-                    <ChevronDown size={9} className={`text-white/25 shrink-0 transition-transform duration-150 ${notchDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  {notchDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 z-10 bg-black/95 backdrop-blur-xl rounded-xl border border-white/10 overflow-hidden py-1">
-                      {(account ? NOTCH_OPTIONS : NOTCH_OPTIONS.filter(o => o.value !== 'playlists')).map(opt => (
-                        <button key={opt.value}
-                          onClick={() => { setNotchCategory(opt.value); setNotchDropdownOpen(false) }}
-                          className={`w-full px-3 py-2 text-left text-[10px] transition-colors ${notchCategory === opt.value ? 'text-white/90 bg-white/8' : 'text-white/50 hover:text-white/80 hover:bg-white/[0.06]'}`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+        {/* Expanded panel — slides in on hover */}
+        <div className="overflow-hidden max-w-0 group-hover:max-w-[272px] transition-[max-width] duration-200 ease-out">
+          <div
+            className="w-64 opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-75
+              bg-black/85 backdrop-blur-2xl rounded-l-2xl border-l border-t border-b border-white/[0.07]
+              flex flex-col overflow-hidden"
+            style={{ height: 'calc(100vh - 180px)', maxHeight: 560 }}
+          >
+
+            {/* Category selector */}
+            <div className="relative px-3 pt-3 pb-2 shrink-0">
+              <button
+                onClick={() => setNotchDropdownOpen(o => !o)}
+                className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.1] transition-colors"
+              >
+                <span className="text-white/60 text-[10px] font-semibold tracking-wide truncate leading-none">
+                  {NOTCH_LABELS[notchCategory]}
+                </span>
+                <ChevronDown size={10} className={`text-white/30 shrink-0 transition-transform duration-150 ${notchDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {notchDropdownOpen && (
+                <div className="absolute top-full left-3 right-3 mt-1 z-10 bg-black/95 backdrop-blur-xl rounded-xl border border-white/10 overflow-hidden py-1 shadow-2xl">
+                  {(account ? NOTCH_OPTIONS : NOTCH_OPTIONS.filter(o => o.value !== 'playlists')).map(opt => (
+                    <button key={opt.value}
+                      onClick={() => {
+                        setNotchCategory(opt.value)
+                        setNotchDropdownOpen(false)
+                        setSelectedAlbumId(null)
+                      }}
+                      className={`w-full px-3 py-2 text-left text-[10px] font-medium transition-colors ${
+                        notchCategory === opt.value
+                          ? 'text-white/90 bg-white/[0.08]'
+                          : 'text-white/45 hover:text-white/80 hover:bg-white/[0.05]'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
+              )}
+            </div>
 
-                {/* Items */}
-                {notchCategory === 'playlists' && account && playlists.length > 0 ? (
-                  playlists.slice(0, 6).map(pl => (
+            {/* Thin separator */}
+            <div className="h-px bg-white/[0.06] mx-3 shrink-0" />
+
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto px-3 py-3" style={{ scrollbarWidth: 'none' }}>
+
+              {/* ── Albums ── */}
+              {notchCategory === 'albums' ? (
+                selectedAlbumId !== null
+                  ? <AlbumDetail albumId={selectedAlbumId} />
+                  : <AlbumsGrid />
+
+              /* ── Playlists ── */
+              ) : notchCategory === 'playlists' && account && playlists.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2.5">
+                  {playlists.slice(0, 6).map(pl => (
                     <button key={pl.id} onClick={() => handleAddToPlaylist(pl.id)} title={pl.name}
-                      className="flex items-center justify-center py-1 rounded-lg hover:bg-white/10 transition-colors group/pl">
-                      <div className="w-16 h-16 rounded-lg shrink-0 bg-white/10 overflow-hidden group-hover/pl:ring-1 group-hover/pl:ring-white/30 transition-all">
+                      className="flex flex-col gap-1.5 text-left group/pl">
+                      <div className="w-full aspect-square rounded-xl overflow-hidden ring-1 ring-white/[0.06] group-hover/pl:ring-white/25 transition-all shadow-md">
                         {(pl.cover_image_url || pl.cover_image)
                           ? <img src={pl.cover_image_url ?? pl.cover_image ?? ''} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full bg-white/[0.07]" />}
+                          : <div className="w-full h-full bg-white/[0.06] flex items-center justify-center">
+                              <Music size={18} className="text-white/15" />
+                            </div>}
                       </div>
+                      <p className="text-white/55 text-[9px] font-medium truncate px-0.5">{pl.name}</p>
                     </button>
-                  ))
-                ) : (
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="flex items-center justify-center py-1">
-                      <div className="w-16 h-16 rounded-lg bg-white/[0.04]" />
-                    </div>
-                  ))
-                )}
-              </div>
+                  ))}
+                </div>
+
+              /* ── Empty state for other categories ── */
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full gap-2 py-8">
+                  <div className="w-10 h-10 rounded-xl bg-white/[0.04] flex items-center justify-center">
+                    <Music size={16} className="text-white/15" />
+                  </div>
+                  <p className="text-white/20 text-[10px] text-center">Coming soon</p>
+                </div>
+              )}
+
             </div>
-            {/* Notch handle ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â pill tab visible at rest, grows on hover */}
-            <div className="w-[5px] group-hover:w-[3px] h-16 group-hover:h-24 rounded-l-full bg-white/20 group-hover:bg-white/50 transition-all duration-200 ease-out shrink-0" />
           </div>
+        </div>
+
+        {/* Notch handle — pill tab */}
+        <div className="w-[5px] group-hover:w-[3px] h-16 group-hover:h-24 rounded-l-full bg-white/20 group-hover:bg-white/50 transition-all duration-200 ease-out shrink-0" />
+      </div>
     </div>
   )
 }
