@@ -80,7 +80,7 @@ export interface QueueSlice {
    * Start radio mode. The queue is seeded with `track` only;
    * subsequent songs come from /radio/random/ one at a time.
    */
-  startRadio: (track: Track) => void
+  startRadio: (track: Track, filter?: { category: string; era: string; search: string; total: number } | null) => void
   /** Exit radio mode, keep current track playing. */
   stopRadio: () => void
 
@@ -303,7 +303,7 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
   // ── jumpToTrack ───────────────────────────────────────────────────────────────
   jumpToTrack: (track) => {
     const { queue } = get()
-    const idx = queue.findIndex((t) => t.id === track.id)
+    const idx = queue.findIndex((t: Track) => t.id === track.id)
     if (idx < 0) return
     set({ queueIndex: idx, currentTrack: track, currentTrackFull: null, isPlaying: true, progress: 0, currentTime: 0 })
   },

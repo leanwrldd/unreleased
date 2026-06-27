@@ -106,7 +106,7 @@ interface AppState {
 }
 
 interface AppActions {
-  setCurrentTrackFull: (full: FullTrack | null) => void
+  setCurrentTrackFull: (full: FullTrack | null | ((prev: FullTrack | null) => FullTrack | null)) => void
   setVolume: (vol: number) => void
   setPlaybackSpeed: (speed: number) => void
 
@@ -197,7 +197,13 @@ export const useStore = create<AppStore>((set, get, store) => ({
   volume: ls.get<number>('volume') ?? 0.8,
   playbackSpeed: ls.get<number>('playbackSpeed') ?? 1,
 
-  setCurrentTrackFull: (currentTrackFull) => set({ currentTrackFull }),
+  setCurrentTrackFull: (full) => {
+    if (typeof full === 'function') {
+      set(state => ({ currentTrackFull: full(state.currentTrackFull) }))
+    } else {
+      set({ currentTrackFull: full })
+    }
+  },
   setVolume: (volume) => { set({ volume }); ls.set('volume', volume) },
   setPlaybackSpeed: (speed) => { set({ playbackSpeed: speed }); ls.set('playbackSpeed', speed) },
 

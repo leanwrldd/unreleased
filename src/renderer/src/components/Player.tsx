@@ -22,6 +22,7 @@ import {
   Info,
   Pencil,
   HardDrive,
+  Loader2,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { formatDuration } from '../lib/lyrics'
@@ -34,7 +35,9 @@ import MetadataEditor from './MetadataEditor'
 import { LibraryTrack } from '../types'
 
 let _seek: ((t: number) => void) | null = null
+let _getAudioDuration: (() => number) | null = null
 export function seekAudio(t: number): void { _seek?.(t) }
+export function getAudioDuration(): number { return _getAudioDuration?.() ?? 0 }
 
 export default function Player(): JSX.Element {
   const {
@@ -196,7 +199,7 @@ export default function Player(): JSX.Element {
     na.load()
   }, [queueIndex, queue.length, isPlaying, repeat, shuffle])
 
-  // Expose seek to LyricsDisplay
+  // Expose seek and duration to other components
   useEffect(() => {
     _seek = (t) => {
       const audio = getActive()
@@ -207,7 +210,8 @@ export default function Player(): JSX.Element {
       setCurrentTime(t)
       if (audio.duration) setProgress(t / audio.duration)
     }
-    return () => { _seek = null }
+    _getAudioDuration = () => getActive()?.duration ?? 0
+    return () => { _seek = null; _getAudioDuration = null }
   }, []) // stable — only depends on refs
 
   // Load full metadata when track changes or currentTrackFull is cleared
