@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react'
-import { SearchCode, HardDrive, Settings, ShieldCheck, ListMusic, Library, LogIn, LogOut, ChevronLeft, ChevronRight, Disc } from 'lucide-react'
+import { SearchCode, HardDrive, Settings, ShieldCheck, ListMusic, Library, LogIn, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
@@ -39,7 +39,6 @@ export default function Sidebar(): JSX.Element {
     ...(isElectron ? [{ icon: <Library size={18} />, label: 'Library', view: 'library' as const }] : []),
     { icon: <ListMusic size={18} />, label: 'Playlists', view: 'playlists' },
     { icon: <img src={logo} alt="WRLD" className="w-[22px] h-[22px] object-contain" />, label: 'WRLD', view: 'wrld' },
-    { icon: <Disc size={18} />, label: 'Albums', view: 'albums-admin' },
   ]
 
   return (

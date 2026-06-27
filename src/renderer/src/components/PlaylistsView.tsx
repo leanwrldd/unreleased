@@ -626,7 +626,7 @@ export default function PlaylistsView(): JSX.Element {
           <div className="border-t border-[var(--border)] mx-6 mb-3 shrink-0" />
           <div className="px-2 pb-8">
             <div className="grid items-center gap-3 px-4 pb-2 text-text-muted text-xs uppercase tracking-widest" style={{ gridTemplateColumns: '28px 40px 1fr 56px' }}>
-              <span>#</span><span /><span>Title</span><div className="flex justify-center"><Clock size={12} /></div>
+              <span className="text-center">#</span><span /><span>Title</span><div className="flex justify-center"><Clock size={12} /></div>
             </div>
             {localTracks.map((lt, i) => {
               const qt = libTrackToTrack(lt)
@@ -952,7 +952,7 @@ export default function PlaylistsView(): JSX.Element {
             {/* Column headers */}
             <div className="grid items-center gap-3 px-4 pb-2 text-text-muted text-xs uppercase tracking-widest" style={{ gridTemplateColumns: '16px 28px 40px 1fr 56px 36px' }}>
               <span />
-              <span>#</span>
+              <span className="text-center">#</span>
               <span />
               <SortHeader label="Title" field="title" sort={sort} onSort={handleSort} />
               <div className="flex justify-center">

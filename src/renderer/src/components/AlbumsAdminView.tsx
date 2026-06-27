@@ -18,11 +18,13 @@ const el = (window as any).electron
 const isElectron = !!el
 
 async function loadData(): Promise<WrldData> {
-  if (el?.loadWrldData) {
-    const d = await el.loadWrldData()
-    if (d) return d
+  if (isElectron) {
+    // In Electron, always use IPC — fetch() won't work over file:// protocol
+    const d = el?.loadWrldData ? await el.loadWrldData() : null
+    return d ?? { albums: [] }
   }
   const r = await fetch('/wrlddata.json')
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
   return r.json()
 }
 
@@ -491,6 +493,25 @@ function TrackRow({ song, index, onChangeName, onDelete }: {
         <X size={13} />
       </button>
     </div>
+  )
+}
+
+// ── Save button ───────────────────────────────────────────────────────────────
+
+function SaveButton({ saving, saved, onSave }: { saving: boolean; saved: boolean; onSave: () => void }) {
+  return (
+    <button
+      onClick={onSave}
+      disabled={saving}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 ${
+        saved
+          ? 'bg-green-500/20 text-green-400 ring-1 ring-green-500/30'
+          : 'bg-[var(--accent)]/15 hover:bg-[var(--accent)]/25 text-[var(--accent)]'
+      }`}
+    >
+      {saving ? <Loader2 size={12} className="animate-spin" /> : saved ? <Check size={12} /> : <Save size={12} />}
+      {saved ? 'Saved' : 'Save'}
+    </button>
   )
 }
 

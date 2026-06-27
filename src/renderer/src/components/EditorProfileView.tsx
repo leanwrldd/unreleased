@@ -303,13 +303,22 @@ export default function EditorProfileView(): JSX.Element {
           </button>
           <div className="flex items-center gap-1.5">
             {(account?.is_editor || account?.is_administrator) && (
-              <button
-                onClick={() => setShowAddSong(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent/15 hover:bg-accent/25 text-accent text-xs font-semibold transition-colors"
-                title="Propose a new song"
-              >
-                <Plus size={12} /> New song
-              </button>
+              <>
+                <button
+                  onClick={() => setActiveView('albums-admin')}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-raised hover:bg-surface-highest text-text-secondary hover:text-text-primary text-xs font-semibold transition-colors"
+                  title="Edit albums (wrlddata.json)"
+                >
+                  Edit albums
+                </button>
+                <button
+                  onClick={() => setShowAddSong(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent/15 hover:bg-accent/25 text-accent text-xs font-semibold transition-colors"
+                  title="Propose a new song"
+                >
+                  <Plus size={12} /> New song
+                </button>
+              </>
             )}
             <button
               onClick={() => setRefreshKey(k => k + 1)}
@@ -504,7 +513,7 @@ export default function EditorProfileView(): JSX.Element {
                       </p>
 
                       {/* Approved count */}
-                      <span className={`text-xs tabular-nums shrink-0 font-semibold ${isMe ? 'text-accent' : rankStyle ? 'text-text-secondary' : 'text-text-muted'}`}>
+                      <span className={`text-xs tabular-nums shrink-0 font-semibold ${isMe ? 'text-accent' : rankStyle ? rankStyle.num : 'text-text-muted'}` }>
                         {entry.approved_count}
                       </span>
                     </div>
@@ -514,7 +523,6 @@ export default function EditorProfileView(): JSX.Element {
             )}
           </div>
         </div>
-
       </div>
 
       {showAddSong && (
