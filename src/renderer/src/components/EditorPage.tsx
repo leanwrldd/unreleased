@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 import {
   Loader2, Check, AlertCircle, LogIn, Clock, X, ChevronDown,
   ChevronUp, Award, Music2, FileText, Pencil, Plus,
@@ -199,6 +199,11 @@ export default function EditorPage(): JSX.Element {
   const [notes,    setNotes]    = useState('')
   const [edNotes,  setEdNotes]  = useState('')
 
+  const [imageUrl,          setImageUrl]          = useState('')
+  const [altNames,          setAltNames]          = useState('')
+  const [fileNames,         setFileNames]         = useState('')
+  const [instrumentalNames, setInstrumentalNames] = useState('')
+
   const [lyricsTab,    setLyricsTab]    = useState<LyricsTab>('lyrics')
   const [lyricsLoading, setLyricsLoading] = useState(false)
   const [lyricsError,   setLyricsError]   = useState<string | null>(null)
@@ -225,6 +230,10 @@ export default function EditorPage(): JSX.Element {
       synced_lyrics:          s.synced_lyrics || '',
       additional_information: s.additional_information || '',
       notes:                  s.notes || '',
+      image_url:              s.image_url || '',
+      track_titles:           s.track_titles || [],
+      file_names:             s.file_names || '',
+      instrumental_names:     s.instrumental_names || '',
     }
   }
 
@@ -244,6 +253,10 @@ export default function EditorPage(): JSX.Element {
     setSynced(s.synced_lyrics || '')
     setAddInfo(s.additional_information || '')
     setNotes(s.notes || '')
+    setImageUrl(s.image_url || '')
+    setAltNames((s.track_titles || []).join('\n'))
+    setFileNames(s.file_names || '')
+    setInstrumentalNames(s.instrumental_names || '')
     setEdNotes('')
     setSubmitState('idle')
     setSubmitError(null)
@@ -300,6 +313,10 @@ export default function EditorPage(): JSX.Element {
       if ('synced_lyrics' in d)           setSynced(String(d.synced_lyrics ?? ''))
       if ('additional_information' in d) setAddInfo(String(d.additional_information ?? ''))
       if ('notes' in d)                  setNotes(String(d.notes ?? ''))
+      if ('image_url' in d)              setImageUrl(String(d.image_url ?? ''))
+      if ('track_titles' in d)           setAltNames(Array.isArray(d.track_titles) ? (d.track_titles as string[]).join('\n') : String(d.track_titles ?? ''))
+      if ('file_names' in d)             setFileNames(String(d.file_names ?? ''))
+      if ('instrumental_names' in d)     setInstrumentalNames(String(d.instrumental_names ?? ''))
       setEdNotes(editorNotes)
     })
   }, [pendingEditProposal, isEditor, setPendingEditProposal, loadSong])
@@ -321,6 +338,10 @@ export default function EditorPage(): JSX.Element {
     release_date: relDate, leak_type: leak,
     lyrics, synced_lyrics: synced,
     additional_information: addInfo, notes,
+    image_url: imageUrl,
+    track_titles: altNames ? altNames.split('\n').map(s => s.trim()).filter(Boolean) : [],
+    file_names: fileNames,
+    instrumental_names: instrumentalNames,
   }
   const patch        = diff(baseline(song), current)
   const changedCount = Object.keys(patch).length
@@ -410,6 +431,9 @@ export default function EditorPage(): JSX.Element {
     requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = start + cleaned.length })
   }
 
+  const onSubmitted = useCallback((a: EditorApplication) => setApplication(a), [])
+  const onSignOut   = useCallback(() => logoutAccount(), [logoutAccount])
+
   /* ── Guards ──────────────────────────────────────────────────────────────── */
   if (!account) return (
     <div className="flex-1 flex flex-col items-center justify-center gap-5 px-6 text-center">
@@ -431,7 +455,7 @@ export default function EditorPage(): JSX.Element {
   if (!isEditor) return (
     <ApplicationView
       application={application} loading={appLoading}
-      onSubmitted={a => setApplication(a)} onSignOut={() => logoutAccount()}
+      onSubmitted={onSubmitted} onSignOut={onSignOut}
     />
   )
 
@@ -524,9 +548,15 @@ export default function EditorPage(): JSX.Element {
 
               {/* IDENTITY */}
               <SectionLabel label="Identity" />
-              <FieldRow label="Title"   value={name}    original={String(base.name || '')}    onChange={setName} />
-              <FieldRow label="Artists" value={artists} original={String(base.credited_artists || '')} onChange={setArtists} />
-              <FieldRow label="Album"   value={album}   original={String(base.album || '')}   onChange={setAlbum} />
+              <FieldRow label="Title"    value={name}     original={String(base.name || '')}    onChange={setName} />
+              <FieldRow label="Artists"  value={artists}  original={String(base.credited_artists || '')} onChange={setArtists} />
+              <FieldRow label="Album"    value={album}    original={String(base.album || '')}   onChange={setAlbum} />
+              <FieldRow label="Cover URL" value={imageUrl} original={String(base.image_url || '')} onChange={setImageUrl} placeholder="https://…" />
+              <TextareaRow
+                label="Alt names" value={altNames}
+                original={(Array.isArray(base.track_titles) ? (base.track_titles as string[]).join('\n') : '')}
+                onChange={setAltNames} rows={2} placeholder="One name per line"
+              />
 
               {/* CLASSIFICATION */}
               <SectionLabel label="Classification" />
@@ -576,9 +606,11 @@ export default function EditorPage(): JSX.Element {
 
               {showMore && (
                 <>
-                  <FieldRow label="Engineers" value={eng}    original={String(base.engineers || '')}             onChange={setEng} />
-                  <FieldRow label="Location"  value={loc}    original={String(base.recording_locations || '')}   onChange={setLoc} placeholder="Studio / city" />
-                  <FieldRow label="Leak type" value={leak}   original={String(base.leak_type || '')}             onChange={setLeak} placeholder="HQ, LQ, snippet…" />
+                  <FieldRow label="Engineers"  value={eng}              original={String(base.engineers || '')}             onChange={setEng} />
+                  <FieldRow label="Location"   value={loc}              original={String(base.recording_locations || '')}   onChange={setLoc} placeholder="Studio / city" />
+                  <FieldRow label="Leak type"  value={leak}             original={String(base.leak_type || '')}             onChange={setLeak} placeholder="HQ, LQ, snippet…" />
+                  <FieldRow label="File names" value={fileNames}        original={String(base.file_names || '')}            onChange={setFileNames} />
+                  <FieldRow label="Inst. names" value={instrumentalNames} original={String(base.instrumental_names || '')} onChange={setInstrumentalNames} />
                   <div className="pt-2 space-y-2">
                     <TextareaRow label="Add. info" value={addInfo} original={String(base.additional_information || '')} onChange={setAddInfo} rows={3} />
                     <TextareaRow label="Notes"     value={notes}   original={String(base.notes || '')}                  onChange={setNotes}   rows={2} />
@@ -713,7 +745,7 @@ function AppField({ label, value, onChange, rows, placeholder, hint }: {
 }
 
 /* ── Application view ─────────────────────────────────────────────────────── */
-function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
+const ApplicationView = memo(function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
   application: EditorApplication | null
   loading: boolean
   onSubmitted: (a: EditorApplication) => void
@@ -797,4 +829,4 @@ function ApplicationView({ application, loading, onSubmitted, onSignOut }: {
       </div>
     </div>
   )
-}
+})

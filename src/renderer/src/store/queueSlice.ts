@@ -170,10 +170,20 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
   // ── playTrack ──────────────────────────────────────────────────────────────
   playTrack: (track, context?, filter = null, source = null) => {
     const tracks: Track[] = context ?? (get().queue as Track[])
-    const idx = tracks.findIndex((t: Track) => t.id === track.id)
+    let idx = tracks.findIndex((t: Track) => t.id === track.id)
+    if (idx < 0) idx = 0
+
+    const { shuffle } = get()
+    let finalQueue = tracks
+    if (shuffle && source !== 'tracker') {
+      const played = tracks.slice(0, idx + 1)
+      const upcoming = fisherYates(tracks.slice(idx + 1))
+      finalQueue = [...played, ...upcoming]
+    }
+
     set({
-      queue: tracks,
-      queueIndex: idx >= 0 ? idx : 0,
+      queue: finalQueue,
+      queueIndex: idx,
       currentTrack: track,
       currentTrackFull: null,
       isPlaying: true,

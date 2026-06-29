@@ -16,6 +16,7 @@ interface Props {
 
 export default function MediaLightbox({ items, index, onClose, onNav }: Props): JSX.Element | null {
   const [videoError, setVideoError] = useState(false)
+  const isElectron = !!(window as any).electron
   const item = items[index]
 
   // Reset video error when item changes
@@ -56,7 +57,7 @@ export default function MediaLightbox({ items, index, onClose, onNav }: Props): 
         onClick={(e) => e.stopPropagation()}
       >
         <span className="text-white/80 text-sm truncate max-w-[60vw]">{item.name}</span>
-        <div className="flex items-center gap-2">
+        <div className={`flex items-center gap-2${isElectron ? ' mr-[132px]' : ''}`}>
           {items.length > 1 && (
             <span className="text-white/40 text-xs">{index + 1} / {items.length}</span>
           )}
