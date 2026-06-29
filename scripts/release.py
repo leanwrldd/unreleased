@@ -1,119 +1,185 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
-release.py — Full automated release for Unreleased Music Player.
+Unreleased Music Player — Interactive Release Script
 
-Usage:
-    python scripts\release.py 1.7.10
-    python scripts\release.py 1.7.10 --notes "What changed"
-    python scripts\release.py 1.7.10 --skip-build
-    python scripts\release.py 1.7.10 --skip-upload
+Just run it — no arguments needed.
 
-Steps performed:
-  1. Bump version in package.json
-  2. Build renderer (vite) on app branch
-  3. Build electron installer (electron-builder)
-  4. Commit + push app branch
-  5. Checkout web branch, sync src/ + package.json, build, commit + push
-  6. Back to app branch
-  7. Create GitHub release for the new tag
-  8. Upload latest.yml, .blockmap, and .exe with streaming progress
+Steps:
+  1. Pick a version (bump patch / minor / major, or keep / custom)
+  2. Commit any pending changes to the desktop branch (app)
+  3. Build the renderer + Electron installer
+  4. Push the desktop branch to GitHub
+  5. Sync the web branch (copies src/ + package.json from app, skips electron/)
+  6. Create the GitHub release and upload all assets
 """
 
-import os
-import sys
-if hasattr(sys.stdout, 'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
-if hasattr(sys.stderr, 'reconfigure'): sys.stderr.reconfigure(encoding='utf-8')
-import json
-import time
-import argparse
-import subprocess
-import urllib.request
-import urllib.error
-import urllib.parse
+import os, sys, re, json, subprocess, time, urllib.request, urllib.error, urllib.parse
+if hasattr(sys.stdout, "reconfigure"): sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"): sys.stderr.reconfigure(encoding="utf-8")
+
+# Enable ANSI colours on Windows
+if sys.platform == "win32":
+    os.system("")
+
 from pathlib import Path
 
-# -- Config --------------------------------------------------------------------
-REPO_OWNER  = "leanwrldd"
-REPO_NAME   = "unreleased"
-API_BASE    = "https://api.github.com"
-UPLOAD_BASE = "https://uploads.github.com"
-ROOT        = Path(__file__).parent.parent
+# ── Config ────────────────────────────────────────────────────────────────────
+ROOT         = Path(__file__).parent.parent
+REPO_OWNER   = "leanwrldd"
+REPO_NAME    = "unreleased"
+APP_BRANCH   = "app"
+WEB_BRANCH   = "web"
+API_BASE     = "https://api.github.com"
+UPLOAD_BASE  = "https://uploads.github.com"
 
-# -- Helpers -------------------------------------------------------------------
+# ── ANSI helpers ──────────────────────────────────────────────────────────────
+RST  = "\033[0m"
+BOLD = "\033[1m"
+DIM  = "\033[2m"
+RED  = "\033[91m"
+GRN  = "\033[92m"
+YLW  = "\033[93m"
+CYN  = "\033[96m"
+WHT  = "\033[97m"
 
-def step(msg: str) -> None:
-    print(f"\n\033[1;36m{'-'*60}\033[0m")
-    print(f"\033[1;36m  {msg}\033[0m")
-    print(f"\033[1;36m{'-'*60}\033[0m")
+def _c(text, *codes):
+    return "".join(codes) + str(text) + RST
 
-def ok(msg: str) -> None:
-    print(f"  \033[32m[OK]\033[0m  {msg}")
+def banner():
+    w = 66
+    print()
+    print(_c("╔" + "═"*(w-2) + "╗", CYN, BOLD))
+    row = "  🎵  UNRELEASED  —  Release & Publish  "
+    print(_c("║", CYN, BOLD) + _c(row.ljust(w-2), WHT, BOLD) + _c("║", CYN, BOLD))
+    print(_c("╚" + "═"*(w-2) + "╝", CYN, BOLD))
+    print()
 
-def err(msg: str) -> None:
-    print(f"  \033[31m[ERR]\033[0m {msg}", file=sys.stderr)
+def section(n, total, title):
+    print()
+    bar = "─" * 52
+    print(_c(f"  [{n}/{total}]  {title}", WHT, BOLD))
+    print(_c("  " + bar, DIM))
+    print()
 
-def run(cmd: str, check: bool = True) -> subprocess.CompletedProcess:
-    """Run a shell command in the project root, streaming output."""
-    print(f"  \033[90m> {cmd}\033[0m")
-    result = subprocess.run(cmd, shell=True, cwd=ROOT)
-    if check and result.returncode != 0:
-        err(f"Command failed (exit {result.returncode}): {cmd}")
-        sys.exit(result.returncode)
-    return result
+def ok(msg):     print(_c("  ✓  ", GRN, BOLD)  + msg)
+def info(msg):   print(_c("  ·  ", CYN)         + msg)
+def warn(msg):   print(_c("  ⚠  ", YLW, BOLD)  + msg)
+def detail(msg): print(_c("     " + msg, DIM))
 
-def get_token() -> str:
-    token = os.environ.get("GH_TOKEN")
-    if token:
-        return token
-    env_path = ROOT / ".env.local"
-    if env_path.exists():
-        for line in env_path.read_text().splitlines():
-            if line.startswith("GH_TOKEN="):
-                return line.split("=", 1)[1].strip()
-    err("GH_TOKEN not found. Set it as an env var or add GH_TOKEN=... to .env.local")
+def die(msg):
+    print()
+    print(_c("  ✗  ", RED, BOLD) + _c(msg, RED))
+    wait()
     sys.exit(1)
 
-def api_request(method: str, path: str, token: str, data=None):
-    url = f"{API_BASE}{path}"
-    headers = {
+def ask(prompt, default=""):
+    hint = _c(f"  [{default}]", DIM) if default else ""
+    try:
+        ans = input(_c(f"\n  ▶  {prompt}", CYN, BOLD) + hint + _c(": ", CYN, BOLD)).strip()
+    except KeyboardInterrupt:
+        print()
+        die("Cancelled.")
+    return ans if ans else default
+
+def confirm(prompt, default=True):
+    yn = "Y/n" if default else "y/N"
+    return ask(f"{prompt} ({yn})", "y" if default else "n").lower() in ("y", "yes")
+
+def wait():
+    try:
+        input(_c("\n\n  Press Enter to close…", DIM))
+    except (EOFError, KeyboardInterrupt):
+        pass
+
+# ── Shell ─────────────────────────────────────────────────────────────────────
+
+def run(cmd, check=True):
+    detail(f"> {cmd}")
+    r = subprocess.run(cmd, shell=True, cwd=ROOT)
+    if check and r.returncode != 0:
+        die(f"Command failed (exit {r.returncode}):\n  {cmd}")
+    return r
+
+def capture(cmd):
+    r = subprocess.run(cmd, shell=True, cwd=ROOT, capture_output=True, text=True)
+    return r.stdout.strip()
+
+def is_dirty():
+    return bool(capture("git status --porcelain"))
+
+def git_branch():
+    return capture("git rev-parse --abbrev-ref HEAD")
+
+# ── package.json ──────────────────────────────────────────────────────────────
+
+def load_version():
+    pkg = json.loads((ROOT / "package.json").read_text("utf-8"))
+    return pkg["version"]
+
+def set_version(new_ver):
+    path = ROOT / "package.json"
+    text = path.read_text("utf-8")
+    new_text, n = re.subn(r'("version"\s*:\s*)"[^"]+"', rf'\g<1>"{new_ver}"', text, count=1)
+    if n == 0:
+        die("Could not find version field in package.json")
+    path.write_text(new_text, "utf-8")
+
+def bump(v, part):
+    maj, mn, pat = map(int, v.split("."))
+    if part == "major": return f"{maj+1}.0.0"
+    if part == "minor": return f"{maj}.{mn+1}.0"
+    return f"{maj}.{mn}.{pat+1}"
+
+# ── GitHub API ────────────────────────────────────────────────────────────────
+
+def get_token():
+    t = os.environ.get("GH_TOKEN")
+    if t: return t
+    env = ROOT / ".env.local"
+    if env.exists():
+        for line in env.read_text().splitlines():
+            if line.startswith("GH_TOKEN="):
+                return line.split("=", 1)[1].strip()
+    die("GH_TOKEN not found.\nSet it as an environment variable or add GH_TOKEN=xxx to .env.local")
+
+def api(method, path, token, data=None):
+    url  = f"{API_BASE}{path}"
+    hdrs = {
         "Authorization": f"token {token}",
         "Accept":        "application/vnd.github+json",
         "Content-Type":  "application/json",
         "User-Agent":    "release.py",
     }
     body = json.dumps(data).encode() if data else None
-    req  = urllib.request.Request(url, data=body, headers=headers, method=method)
+    req  = urllib.request.Request(url, data=body, headers=hdrs, method=method)
     with urllib.request.urlopen(req) as resp:
-        body = resp.read()
-        return json.loads(body) if body else {}
+        raw = resp.read()
+        return json.loads(raw) if raw else {}
 
-# -- Streaming upload with progress -------------------------------------------
+# ── Upload with live progress bar ─────────────────────────────────────────────
 
 class _ProgressFile:
-    def __init__(self, path: Path):
+    def __init__(self, path):
         self._f    = open(path, "rb")
         self._size = path.stat().st_size
         self._done = 0
-
     def read(self, n=-1):
         chunk = self._f.read(n)
         self._done += len(chunk)
-        pct  = self._done * 100 // self._size if self._size else 100
-        bar  = "#" * (pct // 2) + "-" * (50 - pct // 2)
-        mb_d = self._done  / 1_048_576
-        mb_t = self._size  / 1_048_576
-        print(f"\r  [{bar}] {pct:3d}%  {mb_d:.1f}/{mb_t:.1f} MB", end="", flush=True)
+        pct = self._done * 100 // self._size if self._size else 100
+        bar = "#" * (pct // 2) + "-" * (50 - pct // 2)
+        mb_d, mb_t = self._done / 1_048_576, self._size / 1_048_576
+        print(f"\r     [{bar}] {pct:3d}%  {mb_d:.1f}/{mb_t:.1f} MB", end="", flush=True)
         return chunk
+    def __len__(self):  return self._size
+    def close(self):    self._f.close()
 
-    def __len__(self):   return self._size
-    def close(self):     self._f.close()
-
-def upload_asset(release_id: int, filepath: Path, token: str) -> None:
+def upload_asset(release_id, filepath, token):
     name = filepath.name
     size = filepath.stat().st_size
-    print(f"\n  Uploading: {name}  ({size/1_048_576:.1f} MB)")
-    url  = (f"{UPLOAD_BASE}/repos/{REPO_OWNER}/{REPO_NAME}"
-            f"/releases/{release_id}/assets?name={urllib.parse.quote(name)}")
+    print(f"\n  Uploading: {_c(name, WHT, BOLD)}  ({size/1_048_576:.1f} MB)")
+    url = (f"{UPLOAD_BASE}/repos/{REPO_OWNER}/{REPO_NAME}"
+           f"/releases/{release_id}/assets?name={urllib.parse.quote(name)}")
     hdrs = {
         "Authorization":  f"token {token}",
         "Accept":         "application/vnd.github+json",
@@ -121,197 +187,232 @@ def upload_asset(release_id: int, filepath: Path, token: str) -> None:
         "Content-Length": str(size),
         "User-Agent":     "release.py",
     }
-    wrapper = _ProgressFile(filepath)
-    req = urllib.request.Request(url, data=wrapper, headers=hdrs, method="POST")
+    wrap = _ProgressFile(filepath)
+    req  = urllib.request.Request(url, data=wrap, headers=hdrs, method="POST")
     try:
         with urllib.request.urlopen(req) as resp:
             result = json.loads(resp.read())
-            print(f"\n  Done -> {result['browser_download_url']}")
+            print(f"\n  {_c('✓', GRN, BOLD)}  {result['browser_download_url']}")
     except urllib.error.HTTPError as e:
         body = e.read().decode(errors="replace")
         print(f"\n  HTTP {e.code}: {body[:300]}")
         raise
     finally:
-        wrapper.close()
+        wrap.close()
 
-# -- Version bump -------------------------------------------------------------
+# ── Steps ─────────────────────────────────────────────────────────────────────
 
-def bump_version(new_ver: str) -> None:
-    pkg_path = ROOT / "package.json"
-    raw      = pkg_path.read_bytes()
-    text     = raw.decode("utf-8")
-    # Find and replace only the top-level "version" field
-    import re
-    new_text, n = re.subn(r'("version"\s*:\s*)"[^"]+"', rf'\g<1>"{new_ver}"', text, count=1)
-    if n == 0:
-        err("Could not find version field in package.json")
-        sys.exit(1)
-    pkg_path.write_bytes(new_text.encode("utf-8"))
-    ok(f"package.json version -> {new_ver}")
+TOTAL = 6
 
-# -- Git helpers ---------------------------------------------------------------
+def step_version():
+    section(1, TOTAL, "Version")
+    cur = load_version()
+    info(f"Current version: {_c(cur, WHT, BOLD)}")
+    print()
+    opts = [
+        ("1", "keep",   cur,              "Keep current"),
+        ("2", "patch",  bump(cur,"patch"),"Bump patch  "),
+        ("3", "minor",  bump(cur,"minor"),"Bump minor  "),
+        ("4", "major",  bump(cur,"major"),"Bump major  "),
+        ("5", "custom", None,             "Custom…     "),
+    ]
+    for k, _, v, label in opts:
+        print(_c(f"    {k}) {label}  {v or '?'}", DIM))
 
-def git_branch() -> str:
-    r = subprocess.run("git rev-parse --abbrev-ref HEAD", shell=True, cwd=ROOT,
-                       capture_output=True, text=True)
-    return r.stdout.strip()
+    choice = ask("Choice", default="2")
+    entry  = next((o for o in opts if o[0] == choice), None)
+    if not entry:
+        die("Invalid choice.")
 
-def git_checkout(branch: str) -> None:
-    run(f"git checkout {branch}")
+    _, part, new_ver, _ = entry
+    if part == "custom":
+        new_ver = ask("Version (e.g. 2.0.0)")
+        if not re.fullmatch(r"\d+\.\d+\.\d+", new_ver):
+            die("Invalid format. Use major.minor.patch")
+    elif part == "keep":
+        ok(f"Keeping {_c(cur, WHT, BOLD)}")
+        return cur
 
-# -- Main ---------------------------------------------------------------------
+    set_version(new_ver)
+    ok(f"Version: {cur}  →  {_c(new_ver, WHT, BOLD)}")
+    return new_ver
 
-def main():
-    parser = argparse.ArgumentParser(description="Full release automation")
-    parser.add_argument("version",       help="New version e.g. 1.7.10")
-    parser.add_argument("--notes",       default="", help="Release notes body")
-    parser.add_argument("--skip-build",  action="store_true", help="Skip vite + electron-builder")
-    parser.add_argument("--skip-upload", action="store_true", help="Skip asset upload")
-    parser.add_argument("--upload-only", action="store_true", help="Skip build/git; only create/fetch release and upload assets")
-    parser.add_argument("--skip-web",    action="store_true", help="Skip web branch sync (desktop-only release)")
-    args = parser.parse_args()
 
-    ver   = args.version.lstrip("v")
-    tag   = f"v{ver}"
-    token = get_token()
+def step_commit(version):
+    section(2, TOTAL, f"Commit → {APP_BRANCH}")
 
-    # -- upload-only shortcut -------------------------------------------------
-    if args.upload_only:
-        step(f"Upload-only: creating/fetching GitHub release {tag}")
-        try:
-            release = api_request("POST",
-                f"/repos/{REPO_OWNER}/{REPO_NAME}/releases", token,
-                {"tag_name": tag, "name": tag, "body": args.notes or f"Release {tag}",
-                 "draft": False, "prerelease": False})
-            ok(f"Release created: id={release['id']}")
-        except urllib.error.HTTPError as e:
-            if e.code == 422:
-                release = api_request("GET",
-                    f"/repos/{REPO_OWNER}/{REPO_NAME}/releases/tags/{tag}", token)
-                ok(f"Release already exists: id={release['id']}")
-            else:
-                raise
-        release_id = release["id"]
-        step("Uploading release assets")
-        release_dir = ROOT / "release"
-        assets_to_upload = [
-            release_dir / "latest.yml",
-            release_dir / f"Unreleased-Setup-{ver}.exe.blockmap",
-            release_dir / f"Unreleased-Setup-{ver}.exe",
-        ]
-        try:
-            existing = api_request("GET",
-                f"/repos/{REPO_OWNER}/{REPO_NAME}/releases/{release_id}/assets", token)
-            existing_map = {a["name"]: a["id"] for a in existing}
-        except Exception:
-            existing_map = {}
-        for filepath in assets_to_upload:
-            if not filepath.exists():
-                print(f"  WARNING: {filepath.name} not found, skipping")
-                continue
-            if filepath.name in existing_map:
-                print(f"  Deleting existing asset: {filepath.name}")
-                api_request("DELETE",
-                    f"/repos/{REPO_OWNER}/{REPO_NAME}/releases/assets/{existing_map[filepath.name]}",
-                    token)
-            upload_asset(release_id, filepath, token)
-        step("All done!")
-        print(f"\n  Release: https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/tag/{tag}\n")
-        return
+    if git_branch() != APP_BRANCH:
+        info(f"Switching to {APP_BRANCH}")
+        run(f"git checkout {APP_BRANCH}")
 
-    # -- Make sure we start on app branch -------------------------------------
-    if git_branch() != "app":
-        step("Switching to app branch")
-        git_checkout("app")
-
-    # -- 1. Bump version -------------------------------------------------------
-    step(f"Bumping version to {ver}")
-    bump_version(ver)
-
-    # -- 2. Build (app branch) -------------------------------------------------
-    if not args.skip_build:
-        step("Building renderer (vite)")
-        run(r"node_modules\.bin\vite.cmd build")
-
-        step("Building Electron installer (this takes ~2 minutes)")
-        run(r"node_modules\.bin\electron-builder.cmd --win --publish never")
-    else:
-        ok("Skipping build (--skip-build)")
-
-    # -- 3. Commit + push app --------------------------------------------------
-    step("Committing and pushing app branch")
-    run("git add -A")
-    run(f'git commit -m "v{ver}"')
-    run("git push origin app")
-
-    # -- 4. Sync + build + push web branch ------------------------------------
-    if args.skip_web:
-        ok("Skipping web branch sync (--skip-web)")
-    else:
-        step("Syncing to web branch")
-        git_checkout("web")
-        run("git checkout app -- src/ package.json")
-        run(r"node_modules\.bin\vite.cmd build")
+    if is_dirty():
+        info("Uncommitted changes:")
+        for line in capture("git status --short").splitlines():
+            detail(line)
+        msg = ask("Commit message", default=f"v{version}")
         run("git add -A")
-        run(f'git commit -m "v{ver}"')
-        run("git push origin web --force")
-        # back to app
-        git_checkout("app")
+        run(f'git commit -m "{msg}"')
+        ok(f"Committed: {msg}")
+    else:
+        ok("Nothing to commit — tree is clean")
 
-    # -- 5. Create GitHub release ----------------------------------------------
-    step(f"Creating GitHub release {tag}")
-    notes = args.notes or f"Release {tag}"
+
+def step_build():
+    section(3, TOTAL, "Build Electron app")
+    warn("This takes ~2 minutes — output streams below")
+    print()
+    result = subprocess.run(
+        r"node_modules\.bin\electron-builder.cmd --win --publish never",
+        shell=True, cwd=ROOT,
+    )
+    print()
+    if result.returncode != 0:
+        die("Build failed. See output above.")
+    ok("Build complete")
+
+
+def step_push_app():
+    section(4, TOTAL, f"Push → origin/{APP_BRANCH}")
+    run(f"git push origin {APP_BRANCH}")
+    ok(f"Pushed to origin/{APP_BRANCH}")
+
+
+def step_sync_web(version):
+    section(5, TOTAL, f"Sync → {WEB_BRANCH}  (electron/ excluded)")
+
+    original = git_branch()
     try:
-        release = api_request("POST",
+        run(f"git checkout {WEB_BRANCH}")
+
+        # Pull only the web-safe directories from app branch
+        run(f"git checkout {APP_BRANCH} -- src/ package.json package-lock.json")
+
+        if not is_dirty():
+            info("Web branch already up to date.")
+            return
+
+        staged = capture("git diff --cached --name-only").splitlines()
+        info(f"Syncing {len(staged)} file(s) to {WEB_BRANCH}")
+        for f in staged[:8]:
+            detail(f)
+        if len(staged) > 8:
+            detail(f"… and {len(staged)-8} more")
+
+        run("git add -A")
+        run(f'git commit -m "v{version}"')
+        run(f"git push origin {WEB_BRANCH} --force")
+        ok(f"Web branch synced and pushed")
+
+    finally:
+        cur = git_branch()
+        if cur != original:
+            run(f"git checkout {original}")
+
+
+def step_release(version, token):
+    section(6, TOTAL, "GitHub release")
+    tag         = f"v{version}"
+    release_dir = ROOT / "release"
+
+    # Collect assets to upload
+    to_upload = []
+    for name in [
+        "latest.yml",
+        f"Unreleased-Setup-{version}.exe.blockmap",
+        f"Unreleased-Setup-{version}.exe",
+    ]:
+        p = release_dir / name
+        if p.exists():
+            to_upload.append(p)
+        else:
+            warn(f"Not found (skipping): {name}")
+
+    if not to_upload:
+        die(f"No release assets found in {release_dir}/\nDid the build succeed?")
+
+    notes = ask("Release notes  (blank = auto-generate from commits)", default="")
+    if not notes:
+        # Auto-generate from commits since last tag
+        notes = capture(
+            f'git log $(git describe --tags --abbrev=0 2>nul)..HEAD --pretty="- %s" --no-merges 2>nul'
+            if sys.platform == "win32" else
+            f'git log $(git describe --tags --abbrev=0 2>/dev/null)..HEAD --pretty="- %s" --no-merges 2>/dev/null'
+        ) or f"Release {tag}"
+
+    # Create or fetch the release
+    info(f"Creating release {_c(tag, WHT, BOLD)} on GitHub…")
+    try:
+        release = api("POST",
             f"/repos/{REPO_OWNER}/{REPO_NAME}/releases", token,
             {"tag_name": tag, "name": tag, "body": notes,
              "draft": False, "prerelease": False})
-        ok(f"Release created: id={release['id']}")
+        ok(f"Release created  (id={release['id']})")
     except urllib.error.HTTPError as e:
         if e.code == 422:
-            # Already exists — fetch it
-            release = api_request("GET",
+            release = api("GET",
                 f"/repos/{REPO_OWNER}/{REPO_NAME}/releases/tags/{tag}", token)
-            ok(f"Release already exists: id={release['id']}")
+            ok(f"Release already exists  (id={release['id']})")
         else:
             raise
+
     release_id = release["id"]
 
-    # -- 6. Upload assets ------------------------------------------------------
-    if args.skip_upload:
-        ok("Skipping asset upload (--skip-upload)")
-    else:
-        step("Uploading release assets")
-        release_dir = ROOT / "release"
+    # Delete any pre-existing assets with the same name
+    try:
+        existing = {a["name"]: a["id"] for a in
+                    api("GET", f"/repos/{REPO_OWNER}/{REPO_NAME}/releases/{release_id}/assets", token)}
+    except Exception:
+        existing = {}
 
-        assets_to_upload = [
-            release_dir / "latest.yml",
-            release_dir / f"Unreleased-Setup-{ver}.exe.blockmap",
-            release_dir / f"Unreleased-Setup-{ver}.exe",
-        ]
+    for fp in to_upload:
+        if fp.name in existing:
+            info(f"Replacing existing asset: {fp.name}")
+            api("DELETE", f"/repos/{REPO_OWNER}/{REPO_NAME}/releases/assets/{existing[fp.name]}", token)
 
-        # Delete any existing assets with the same names first
+    for fp in to_upload:
+        upload_asset(release_id, fp, token)
+
+    url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/tag/{tag}"
+    print()
+    print(_c(f"  🚀  {url}", GRN, BOLD))
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+def main():
+    banner()
+    try:
+        token   = get_token()
+        version = step_version()
+        step_commit(version)
+        step_build()
+        step_push_app()
+        step_sync_web(version)
+        step_release(version, token)
+
+        print()
+        print(_c("  " + "═" * 46, GRN, BOLD))
+        print(_c(f"  ✓  v{version} released successfully!", GRN, BOLD))
+        print(_c("  " + "═" * 46, GRN, BOLD))
+        print()
+
+    except KeyboardInterrupt:
+        print()
+        warn("Interrupted.")
+    except SystemExit:
+        raise
+    except Exception as exc:
+        die(str(exc))
+    finally:
+        # Always land back on the desktop branch
         try:
-            existing = api_request("GET",
-                f"/repos/{REPO_OWNER}/{REPO_NAME}/releases/{release_id}/assets", token)
-            existing_map = {a["name"]: a["id"] for a in existing}
+            if git_branch() != APP_BRANCH:
+                subprocess.run(f"git checkout {APP_BRANCH}", shell=True, cwd=ROOT)
         except Exception:
-            existing_map = {}
+            pass
 
-        for filepath in assets_to_upload:
-            if not filepath.exists():
-                print(f"  WARNING: {filepath.name} not found, skipping")
-                continue
-            if filepath.name in existing_map:
-                print(f"  Deleting existing asset: {filepath.name}")
-                api_request("DELETE",
-                    f"/repos/{REPO_OWNER}/{REPO_NAME}/releases/assets/{existing_map[filepath.name]}",
-                    token)
-            upload_asset(release_id, filepath, token)
+    wait()
 
-    # -- Done ------------------------------------------------------------------
-    step("All done!")
-    print(f"\n  Release: https://github.com/{REPO_OWNER}/{REPO_NAME}/releases/tag/{tag}\n")
 
 if __name__ == "__main__":
     main()

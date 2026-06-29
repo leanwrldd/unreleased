@@ -668,9 +668,20 @@ export default function WrldView(): JSX.Element {
                   </button>
                   <div className="relative flex-1 h-1 rounded-full cursor-pointer group/vol"
                     style={{ background: 'rgba(255,255,255,0.18)' }}
-                    onClick={e => {
-                      const rect = e.currentTarget.getBoundingClientRect()
-                      setVolume(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)))
+                    onMouseDown={e => {
+                      const track = e.currentTarget
+                      const compute = (clientX: number) => {
+                        const rect = track.getBoundingClientRect()
+                        setVolume(Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)))
+                      }
+                      compute(e.clientX)
+                      const onMove = (ev: MouseEvent) => compute(ev.clientX)
+                      const onUp = () => {
+                        document.removeEventListener('mousemove', onMove)
+                        document.removeEventListener('mouseup', onUp)
+                      }
+                      document.addEventListener('mousemove', onMove)
+                      document.addEventListener('mouseup', onUp)
                     }}
                   >
                     <div className="h-full rounded-full" style={{ width: `${volume * 100}%`, background: txtTer }} />

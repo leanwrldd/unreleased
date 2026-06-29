@@ -294,8 +294,12 @@ export default function Player(): JSX.Element {
   useEffect(() => {
     const audio = getActive()
     if (!audio) return
-    if (isPlaying) audio.play().catch(console.error)
-    else audio.pause()
+    if (isPlaying) {
+      audio.play().catch(console.error)
+    } else {
+      if (cfActive.current) cancelCF()
+      audio.pause()
+    }
   }, [isPlaying])
 
   // Volume — only change if not mid-crossfade
@@ -720,7 +724,7 @@ export default function Player(): JSX.Element {
           </div>
           <div className="flex items-center gap-0.5 shrink-0">
             {!radioFmActive && (
-              <button onClick={toggleShuffle} className={`p-1.5 transition-colors ${shuffle ? 'text-accent' : 'text-text-muted hover:text-text-primary'}`}>
+              <button onClick={toggleShuffle} className={`p-1.5 transition-colors ${shuffle ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}>
                 <Shuffle size={15} />
               </button>
             )}
@@ -740,7 +744,7 @@ export default function Player(): JSX.Element {
               <SkipForward size={18} fill="currentColor" />
             </button>
             {!radioFmActive && (
-              <button onClick={toggleRepeat} className={`p-1.5 transition-colors ${repeat !== 'none' ? 'text-accent' : 'text-text-muted hover:text-text-primary'}`}>
+              <button onClick={toggleRepeat} className={`p-1.5 transition-colors ${repeat !== 'none' ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}>
                 {repeat === 'one' ? <Repeat1 size={15} /> : <Repeat size={15} />}
               </button>
             )}
