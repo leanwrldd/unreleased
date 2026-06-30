@@ -56,6 +56,21 @@ export default function RadioFmPlayer(): JSX.Element {
     if (audioRef.current) audioRef.current.volume = volume
   }, [volume])
 
+  // Mobile background watchdog — the socket/audio pipeline can silently
+  // stall while the tab is hidden (throttled timers, OS-paused audio).
+  // Periodically nudge it, and recheck immediately when the tab regains focus.
+  useEffect(() => {
+    if (!radioFmActive) return
+    const check = (): void => clientRef.current?.checkHealth()
+    const id = setInterval(check, 8000)
+    const onVisible = (): void => { if (document.visibilityState === 'visible') check() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [radioFmActive])
+
   useEffect(() => {
     const client = clientRef.current
     if (!client) return

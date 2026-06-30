@@ -211,6 +211,8 @@ export default function EditorPage(): JSX.Element {
   const [submitError,  setSubmitError]  = useState<string | null>(null)
   const [showMore,     setShowMore]     = useState(false)
   const [editingPropId, setEditingPropId] = useState<number | null>(null)
+  // True while editing a 'create' proposal (new song) — has no backing song object yet
+  const [isNewSongDraft, setIsNewSongDraft] = useState(false)
 
   const baseline = (s: JWApiSong | null): Record<string, unknown> => {
     if (!s) return {}
@@ -297,7 +299,8 @@ export default function EditorPage(): JSX.Element {
     const { id, songId, proposedData: d, editorNotes } = pendingEditProposal
     setPendingEditProposal(null)
     setEditingPropId(id)
-    loadSong(songId).then(() => {
+
+    const applyProposedData = (): void => {
       if ('name' in d)                   setName(String(d.name ?? ''))
       if ('credited_artists' in d)        setArtists(String(d.credited_artists ?? ''))
       if ('album' in d)                   setAlbum(String(d.album ?? ''))
@@ -318,7 +321,17 @@ export default function EditorPage(): JSX.Element {
       if ('file_names' in d)             setFileNames(String(d.file_names ?? ''))
       if ('instrumental_names' in d)     setInstrumentalNames(String(d.instrumental_names ?? ''))
       setEdNotes(editorNotes)
-    })
+    }
+
+    if (songId == null) {
+      // 'create' proposal — new song, no backing song record exists yet
+      setSong(null)
+      setIsNewSongDraft(true)
+      applyProposedData()
+    } else {
+      setIsNewSongDraft(false)
+      loadSong(songId).then(applyProposedData)
+    }
   }, [pendingEditProposal, isEditor, setPendingEditProposal, loadSong])
 
   useEffect(() => {
@@ -349,18 +362,20 @@ export default function EditorPage(): JSX.Element {
 
   const cancelEditProposal = (): void => {
     setEditingPropId(null)
+    setIsNewSongDraft(false)
     if (song) populate(song)
   }
 
   const submit = async (): Promise<void> => {
-    if (!song || changedCount === 0) return
+    if ((!song && !isNewSongDraft) || changedCount === 0) return
     setSubmitState('submitting')
     setSubmitError(null)
     try {
       if (editingPropId != null) {
         await userApi.updateProposal(editingPropId, { proposed_data: patch, editor_notes: edNotes })
         setEditingPropId(null)
-      } else {
+        setIsNewSongDraft(false)
+      } else if (song) {
         await userApi.createProposal({
           song: song.id, change_type: 'update',
           title: name || song.name, proposed_data: patch, editor_notes: edNotes,
@@ -480,7 +495,7 @@ export default function EditorPage(): JSX.Element {
           <div className="flex items-center justify-center h-40">
             <Loader2 size={18} className="animate-spin text-text-muted" />
           </div>
-        ) : !song ? (
+        ) : !song && !isNewSongDraft ? (
           <div className="flex flex-col items-center justify-center gap-3 h-64 px-6 text-center">
             <div className="w-12 h-12 rounded-2xl bg-surface-overlay border border-[var(--border)] flex items-center justify-center">
               <FileText size={18} className="text-text-muted opacity-65" />
@@ -506,16 +521,16 @@ export default function EditorPage(): JSX.Element {
 
             {/* ── Song header with blurred art ── */}
             <div className="relative overflow-hidden shrink-0">
-              {song.image_url && (
+              {imageUrl && (
                 <img
-                  src={buildImageUrl(song.image_url)} alt=""
+                  src={buildImageUrl(imageUrl)} alt=""
                   className="absolute inset-0 w-full h-full object-cover scale-150 blur-3xl opacity-[0.18] pointer-events-none select-none"
                 />
               )}
               <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to bottom, transparent 0%, var(--surface) 100%)" }} />
               <div className="relative flex items-end gap-3.5 px-4 pt-7 pb-4">
-                {song.image_url
-                  ? <img src={buildImageUrl(song.image_url)} alt=""
+                {imageUrl
+                  ? <img src={buildImageUrl(imageUrl)} alt=""
                       className="w-[60px] h-[60px] rounded-xl object-cover shadow-xl shrink-0 ring-1 ring-white/10" />
                   : <div className="w-[60px] h-[60px] rounded-xl bg-surface-overlay border border-[var(--border)] flex items-center justify-center shrink-0">
                       <Music2 size={22} className="text-text-muted" />
@@ -523,20 +538,20 @@ export default function EditorPage(): JSX.Element {
                 }
                 <div className="min-w-0 flex-1 pb-0.5">
                   <p className="text-text-primary font-bold text-[15px] leading-snug truncate">
-                    {song.track_titles?.[0] || song.name}
+                    {name || song?.track_titles?.[0] || song?.name || 'Untitled'}
                   </p>
                   <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${CAT_BADGE[song.category] || 'bg-surface-overlay text-text-muted'}`}>
-                      {CATEGORY_LABELS[song.category] || song.category}
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${CAT_BADGE[cat] || 'bg-surface-overlay text-text-muted'}`}>
+                      {CATEGORY_LABELS[cat] || cat || 'Uncategorized'}
                     </span>
-                    {song.era?.name && (
-                      <span className="text-text-muted opacity-75 text-[11px] truncate">{song.era.name}</span>
+                    {album && (
+                      <span className="text-text-muted opacity-75 text-[11px] truncate">{album}</span>
                     )}
-                    <span className="text-text-muted opacity-25 text-[11px]">#{song.id}</span>
+                    <span className="text-text-muted opacity-25 text-[11px]">{song ? `#${song.id}` : 'new song'}</span>
                   </div>
                 </div>
                 <button
-                  onClick={() => { setSong(null); setEditingPropId(null) }}
+                  onClick={() => { setSong(null); setEditingPropId(null); setIsNewSongDraft(false) }}
                   className="p-1.5 rounded-lg text-text-muted opacity-30 hover:opacity-100 hover:bg-white/10 transition-colors shrink-0 mb-0.5">
                   <X size={14} />
                 </button>
@@ -581,10 +596,10 @@ export default function EditorPage(): JSX.Element {
               </div>
 
               <SelectRow
-                label="Era" value={eraId} original={song.era?.id ? String(song.era.id) : ''}
+                label="Era" value={eraId} original={song?.era?.id ? String(song.era.id) : ''}
                 onChange={setEraId}
                 options={eras.map(e => ({ value: String(e.id), label: e.name }))}
-                placeholder={song.era?.name || '—'}
+                placeholder={song?.era?.name || '—'}
               />
 
               {/* CREDITS */}

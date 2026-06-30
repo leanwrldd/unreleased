@@ -159,6 +159,22 @@ interface ContextMenuState {
   showPlaylists: boolean
 }
 
+// Hoisted to module scope — defining this inside SongContextMenu's render body
+// would give it a new function identity every render, causing React to
+// unmount/remount every menu item button (and flicker any :hover state) on
+// each re-render rather than just updating it.
+function MenuItem({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }): JSX.Element {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+    >
+      {icon}
+      {label}
+    </button>
+  )
+}
+
 function SongContextMenu({
   state,
   onClose,
@@ -189,6 +205,7 @@ function SongContextMenu({
   const [newName, setNewName] = useState('')
   const [addingToLib, setAddingToLib] = useState(false)
   const [addedToLib, setAddedToLib] = useState(false)
+  const [contained, setContained] = useState<Set<number>>(new Set())
   const el = (window as any).electron
 
   useEffect(() => {
@@ -204,12 +221,27 @@ function SongContextMenu({
     }
   }, [onClose])
 
+  // Check which playlists already contain this song
+  useEffect(() => {
+    if (!account || songId == null || playlists.length === 0) return
+    Promise.all(
+      playlists.map(p =>
+        userApi.getPlaylist(p.id)
+          .then(d => ({ id: p.id, has: (d.items ?? []).some(it => it.song.id === songId) }))
+          .catch(() => ({ id: p.id, has: false }))
+      )
+    ).then(results => {
+      setContained(new Set(results.filter(r => r.has).map(r => r.id)))
+    })
+  }, [playlists, songId, account])
+
   const addTo = async (id: number): Promise<void> => {
     if (songId == null) return
     setBusyId(id)
     try {
       await userApi.addToPlaylist(id, songId)
       setDoneId(id)
+      setContained(prev => new Set([...prev, id]))
       await refreshPlaylists()
     } catch {}
     finally { setBusyId(null) }
@@ -233,16 +265,6 @@ function SongContextMenu({
   const menuHeight = state.showPlaylists ? 320 : 200
   const top = Math.max(8, Math.min(state.y, window.innerHeight - menuHeight - 8))
   const left = Math.max(8, Math.min(state.x, window.innerWidth - menuWidth - 8))
-
-  const MenuItem = ({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }): JSX.Element => (
-    <button
-      onClick={(e) => { e.stopPropagation(); onClick() }}
-      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-    >
-      {icon}
-      {label}
-    </button>
-  )
 
   return (
     <div
@@ -280,18 +302,25 @@ function SongContextMenu({
               {playlists.length === 0 && (
                 <p className="px-3 py-2 text-xs text-text-muted">No playlists yet.</p>
               )}
-              {playlists.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={(e) => { e.stopPropagation(); addTo(p.id) }}
-                  disabled={busyId === p.id}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-                >
-                  <ListMusic size={13} className="shrink-0 text-text-muted" />
-                  <span className="flex-1 truncate text-xs">{p.name}</span>
-                  {busyId === p.id ? <Loader2 size={12} className="animate-spin" /> : doneId === p.id ? <span className="text-accent text-[10px]">✓</span> : null}
-                </button>
-              ))}
+              {playlists.map((p) => {
+                const alreadyIn = contained.has(p.id)
+                return (
+                  <button
+                    key={p.id}
+                    onClick={(e) => { e.stopPropagation(); addTo(p.id) }}
+                    disabled={busyId === p.id}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                  >
+                    <ListMusic size={13} className={`shrink-0 ${alreadyIn ? 'text-accent' : 'text-text-muted'}`} />
+                    <span className="flex-1 truncate text-xs">{p.name}</span>
+                    {busyId === p.id
+                      ? <Loader2 size={12} className="animate-spin" />
+                      : (doneId === p.id || alreadyIn)
+                        ? <Check size={12} className="text-accent shrink-0" />
+                        : null}
+                  </button>
+                )
+              })}
             </div>
           )}
           {account && (

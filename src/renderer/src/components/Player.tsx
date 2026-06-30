@@ -302,6 +302,25 @@ export default function Player(): JSX.Element {
     }
   }, [isPlaying])
 
+  // Mobile background watchdog — browsers can silently pause an audio
+  // element (or never finish a play() call) while the tab is hidden, with
+  // no event firing to tell the app. Periodically nudge it back, and
+  // recheck immediately when the tab regains focus.
+  useEffect(() => {
+    const check = (): void => {
+      if (!isPlaying) return
+      const audio = getActive()
+      if (audio && audio.paused) audio.play().catch(() => {})
+    }
+    const id = setInterval(check, 8000)
+    const onVisible = (): void => { if (document.visibilityState === 'visible') check() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [isPlaying])
+
   // Volume — only change if not mid-crossfade
   useEffect(() => {
     const audio = getActive()
@@ -490,9 +509,17 @@ export default function Player(): JSX.Element {
       // Tell the load useEffect to skip (audio already playing)
       skipNextLoad.current = true
 
+      // Preserve a pause that raced in right at the crossfade boundary —
+      // don't let the queue-advance forcibly resume playback. Since the
+      // active slot just swapped, the [isPlaying] effect won't re-fire if
+      // the value doesn't change (false -> false), so pause explicitly here.
+      const wasPlaying = useStore.getState().isPlaying
+      if (!wasPlaying) na?.pause()
+
       if (wasRadio) {
         // Radio: delegate to nextTrack() which handles queue history + prefetch
         nextTrack()
+        if (!wasPlaying) useStore.setState({ isPlaying: false })
       } else if (targetIdx >= 0 && targetIdx < queue.length) {
         // Normal queue: advance store to the crossfaded-into track
         const track = queue[targetIdx]
@@ -501,7 +528,7 @@ export default function Player(): JSX.Element {
           queueIndex: targetIdx,
           currentTrack: track,
           currentTrackFull: isSameTrack ? useStore.getState().currentTrackFull : null,
-          isPlaying: true,
+          isPlaying: wasPlaying,
         })
       }
       return
