@@ -298,7 +298,16 @@ def step_sync_web(version):
     try:
         run(f"git checkout {WEB_BRANCH}")
 
-        # Pull only the web-safe directories from app branch
+        # Pull only the web-safe directories from app branch.
+        #   `git checkout app -- src/` copies files that EXIST in app but does
+        #   NOT remove files that were DELETED in app — they'd linger on web
+        #   forever. So first delete files that app no longer has, then restore.
+        deleted = capture(
+            f"git diff --diff-filter=D --name-only {WEB_BRANCH} {APP_BRANCH} -- src/"
+        ).splitlines()
+        for f in deleted:
+            if f.strip():
+                run(f'git rm -q --ignore-unmatch "{f.strip()}"', check=False)
         run(f"git checkout {APP_BRANCH} -- src/ package.json package-lock.json")
 
         if not is_dirty():
