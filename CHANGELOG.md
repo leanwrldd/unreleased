@@ -18,6 +18,18 @@ All notable changes to this project are documented here.
 
 ---
 
+## [1.10.6] — 2026-07-01
+
+- **New** WRLD view: "···" context menu on the current track (Apple Music-style)
+- **New** WRLD view: synced lyrics scroll with a smooth GPU-composited animation instead of choppy native smooth-scroll
+- **Fix** Discord Rich Presence showed a bogus ticking timer while paused — now switches activity type correctly
+- **Fix** Lyrics could leak from one song to another when the API's `?song=` filter was ignored
+- **Fix** Shuffle could play a different track than the one shown as "up next" during crossfade
+- **Fix** Editor song edits / proposal approvals could be momentarily clobbered by a race with the currently-playing track prefill
+- **Improve** Lyrics are now cached per session — fewer redundant API calls on replay
+
+---
+
 ## [1.8.9 – 1.10.5] — 2026-06-26 to 2026-06-30
 
 - **New** Discord Rich Presence — shows your currently playing track (or 999 FM stream) on your Discord profile, with a live progress bar; toggle in Settings
