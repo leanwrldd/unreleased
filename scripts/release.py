@@ -6,15 +6,14 @@ Just run it — no arguments needed.
 
 Steps:
   1. Pick a version (bump patch / minor / major, or keep / custom)
-  2. Enter in-app changelog entries (prepended to changelog.ts)
-  3. Commit all changes to the desktop branch (app)
-  4. Build the renderer + Electron installer
-  5. Push the desktop branch to GitHub
-  6. Sync the web branch (copies src/ + package.json from app, skips electron/)
-  7. Create the GitHub release and upload all assets
+  2. Commit all changes to the desktop branch (app)
+  3. Build the renderer + Electron installer
+  4. Push the desktop branch to GitHub
+  5. Sync the web branch (copies src/ + package.json from app, skips electron/)
+  6. Create the GitHub release and upload all assets
 """
 
-import os, sys, re, json, subprocess, time, urllib.request, urllib.error, urllib.parse, datetime
+import os, sys, re, json, subprocess, time, urllib.request, urllib.error, urllib.parse
 if hasattr(sys.stdout, "reconfigure"): sys.stdout.reconfigure(encoding="utf-8")
 if hasattr(sys.stderr, "reconfigure"): sys.stderr.reconfigure(encoding="utf-8")
 
@@ -203,8 +202,7 @@ def upload_asset(release_id, filepath, token):
 
 # ── Steps ─────────────────────────────────────────────────────────────────────
 
-TOTAL = 7
-CHANGELOG_PATH = ROOT / "src" / "renderer" / "src" / "lib" / "changelog.ts"
+TOTAL = 6
 
 def step_version():
     section(1, TOTAL, "Version")
@@ -240,86 +238,8 @@ def step_version():
     return new_ver
 
 
-def _parse_entry(line: str):
-    """Return (type, text) from a prefixed line, or None if blank."""
-    line = line.strip()
-    if not line:
-        return None
-    m = re.match(r'^(\+|new:?|n:?)\s*(.*)', line, re.IGNORECASE)
-    if m: return ('new',     m.group(2).strip())
-    m = re.match(r'^(\*|fix:?|f:?)\s*(.*)', line, re.IGNORECASE)
-    if m: return ('fix',     m.group(2).strip())
-    m = re.match(r'^(\^|imp(?:rove)?:?|i:?)\s*(.*)', line, re.IGNORECASE)
-    if m: return ('improve', m.group(2).strip())
-    return ('new', line)   # no prefix → default to 'new'
-
-
-def step_changelog(version):
-    section(2, TOTAL, "In-app changelog")
-    today = datetime.date.today().isoformat()
-    info(f"Date: {today}   Version: {version}")
-    print()
-    print(_c("    Prefix legend:", DIM))
-    print(_c("      +  /  new:   →  new feature", DIM))
-    print(_c("      *  /  fix:   →  bug fix", DIM))
-    print(_c("      ^  /  imp:   →  improvement", DIM))
-    print(_c("    (enter a blank line when done)", DIM))
-    print()
-
-    changes = []
-    while True:
-        try:
-            raw = input(_c("    entry: ", CYN)).strip()
-        except KeyboardInterrupt:
-            print(); die("Cancelled.")
-        if not raw:
-            break
-        parsed = _parse_entry(raw)
-        if parsed:
-            typ, text = parsed
-            if text:
-                changes.append((typ, text))
-                label = {'new': _c('new',     GRN), 'fix': _c('fix',     YLW), 'improve': _c('imp', CYN)}[typ]
-                print(_c(f"    [{label}] {text}", DIM))
-
-    if not changes:
-        warn("No entries — changelog.ts not modified.")
-        return []
-
-    # Build the TypeScript block to prepend
-    lines = []
-    for typ, text in changes:
-        padding = ' ' * (7 - len(typ))
-        safe = text.replace("\\", "\\\\").replace("'", "\\'")
-        lines.append(f"      {{ type: '{typ}',{padding}text: '{safe}' }},")
-
-    new_entry = (
-        f"  {{\n"
-        f"    version: '{version}',\n"
-        f"    date: '{today}',\n"
-        f"    changes: [\n"
-        + "\n".join(lines) + "\n"
-        f"    ],\n"
-        f"  }},"
-    )
-
-    marker = "export const CHANGELOG: ChangelogEntry[] = ["
-    src = CHANGELOG_PATH.read_text(encoding='utf-8-sig')
-    idx = src.find(marker)
-    if idx < 0:
-        die("Cannot find CHANGELOG array in changelog.ts")
-
-    insert_at = idx + len(marker)
-    CHANGELOG_PATH.write_text(
-        src[:insert_at] + "\n" + new_entry + src[insert_at:],
-        encoding='utf-8-sig'
-    )
-    ok(f"changelog.ts — added {len(changes)} entr{'y' if len(changes)==1 else 'ies'} for v{version}")
-    return changes
-
-
 def step_commit(version):
-    section(3, TOTAL, f"Commit → {APP_BRANCH}")
+    section(2, TOTAL, f"Commit → {APP_BRANCH}")
 
     if git_branch() != APP_BRANCH:
         info(f"Switching to {APP_BRANCH}")
@@ -338,7 +258,7 @@ def step_commit(version):
 
 
 def step_build():
-    section(4, TOTAL, "Build Electron app")
+    section(3, TOTAL, "Build Electron app")
     warn("This takes ~2 minutes — output streams below")
     print()
 
@@ -366,13 +286,13 @@ def step_build():
 
 
 def step_push_app():
-    section(5, TOTAL, f"Push → origin/{APP_BRANCH}")
+    section(4, TOTAL, f"Push → origin/{APP_BRANCH}")
     run(f"git push origin {APP_BRANCH}")
     ok(f"Pushed to origin/{APP_BRANCH}")
 
 
 def step_sync_web(version):
-    section(6, TOTAL, f"Sync → {WEB_BRANCH}  (electron/ excluded)")
+    section(5, TOTAL, f"Sync → {WEB_BRANCH}  (electron/ excluded)")
 
     original = git_branch()
     try:
@@ -404,7 +324,7 @@ def step_sync_web(version):
 
 
 def step_release(version, token):
-    section(7, TOTAL, "GitHub release")
+    section(6, TOTAL, "GitHub release")
     tag         = f"v{version}"
     release_dir = ROOT / "release"
 
@@ -479,7 +399,6 @@ def main():
     try:
         token   = get_token()
         version = step_version()
-        step_changelog(version)
         step_commit(version)
         step_build()
         step_push_app()
