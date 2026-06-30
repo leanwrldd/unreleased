@@ -17,6 +17,22 @@ All notable changes to this project are documented here.
 - **Fix** Local playlists: context menus were invisible due to overflow clipping — fixed with portal rendering
 
 ---
+
+## [1.8.9 – 1.10.5] — 2026-06-26 to 2026-06-30
+
+- **New** Discord Rich Presence — shows your currently playing track (or 999 FM stream) on your Discord profile, with a live progress bar; toggle in Settings
+- **New** Albums Admin view — add, edit, and reorder albums, versions, and tracklists
+- **New** "Propose new song" flow for editors — submit full song details for admin review
+- **New** Virtualized scrolling for large song/album lists — fixes slowdowns with thousands of tracks
+- **New** 999 FM: mobile background watchdog keeps playback alive when the tab/app is backgrounded
+- **New** Shuffle now reshuffles the upcoming queue each time a track starts
+- **New** Synced lyrics animate smoothly instead of jumping in chunks
+- **Fix** Crossfade/pause race conditions that could leave audio playing after pause
+- **Fix** Stale track info "bleeding into" the next song on fast skips
+- **Fix** 999 FM vote popup sometimes failed to reopen or reset your vote unexpectedly
+- **Fix** Editor proposal "Additional info" field overwrote the wrong data on submit
+
+---
 ## [1.7.3] — 2026-06-22
 
 - **Fix** Mobile lock screen now shows track title, artist, and cover art via Media Session API
