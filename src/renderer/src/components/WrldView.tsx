@@ -617,15 +617,18 @@ export default function WrldView(): JSX.Element {
                       : <SkipBack size={26} fill="currentColor" />}
                   </button>
 
-                  {/* Play / Pause */}
+                  {/* Play / Pause — disabled during 999FM, live stream can't be locally paused */}
                   <button
                     onClick={() => setIsPlaying(!isPlaying)}
-                    className="w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-opacity hover:opacity-80 active:scale-95"
+                    disabled={radioFmActive}
+                    className="w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-opacity hover:opacity-80 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:opacity-30"
                     style={{ background: txtPri, color: textIsDark ? 'white' : 'black' }}
                   >
-                    {isPlaying
+                    {radioFmActive
                       ? <Pause size={24} fill="currentColor" />
-                      : <Play  size={24} fill="currentColor" className="ml-0.5" />}
+                      : isPlaying
+                        ? <Pause size={24} fill="currentColor" />
+                        : <Play  size={24} fill="currentColor" className="ml-0.5" />}
                   </button>
 
                   {/* Next */}
@@ -948,7 +951,7 @@ const LyricsPanel = memo(function LyricsPanel({
                     color:      isActive ? txtPri : txtSec,
                     opacity:    isActive ? 1 : dist === 1 ? 0.55 : dist === 2 ? 0.35 : 0.2,
                     filter:     (!isActive && !isPast && dist >= 2) ? 'blur(0.6px)' : 'none',
-                    transition: 'opacity 0.45s ease, color 0.45s ease, font-size 0.3s ease, font-weight 0.3s ease, filter 0.45s ease',
+                    transition: 'opacity 0.4s cubic-bezier(0.4,0,0.2,1), color 0.4s cubic-bezier(0.4,0,0.2,1), font-size 0.4s cubic-bezier(0.4,0,0.2,1), font-weight 0.4s cubic-bezier(0.4,0,0.2,1), filter 0.4s cubic-bezier(0.4,0,0.2,1)',
                     textShadow: isActive ? '0 0 30px rgba(255,255,255,0.12)' : 'none',
                   }}
                 >

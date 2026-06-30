@@ -129,6 +129,21 @@ export class RadioStreamClient {
     return this.send({ type: 'vote', value })
   }
 
+  // Recovery nudge for mobile background tabs — browsers can silently close
+  // the websocket and/or pause the audio element while hidden, without firing
+  // the events this class normally reacts to. Safe to call repeatedly: it's a
+  // no-op when the connection/audio are already healthy.
+  checkHealth(): void {
+    if (!this.shouldReconnect) return
+    if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+      if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null }
+      this.open()
+    }
+    if (this.listening && this.audioEl?.paused) {
+      this.audioEl.play().catch(() => {})
+    }
+  }
+
   private scheduleReconnect(): void {
     if (!this.shouldReconnect) return
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer)
