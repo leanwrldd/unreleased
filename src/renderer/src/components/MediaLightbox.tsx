@@ -16,7 +16,9 @@ interface Props {
 
 export default function MediaLightbox({ items, index, onClose, onNav }: Props): JSX.Element | null {
   const [videoError, setVideoError] = useState(false)
-  const isElectron = !!(window as any).electron
+  // Matches App.tsx's check (which decides whether WindowControls renders) so
+  // this never disagrees with whether the title-bar buttons are actually there.
+  const isElectron = navigator.userAgent.includes('Electron')
   const item = items[index]
 
   // Reset video error when item changes

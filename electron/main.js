@@ -438,6 +438,27 @@ function formatTime(ms) {
   return `${min}:${sec}.${msRem}`
 }
 
+// Reverse of the [mm:ss.mmm]text reading above — parses LRC-style text back
+// into the {text, timeStamp} list a SYLT (synchronised lyrics) ID3 frame
+// needs. Mirrors the renderer's parseLrc() regex (lib/lyrics.ts) so anything
+// the app considers valid synced lyrics round-trips through writing too.
+function parseLrcToSylt(lrc) {
+  const timeRegex = /\[(\d{1,2}):(\d{2})[.:](\d{2,3})\]/g
+  const lines = []
+  for (const rawLine of lrc.split(/\r?\n/)) {
+    const matches = [...rawLine.matchAll(timeRegex)]
+    if (matches.length === 0) continue
+    const text = rawLine.replace(timeRegex, '').trim()
+    for (const match of matches) {
+      const min = parseInt(match[1], 10)
+      const sec = parseInt(match[2], 10)
+      const ms = parseInt(match[3].padEnd(3, '0'), 10)
+      lines.push({ text, timeStamp: (min * 60 + sec) * 1000 + ms })
+    }
+  }
+  return lines.sort((a, b) => a.timeStamp - b.timeStamp)
+}
+
 ipcMain.handle('write-track-metadata', async (_, filePath, metadata) => {
   const ext = path.extname(filePath).toLowerCase()
   if (ext !== '.mp3') return { error: 'Only MP3 metadata writing is supported currently' }
@@ -454,6 +475,16 @@ ipcMain.handle('write-track-metadata', async (_, filePath, metadata) => {
     if (metadata.composer !== undefined) tags.composer = metadata.composer
     if (metadata.genre !== undefined) tags.genre = metadata.genre
     if (metadata.lyrics !== undefined) tags.unsynchronisedLyrics = { language: 'eng', text: metadata.lyrics }
+    if (metadata.syncedLyrics !== undefined) {
+      const synced = parseLrcToSylt(metadata.syncedLyrics || '')
+      tags.synchronisedLyrics = synced.length ? [{
+        language: 'eng',
+        timeStampFormat: NodeID3.TagConstants.TimeStampFormat.MILLISECONDS,
+        contentType: NodeID3.TagConstants.SynchronisedLyrics.ContentType.LYRICS,
+        shortText: 'Synced lyrics',
+        synchronisedText: synced,
+      }] : []
+    }
     if (metadata.albumArtBase64 !== undefined && metadata.albumArtBase64) {
       // albumArtBase64 is a data URL: "data:<mime>;base64,<data>"
       const match = metadata.albumArtBase64.match(/^data:([^;]+);base64,(.+)$/)

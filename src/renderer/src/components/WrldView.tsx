@@ -584,6 +584,112 @@ export default function WrldView(): JSX.Element {
               ? (fmTab === 'radio' ? FmRadioPanel() : <LyricsPanel rawLyrics={rawLyrics} isSynced={isSynced} syncedLines={syncedLines} radioFmActive={radioFmActive} currentTrack={currentTrack} isEditor={isEditor} txtPri={txtPri} txtSec={txtSec} txtTer={txtTer} txtFaint={txtFaint} />)
               : <LyricsPanel rawLyrics={rawLyrics} isSynced={isSynced} syncedLines={syncedLines} radioFmActive={radioFmActive} currentTrack={currentTrack} isEditor={isEditor} txtPri={txtPri} txtSec={txtSec} txtTer={txtTer} txtFaint={txtFaint} />
             }
+
+            {/* Mobile playback bar — the bottom Player bar is hidden on this
+                page, and the mobile layout never had its own controls, so
+                this is the only way to control playback here. FM has no
+                local play/pause/seek, so that mode is volume-only. */}
+            <div className="shrink-0 px-4 pt-2" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}>
+              {!radioFmActive && (
+                <>
+                  <ProgressBar txtPri={txtPri} txtTer={txtTer} />
+                  <div className="flex items-center justify-between mt-2 mb-1">
+                    <button
+                      onClick={toggleShuffle}
+                      title={shuffle ? 'Shuffle on' : 'Shuffle off'}
+                      className="p-2 rounded-full transition-colors"
+                      style={{ color: shuffle ? txtPri : txtTer, opacity: shuffle ? 1 : 0.6 }}
+                    >
+                      <Shuffle size={16} />
+                    </button>
+                    <button
+                      onClick={() => prevTrack()}
+                      className="p-2 rounded-full transition-opacity hover:opacity-70"
+                      style={{ color: txtPri }}
+                      title="Previous"
+                    >
+                      <SkipBack size={24} fill="currentColor" />
+                    </button>
+                    <button
+                      onClick={() => setIsPlaying(!isPlaying)}
+                      className="w-12 h-12 rounded-full flex items-center justify-center shadow-xl transition-opacity hover:opacity-80 active:scale-95"
+                      style={{ background: txtPri, color: textIsDark ? 'white' : 'black' }}
+                    >
+                      {isPlaying
+                        ? <Pause size={20} fill="currentColor" />
+                        : <Play  size={20} fill="currentColor" className="ml-0.5" />}
+                    </button>
+                    <button
+                      onClick={() => nextTrack()}
+                      className="p-2 rounded-full transition-opacity hover:opacity-70"
+                      style={{ color: txtPri }}
+                      title="Next"
+                    >
+                      <SkipFwd size={24} fill="currentColor" />
+                    </button>
+                    <button
+                      onClick={toggleRepeat}
+                      title={repeat === 'none' ? 'No repeat' : repeat === 'all' ? 'Repeat all' : 'Repeat one'}
+                      className="p-2 rounded-full transition-colors"
+                      style={{ color: repeat !== 'none' ? txtPri : txtTer, opacity: repeat !== 'none' ? 1 : 0.6 }}
+                    >
+                      {repeat === 'one' ? <Repeat1 size={16} /> : <Repeat size={16} />}
+                    </button>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center gap-2.5">
+                <button
+                  onClick={() => setVolume(volume === 0 ? 0.5 : 0)}
+                  className="shrink-0 transition-opacity hover:opacity-70"
+                  style={{ color: txtTer }}
+                >
+                  {volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                </button>
+                <div className="relative flex-1 h-1 rounded-full cursor-pointer group/vol"
+                  style={{ background: 'rgba(255,255,255,0.18)' }}
+                  onMouseDown={e => {
+                    const track = e.currentTarget
+                    const compute = (clientX: number) => {
+                      const rect = track.getBoundingClientRect()
+                      setVolume(Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)))
+                    }
+                    compute(e.clientX)
+                    const onMove = (ev: MouseEvent) => compute(ev.clientX)
+                    const onUp = () => {
+                      document.removeEventListener('mousemove', onMove)
+                      document.removeEventListener('mouseup', onUp)
+                    }
+                    document.addEventListener('mousemove', onMove)
+                    document.addEventListener('mouseup', onUp)
+                  }}
+                  onTouchStart={e => {
+                    const track = e.currentTarget
+                    const compute = (clientX: number) => {
+                      const rect = track.getBoundingClientRect()
+                      setVolume(Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)))
+                    }
+                    compute(e.touches[0].clientX)
+                    const onMove = (ev: TouchEvent) => compute(ev.touches[0].clientX)
+                    const onEnd = () => {
+                      document.removeEventListener('touchmove', onMove)
+                      document.removeEventListener('touchend', onEnd)
+                    }
+                    document.addEventListener('touchmove', onMove)
+                    document.addEventListener('touchend', onEnd)
+                  }}
+                >
+                  <div className="h-full rounded-full" style={{ width: `${volume * 100}%`, background: txtTer }} />
+                  <div
+                    className="absolute top-1/2 w-3 h-3 rounded-full shadow-lg opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
+                    style={{ left: `${volume * 100}%`, transform: 'translate(-50%, -50%)', background: txtPri }}
+                  />
+                </div>
+                <span className="shrink-0 text-[11px] tabular-nums w-8 text-right" style={{ color: txtTer }}>
+                  {Math.round(volume * 100)}%
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Desktop layout */}
@@ -618,74 +724,63 @@ export default function WrldView(): JSX.Element {
 
               {/* Playback controls */}
               <div className="w-full flex flex-col gap-4" style={{ maxWidth: 320 }}>
-                {/* Main controls row */}
+                {/* Main controls row — hidden during 999FM; it's a live stream,
+                    nothing here to locally play/pause/seek. Voting to skip
+                    lives in the FM panel itself instead of a repurposed button. */}
+                {!radioFmActive && (
                 <div className="flex items-center justify-between">
                   {/* Shuffle */}
-                  {!radioFmActive && (
-                    <button
-                      onClick={toggleShuffle}
-                      title={shuffle ? 'Shuffle on' : 'Shuffle off'}
-                      className="p-2 rounded-full transition-colors"
-                      style={{ color: shuffle ? txtPri : txtTer, opacity: shuffle ? 1 : 0.6 }}
-                    >
-                      <Shuffle size={16} />
-                    </button>
-                  )}
+                  <button
+                    onClick={toggleShuffle}
+                    title={shuffle ? 'Shuffle on' : 'Shuffle off'}
+                    className="p-2 rounded-full transition-colors"
+                    style={{ color: shuffle ? txtPri : txtTer, opacity: shuffle ? 1 : 0.6 }}
+                  >
+                    <Shuffle size={16} />
+                  </button>
 
                   {/* Prev */}
                   <button
-                    onClick={() => radioFmActive ? getActiveRadioClient()?.proposeSkip() : prevTrack()}
+                    onClick={() => prevTrack()}
                     className="p-2 rounded-full transition-opacity hover:opacity-70"
                     style={{ color: txtPri }}
-                    title={radioFmActive ? 'Vote to skip' : 'Previous'}
+                    title="Previous"
                   >
-                    {radioFmActive
-                      ? <SkipForward size={26} />
-                      : <SkipBack size={26} fill="currentColor" />}
+                    <SkipBack size={26} fill="currentColor" />
                   </button>
 
-                  {/* Play / Pause — disabled during 999FM, live stream can't be locally paused */}
+                  {/* Play / Pause */}
                   <button
                     onClick={() => setIsPlaying(!isPlaying)}
-                    disabled={radioFmActive}
-                    className="w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-opacity hover:opacity-80 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:opacity-30"
+                    className="w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-opacity hover:opacity-80 active:scale-95"
                     style={{ background: txtPri, color: textIsDark ? 'white' : 'black' }}
                   >
-                    {radioFmActive
+                    {isPlaying
                       ? <Pause size={24} fill="currentColor" />
-                      : isPlaying
-                        ? <Pause size={24} fill="currentColor" />
-                        : <Play  size={24} fill="currentColor" className="ml-0.5" />}
+                      : <Play  size={24} fill="currentColor" className="ml-0.5" />}
                   </button>
 
                   {/* Next */}
-                  {!radioFmActive && (
-                    <button
-                      onClick={() => nextTrack()}
-                      className="p-2 rounded-full transition-opacity hover:opacity-70"
-                      style={{ color: txtPri }}
-                      title="Next"
-                    >
-                      <SkipFwd size={26} fill="currentColor" />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => nextTrack()}
+                    className="p-2 rounded-full transition-opacity hover:opacity-70"
+                    style={{ color: txtPri }}
+                    title="Next"
+                  >
+                    <SkipFwd size={26} fill="currentColor" />
+                  </button>
 
                   {/* Repeat */}
-                  {!radioFmActive && (
-                    <button
-                      onClick={toggleRepeat}
-                      title={repeat === 'none' ? 'No repeat' : repeat === 'all' ? 'Repeat all' : 'Repeat one'}
-                      className="p-2 rounded-full transition-colors"
-                      style={{ color: repeat !== 'none' ? txtPri : txtTer, opacity: repeat !== 'none' ? 1 : 0.6 }}
-                    >
-                      {repeat === 'one' ? <Repeat1 size={16} /> : <Repeat size={16} />}
-                    </button>
-                  )}
-
-                  {/* FM spacers to keep play button centered */}
-                  {radioFmActive && <div className="w-10" />}
-                  {radioFmActive && <div className="w-10" />}
+                  <button
+                    onClick={toggleRepeat}
+                    title={repeat === 'none' ? 'No repeat' : repeat === 'all' ? 'Repeat all' : 'Repeat one'}
+                    className="p-2 rounded-full transition-colors"
+                    style={{ color: repeat !== 'none' ? txtPri : txtTer, opacity: repeat !== 'none' ? 1 : 0.6 }}
+                  >
+                    {repeat === 'one' ? <Repeat1 size={16} /> : <Repeat size={16} />}
+                  </button>
                 </div>
+                )}
 
                 {/* Volume row */}
                 <div className="flex items-center gap-2.5">

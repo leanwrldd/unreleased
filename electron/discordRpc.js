@@ -67,8 +67,19 @@ async function connect() {
 async function applyOp(op) {
   if (!connected || !client?.user) { pendingOp = op; return }
   try {
-    if (op.clear) await client.user.clearActivity()
-    else await client.user.setActivity(op.activity)
+    if (op.clear) {
+      await client.user.clearActivity()
+      return
+    }
+    // Discord's client can retain the previous activity's start/end
+    // timestamps when a later SET_ACTIVITY simply omits them, instead of
+    // fully replacing — observed as a paused track showing its elapsed
+    // timer keep ticking up (looking like the song had just restarted).
+    // Force a real reset first whenever this update has no timestamps.
+    if (op.activity.startTimestamp == null && op.activity.endTimestamp == null) {
+      await client.user.clearActivity().catch(() => {})
+    }
+    await client.user.setActivity(op.activity)
   } catch {
     // Activity updates can race a disconnect — ignore, next call will retry.
   }
