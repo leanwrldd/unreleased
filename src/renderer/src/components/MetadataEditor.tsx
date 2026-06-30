@@ -139,6 +139,7 @@ export default function MetadataEditor({ track, onClose, onSaved }: MetadataEdit
         trackNumber: fields.trackNumber ? parseInt(fields.trackNumber) : null,
         composer: fields.composer, genre: fields.genre,
         lyrics: fields.lyrics,
+        syncedLyrics: fields.syncedLyrics,
         albumArtBase64: fields.albumArt,
       })
       if (result.error) { setError(result.error); return }
