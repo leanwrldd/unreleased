@@ -503,9 +503,15 @@ export async function getApprovedSyncedLyrics(songId: number, isAdmin: boolean):
     url.searchParams.set('status', 'approved')
     const proposals: SongEditProposal[] = await request(url.toString(), { method: 'GET' })
     if (!Array.isArray(proposals)) return null
-    // Find the most recent approved proposal that has synced_lyrics in applied_data
+    // Find the most recent approved proposal that has synced_lyrics in applied_data.
+    // Crucially, verify the proposal actually belongs to THIS song: the `?song=`
+    // query filter can't be relied on (when the API ignores it, every song with
+    // no proposal of its own would inherit the latest approved synced lyrics from
+    // some other song). Match on either id field the backend may use.
     const sorted = proposals
-      .filter(p => p.status === 'approved' && p.applied_data && 'synced_lyrics' in p.applied_data)
+      .filter(p =>
+        (p.song === songId || p.song_public_id === songId) &&
+        p.status === 'approved' && p.applied_data && 'synced_lyrics' in p.applied_data)
       .sort((a, b) => new Date(b.reviewed_at || 0).getTime() - new Date(a.reviewed_at || 0).getTime())
     if (sorted.length === 0) return null
     const val = sorted[0].applied_data['synced_lyrics']

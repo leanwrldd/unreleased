@@ -129,7 +129,12 @@ function setNowPlaying(info) {
   if (!info || !info.title) { clearActivity(); return }
 
   const activity = {
-    type: ActivityType.Listening,
+    // Discord renders a Spotify-style live time-bar for Listening activities.
+    // When we don't supply real timestamps (paused — see below), it falls
+    // back to showing time elapsed since the activity was last set, which
+    // looks like an unrelated ticking counter. Playing doesn't get that
+    // fallback treatment, so use it while paused to avoid the bogus timer.
+    type: info.isPlaying ? ActivityType.Listening : ActivityType.Playing,
     details: info.title,
     state: info.artist || undefined,
     largeImageKey: LARGE_IMAGE_KEY,
