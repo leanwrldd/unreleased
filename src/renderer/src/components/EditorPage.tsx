@@ -192,6 +192,7 @@ export default function EditorPage(): JSX.Element {
   const [loc,      setLoc]      = useState('')
   const [recDate,  setRecDate]  = useState('')
   const [relDate,  setRelDate]  = useState('')
+  const [previewDate, setPreviewDate] = useState('')
   const [leak,     setLeak]     = useState('')
   const [lyrics,   setLyrics]   = useState('')
   const [synced,   setSynced]   = useState('')
@@ -200,8 +201,10 @@ export default function EditorPage(): JSX.Element {
   const [edNotes,  setEdNotes]  = useState('')
 
   const [imageUrl,          setImageUrl]          = useState('')
+  const [filePath,          setFilePath]          = useState('')
   const [altNames,          setAltNames]          = useState('')
   const [fileNames,         setFileNames]         = useState('')
+  const [instrumentals,     setInstrumentals]     = useState('')
   const [instrumentalNames, setInstrumentalNames] = useState('')
 
   const [lyricsTab,    setLyricsTab]    = useState<LyricsTab>('lyrics')
@@ -227,14 +230,17 @@ export default function EditorPage(): JSX.Element {
       recording_locations:    s.recording_locations || '',
       record_dates:           s.record_dates || '',
       release_date:           cleanDate(s.release_date),
+      preview_date:           cleanDate(s.preview_date),
       leak_type:              s.leak_type || '',
       lyrics:                 s.lyrics || '',
       synced_lyrics:          s.synced_lyrics || '',
       additional_information: s.additional_information || '',
       notes:                  s.notes || '',
       image_url:              s.image_url || '',
+      path:                   s.path || '',
       track_titles:           s.track_titles || [],
       file_names:             s.file_names || '',
+      instrumentals:          s.instrumentals || '',
       instrumental_names:     s.instrumental_names || '',
     }
   }
@@ -250,14 +256,17 @@ export default function EditorPage(): JSX.Element {
     setLoc(s.recording_locations || '')
     setRecDate(s.record_dates || '')
     setRelDate(cleanDate(s.release_date))
+    setPreviewDate(cleanDate(s.preview_date))
     setLeak(s.leak_type || '')
     setLyrics(s.lyrics || '')
     setSynced(s.synced_lyrics || '')
     setAddInfo(s.additional_information || '')
     setNotes(s.notes || '')
     setImageUrl(s.image_url || '')
+    setFilePath(s.path || '')
     setAltNames((s.track_titles || []).join('\n'))
     setFileNames(s.file_names || '')
+    setInstrumentals(s.instrumentals || '')
     setInstrumentalNames(s.instrumental_names || '')
     setEdNotes('')
     setSubmitState('idle')
@@ -288,11 +297,15 @@ export default function EditorPage(): JSX.Element {
   }, [pendingEditorSongId, isEditor, setPendingEditorSongId, loadSong])
 
   useEffect(() => {
-    if (!isEditor || song || pendingEditorSongId) return
+    // Don't hijack a new-song draft (or an about-to-be-applied edit proposal)
+    // with whatever happens to be playing — this raced with the
+    // pendingEditProposal effect below and clobbered the draft once the
+    // currently-playing track's fetch resolved a moment later.
+    if (!isEditor || song || pendingEditorSongId || isNewSongDraft || pendingEditProposal) return
     if (!currentTrack) return
     const id = userApi.trackIdToSongId(currentTrack.id)
     if (id) loadSong(id)
-  }, [isEditor, song, currentTrack, pendingEditorSongId, loadSong])
+  }, [isEditor, song, currentTrack, pendingEditorSongId, isNewSongDraft, pendingEditProposal, loadSong])
 
   useEffect(() => {
     if (!pendingEditProposal || !isEditor) return
@@ -311,14 +324,17 @@ export default function EditorPage(): JSX.Element {
       if ('recording_locations' in d)    setLoc(String(d.recording_locations ?? ''))
       if ('record_dates' in d)           setRecDate(String(d.record_dates ?? ''))
       if ('release_date' in d)           setRelDate(String(d.release_date ?? ''))
+      if ('preview_date' in d)           setPreviewDate(String(d.preview_date ?? ''))
       if ('leak_type' in d)              setLeak(String(d.leak_type ?? ''))
       if ('lyrics' in d)                 setLyrics(String(d.lyrics ?? ''))
       if ('synced_lyrics' in d)           setSynced(String(d.synced_lyrics ?? ''))
       if ('additional_information' in d) setAddInfo(String(d.additional_information ?? ''))
       if ('notes' in d)                  setNotes(String(d.notes ?? ''))
       if ('image_url' in d)              setImageUrl(String(d.image_url ?? ''))
+      if ('path' in d)                   setFilePath(String(d.path ?? ''))
       if ('track_titles' in d)           setAltNames(Array.isArray(d.track_titles) ? (d.track_titles as string[]).join('\n') : String(d.track_titles ?? ''))
       if ('file_names' in d)             setFileNames(String(d.file_names ?? ''))
+      if ('instrumentals' in d)          setInstrumentals(String(d.instrumentals ?? ''))
       if ('instrumental_names' in d)     setInstrumentalNames(String(d.instrumental_names ?? ''))
       setEdNotes(editorNotes)
     }
@@ -348,12 +364,14 @@ export default function EditorPage(): JSX.Element {
     era_id: eraId ? Number(eraId) : '',
     producers: prod, engineers: eng,
     recording_locations: loc, record_dates: recDate,
-    release_date: relDate, leak_type: leak,
+    release_date: relDate, preview_date: previewDate, leak_type: leak,
     lyrics, synced_lyrics: synced,
     additional_information: addInfo, notes,
     image_url: imageUrl,
+    path: filePath,
     track_titles: altNames ? altNames.split('\n').map(s => s.trim()).filter(Boolean) : [],
     file_names: fileNames,
+    instrumentals,
     instrumental_names: instrumentalNames,
   }
   const patch        = diff(baseline(song), current)
@@ -567,6 +585,7 @@ export default function EditorPage(): JSX.Element {
               <FieldRow label="Artists"  value={artists}  original={String(base.credited_artists || '')} onChange={setArtists} />
               <FieldRow label="Album"    value={album}    original={String(base.album || '')}   onChange={setAlbum} />
               <FieldRow label="Cover URL" value={imageUrl} original={String(base.image_url || '')} onChange={setImageUrl} placeholder="https://…" />
+              <FieldRow label="File URL"  value={filePath} original={String(base.path || '')}      onChange={setFilePath} placeholder="Path/URL to the audio file" />
               <TextareaRow
                 label="Alt names" value={altNames}
                 original={(Array.isArray(base.track_titles) ? (base.track_titles as string[]).join('\n') : '')}
@@ -610,6 +629,7 @@ export default function EditorPage(): JSX.Element {
               <SectionLabel label="Dates" />
               <FieldRow label="Recorded"  value={recDate} original={String(base.record_dates || '')}  onChange={setRecDate} placeholder="YYYY-MM-DD" />
               <FieldRow label="Released"  value={relDate} original={String(base.release_date || '')}  onChange={setRelDate} placeholder="YYYY-MM-DD" />
+              <FieldRow label="Preview"   value={previewDate} original={String(base.preview_date || '')} onChange={setPreviewDate} placeholder="YYYY-MM-DD" />
 
               {/* More fields */}
               <button
@@ -625,6 +645,7 @@ export default function EditorPage(): JSX.Element {
                   <FieldRow label="Location"   value={loc}              original={String(base.recording_locations || '')}   onChange={setLoc} placeholder="Studio / city" />
                   <FieldRow label="Leak type"  value={leak}             original={String(base.leak_type || '')}             onChange={setLeak} placeholder="HQ, LQ, snippet…" />
                   <FieldRow label="File names" value={fileNames}        original={String(base.file_names || '')}            onChange={setFileNames} />
+                  <FieldRow label="Instrumentals" value={instrumentals} original={String(base.instrumentals || '')}       onChange={setInstrumentals} placeholder="Instrumental versions available" />
                   <FieldRow label="Inst. names" value={instrumentalNames} original={String(base.instrumental_names || '')} onChange={setInstrumentalNames} />
                   <div className="pt-2 space-y-2">
                     <TextareaRow label="Add. info" value={addInfo} original={String(base.additional_information || '')} onChange={setAddInfo} rows={3} />

@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useMemo } from 'react'
+import React, { useEffect, useRef, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
 import { useStore } from '../store/useStore'
-import { seekAudio } from './Player'
+import { seekAudio, getAudioCurrentTime } from './Player'
 
 export default function LyricsDisplay(): JSX.Element {
   const { currentTrackFull, account } = useStore(useShallow(s => ({
@@ -24,12 +24,31 @@ export default function LyricsDisplay(): JSX.Element {
     return []
   }, [rawLyrics, isSynced])
 
-  // Selector returns the line INDEX so Zustand only re-renders when the line changes,
-  // not on every audio tick. This is what caused the blinking.
-  const currentLineIdx = useStore(s => {
-    if (!isSynced || syncedLines.length === 0) return -1
-    return getCurrentLineIndex(syncedLines, s.currentTime)
-  })
+  // Driven by requestAnimationFrame against the LIVE audio.currentTime rather
+  // than the Zustand-stored value (which only updates on the native
+  // 'timeupdate' event, ~4x/sec) — that throttling is what made the active
+  // line snap every ~250ms instead of transitioning smoothly.
+  const [currentLineIdx, setCurrentLineIdx] = useState(-1)
+  const lineIdxRef = useRef(-1)
+
+  useEffect(() => {
+    if (!isSynced || syncedLines.length === 0) {
+      setCurrentLineIdx(-1)
+      lineIdxRef.current = -1
+      return
+    }
+    let raf = 0
+    const tick = (): void => {
+      const idx = getCurrentLineIndex(syncedLines, getAudioCurrentTime())
+      if (idx !== lineIdxRef.current) {
+        lineIdxRef.current = idx
+        setCurrentLineIdx(idx)
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [isSynced, syncedLines])
 
   useEffect(() => {
     if (activeRef.current && containerRef.current) {

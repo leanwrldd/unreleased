@@ -3,7 +3,7 @@ import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, ChevronDown
 import { useStore } from '../store/useStore'
 import { useShallow } from 'zustand/react/shallow'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
-import { seekAudio, getAudioDuration } from './Player'
+import { seekAudio, getAudioDuration, getAudioCurrentTime } from './Player'
 import { buildImageUrl, apiFetch, songToTrack, JWAPI_BASE, playlistCoverUrl } from '../lib/juicewrldApi'
 import { getActiveRadioClient } from '../lib/radioSocketService'
 import type { JWApiSong } from '../lib/juicewrldApi'
@@ -186,18 +186,45 @@ export default function WrldView(): JSX.Element {
     { value: 'unreleased', label: 'Unreleased' },
     { value: 'playlists', label: 'Playlists' },
   ]
-  useEffect(() => { setVoteDismissed(false); setMyVote(null) }, [radioFmVote?.track, radioFmVote?.kind])
-
-  // Locally interpolate the countdown so it ticks every second between server updates
+  // A "new vote" is detected by active rising edge (false/absent -> true),
+  // NOT by track/kind equality — those can stay identical across repeated
+  // metadata broadcasts for the SAME ongoing vote, but using them as the
+  // reset trigger also means a stale/unrelated broadcast can spuriously
+  // reset your vote selection (un-highlighting Yes/No) and a brand new vote
+  // on the same track right after the last one never reopens the dismissed
+  // popup. Rising edge of `active` is the only reliable "vote just started" signal.
+  const wasVoteActiveRef = useRef(false)
   useEffect(() => {
-    if (countdownRef.current) clearInterval(countdownRef.current)
-    if (radioFmVote?.seconds_left == null) { setLocalSecondsLeft(null); return }
+    const isActive = !!radioFmVote?.active
+    if (isActive && !wasVoteActiveRef.current) {
+      setVoteDismissed(false)
+      setMyVote(null)
+    }
+    wasVoteActiveRef.current = isActive
+  }, [radioFmVote?.active])
+
+  // Locally tick the countdown once per second, independent of how often
+  // server metadata broadcasts arrive. The interval is created once per vote
+  // and only re-synced (not torn down/recreated) on each server update —
+  // recreating it on every broadcast meant it could be cleared before ever
+  // reaching its own 1000ms tick if broadcasts arrived more often than that,
+  // making the displayed countdown look static.
+  useEffect(() => {
+    if (!radioFmVote?.active || radioFmVote.seconds_left == null) {
+      if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null }
+      setLocalSecondsLeft(null)
+      return
+    }
     setLocalSecondsLeft(radioFmVote.seconds_left)
-    countdownRef.current = setInterval(() => {
-      setLocalSecondsLeft(s => (s != null && s > 0) ? s - 1 : 0)
-    }, 1000)
-    return () => { if (countdownRef.current) clearInterval(countdownRef.current) }
-  }, [radioFmVote?.seconds_left])
+    if (!countdownRef.current) {
+      countdownRef.current = setInterval(() => {
+        setLocalSecondsLeft(s => (s != null && s > 0) ? s - 1 : 0)
+      }, 1000)
+    }
+  }, [radioFmVote?.active, radioFmVote?.seconds_left])
+
+  // Unmount-only cleanup for the countdown interval
+  useEffect(() => () => { if (countdownRef.current) clearInterval(countdownRef.current) }, [])
 
   const fmLabel    = radioFmActive
     ? (radioFmIsLive ? '999 FM · LIVE' : '999 FM · OFF')
@@ -277,7 +304,7 @@ export default function WrldView(): JSX.Element {
           </div>
         </div>
       ) : (
-        <button onClick={() => getActiveRadioClient()?.proposeSkip()}
+        <button onClick={() => { setVoteDismissed(false); getActiveRadioClient()?.proposeSkip() }}
           className="flex items-center gap-2 text-sm text-white/30 hover:text-white/65 transition-colors self-start">
           <SkipForward size={14} /> Vote to skip
         </button>
@@ -523,7 +550,7 @@ export default function WrldView(): JSX.Element {
           </div>
 
           {/* Mobile layout */}
-          <div className="md:hidden relative z-10 flex flex-col h-full">
+          <div className="md:hidden relative z-10 flex flex-col h-full min-h-0">
 
             {/* Header: art + title */}
             <div className="flex items-center gap-3 px-4 pt-12 pb-3 shrink-0">
@@ -692,6 +719,12 @@ export default function WrldView(): JSX.Element {
                       className="absolute top-1/2 w-2.5 h-2.5 rounded-full opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
                       style={{ left: `${volume * 100}%`, transform: 'translate(-50%, -50%)', background: txtPri }}
                     />
+                    <span
+                      className="absolute -top-7 -translate-x-1/2 px-1.5 py-0.5 rounded-md bg-black/80 text-white text-[10px] tabular-nums opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
+                      style={{ left: `${volume * 100}%` }}
+                    >
+                      {Math.round(volume * 100)}%
+                    </span>
                   </div>
                 </div>
               </div>
@@ -896,10 +929,31 @@ const LyricsPanel = memo(function LyricsPanel({
 }: LyricsPanelProps) {
   const activeRef = useRef<HTMLDivElement>(null)
 
-  const currentLineIdx = useStore(s => {
-    if (!isSynced || syncedLines.length === 0) return -1
-    return getCurrentLineIndex(syncedLines, s.currentTime)
-  })
+  // Driven by requestAnimationFrame against the LIVE audio.currentTime rather
+  // than the Zustand-stored value (which only updates on the native
+  // 'timeupdate' event, ~4x/sec) — that throttling is what made the active
+  // line snap every ~250ms instead of transitioning smoothly.
+  const [currentLineIdx, setCurrentLineIdx] = useState(-1)
+  const lineIdxRef = useRef(-1)
+
+  useEffect(() => {
+    if (!isSynced || syncedLines.length === 0) {
+      setCurrentLineIdx(-1)
+      lineIdxRef.current = -1
+      return
+    }
+    let raf = 0
+    const tick = (): void => {
+      const idx = getCurrentLineIndex(syncedLines, getAudioCurrentTime())
+      if (idx !== lineIdxRef.current) {
+        lineIdxRef.current = idx
+        setCurrentLineIdx(idx)
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [isSynced, syncedLines])
 
   useEffect(() => {
     activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -924,7 +978,7 @@ const LyricsPanel = memo(function LyricsPanel({
 
   if (isSynced && syncedLines.length > 0) {
     return (
-      <div className="relative flex-1 overflow-hidden">
+      <div className="relative flex-1 min-h-0 overflow-hidden">
         <div className="absolute top-0 left-0 right-0 z-10 pointer-events-none" style={{ height: 80, background: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)' }} />
         <div className="absolute bottom-0 left-0 right-0 z-10 pointer-events-none" style={{ height: 80, background: 'linear-gradient(to top, rgba(0,0,0,0.55), transparent)' }} />
         <div
@@ -967,7 +1021,7 @@ const LyricsPanel = memo(function LyricsPanel({
   }
 
   return (
-    <div className={`flex-1 overflow-y-auto ${padded ? 'py-16 pr-16 pl-8' : 'py-4 px-4 md:py-8 md:pr-12 md:pl-6'}`} style={{ scrollbarWidth: 'none' }}>
+    <div className={`flex-1 min-h-0 overflow-y-auto ${padded ? 'py-16 pr-16 pl-8' : 'py-4 px-4 md:py-8 md:pr-12 md:pl-6'}`} style={{ scrollbarWidth: 'none' }}>
       <pre className="text-xs md:text-sm leading-6 md:leading-7 whitespace-pre-wrap font-sans" style={{ color: txtSec }}>{rawLyrics}</pre>
     </div>
   )

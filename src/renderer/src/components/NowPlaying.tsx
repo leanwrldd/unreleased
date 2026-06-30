@@ -58,7 +58,7 @@ export default function NowPlaying(): JSX.Element {
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
         <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
           <h2 className="text-text-primary font-semibold text-sm uppercase tracking-widest">Now Playing</h2>
           <div className="flex items-center gap-2">
@@ -147,7 +147,7 @@ export default function NowPlaying(): JSX.Element {
                 </div>
               )
             })()}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
               <LyricsDisplay />
             </div>
           </>

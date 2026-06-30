@@ -1,7 +1,8 @@
-﻿const { app, BrowserWindow, shell, dialog, Menu, Tray, ipcMain } = require('electron')
+﻿const { app, BrowserWindow, shell, dialog, Menu, Tray, ipcMain, nativeImage } = require('electron')
 const { autoUpdater } = require('electron-updater')
 const path = require('path')
 const fs = require('fs')
+const discordRpc = require('./discordRpc')
 
 const isDev = !app.isPackaged || process.env.NODE_ENV === 'development'
 
@@ -15,6 +16,7 @@ let appSettings = {
   autoDownload: true,
   minimizeToTray: false,
   startupView: 'api-tracker',
+  discordRpcEnabled: true,
 }
 try {
   const saved = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
@@ -267,6 +269,18 @@ ipcMain.handle('set-app-setting', (_, key, value) => {
   appSettings[key] = value
   saveSettings()
   if (key === 'autoDownload') autoUpdater.autoDownload = value
+  if (key === 'discordRpcEnabled') discordRpc.setEnabled(value)
+  return true
+})
+
+// ── IPC: Discord Rich Presence ────────────────────────────────────────────────
+ipcMain.handle('discord-rpc-set-activity', (_, nowPlaying) => {
+  discordRpc.setNowPlaying(nowPlaying)
+  return true
+})
+
+ipcMain.handle('discord-rpc-clear-activity', () => {
+  discordRpc.clearActivity()
   return true
 })
 
@@ -355,15 +369,34 @@ ipcMain.handle('scan-library', async (_, folders) => {
   return { tracks, errors }
 })
 
-ipcMain.handle('read-album-art', async (_, filePath) => {
+// Embedded album art is often full-resolution (1400px+). Returning it raw meant
+// the renderer decoded a multi-MB bitmap PER track row and kept it in memory for
+// every track — opening the Library tab could pull gigabytes of RAM. Downscale to
+// a JPEG thumbnail (longest edge <= maxSize) before handing it to the renderer.
+function coverToThumbDataUri(rawBuffer, fallbackFormat, maxSize) {
+  try {
+    const img = nativeImage.createFromBuffer(rawBuffer)
+    if (img.isEmpty()) throw new Error('decode failed')
+    const { width, height } = img.getSize()
+    const longest = Math.max(width, height)
+    const sized = (maxSize && longest > maxSize)
+      ? img.resize(width >= height ? { width: maxSize, quality: 'good' } : { height: maxSize, quality: 'good' })
+      : img
+    return `data:image/jpeg;base64,${sized.toJPEG(82).toString('base64')}`
+  } catch {
+    // Unsupported format (rare, e.g. webp on some platforms) — fall back to raw.
+    return `data:${fallbackFormat};base64,${Buffer.from(rawBuffer).toString('base64')}`
+  }
+}
+
+ipcMain.handle('read-album-art', async (_, filePath, maxSize = 256) => {
   let mm
   try { mm = require('music-metadata') } catch { return null }
   try {
     const metadata = await mm.parseFile(filePath, { skipCovers: false, duration: false })
     const pic = metadata.common.picture?.[0]
     if (!pic) return null
-    const b64 = Buffer.from(pic.data).toString('base64')
-    return `data:${pic.format};base64,${b64}`
+    return coverToThumbDataUri(Buffer.from(pic.data), pic.format, maxSize)
   } catch { return null }
 })
 
@@ -375,7 +408,8 @@ ipcMain.handle('read-track-metadata', async (_, filePath) => {
     const common = metadata.common
     const format = metadata.format
     const pic = common.picture?.[0]
-    const albumArt = pic ? `data:${pic.format};base64,${Buffer.from(pic.data).toString('base64')}` : null
+    // Larger cap here — this feeds the full Now Playing art, not a list thumbnail.
+    const albumArt = pic ? coverToThumbDataUri(Buffer.from(pic.data), pic.format, 512) : null
     return {
       title: common.title || '',
       artist: (common.artists || []).join(', ') || common.artist || '',
@@ -566,6 +600,7 @@ ipcMain.handle('select-image-file', async () => {
 app.whenReady().then(() => {
   createWindow()
   createTray()
+  discordRpc.setEnabled(appSettings.discordRpcEnabled !== false)
 
   if (!isDev) {
     mainWindow.once('ready-to-show', () => {
@@ -579,7 +614,7 @@ app.whenReady().then(() => {
   })
 })
 
-app.on('before-quit', () => { isQuitting = true })
+app.on('before-quit', () => { isQuitting = true; discordRpc.setEnabled(false) })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

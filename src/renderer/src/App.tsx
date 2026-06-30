@@ -33,6 +33,7 @@ import EditorProfileView from './components/EditorProfileView'
 import NotFoundView from './components/NotFoundView'
 import DocsPage from './components/DocsPage'
 import RadioFmPlayer from './components/RadioFmPlayer'
+import DiscordRpcSync from './components/DiscordRpcSync'
 import WrldView from './components/WrldView'
 import AlbumsAdminView from './components/AlbumsAdminView'
 import UserAuthModal from './components/UserAuthModal'
@@ -178,6 +179,7 @@ export default function App(): JSX.Element {
       </div>
       <Player />
       <RadioFmPlayer />
+      <DiscordRpcSync />
       <BottomNav />
       {showSettings && <Settings />}
       {showUserAuth && <UserAuthModal onClose={() => setShowUserAuth(false)} />}

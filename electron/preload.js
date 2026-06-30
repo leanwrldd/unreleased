@@ -21,11 +21,15 @@ contextBridge.exposeInMainWorld('electron', {
   getAppSettings:  ()           => ipcRenderer.invoke('get-app-settings'),
   setAppSetting:   (key, value) => ipcRenderer.invoke('set-app-setting', key, value),
 
+  // Discord Rich Presence
+  discordRpcSetActivity: (activity) => ipcRenderer.invoke('discord-rpc-set-activity', activity),
+  discordRpcClearActivity: ()       => ipcRenderer.invoke('discord-rpc-clear-activity'),
+
   // Library
   loadLibraryData:    ()              => ipcRenderer.invoke('load-library-data'),
   saveLibraryData:    (data)          => ipcRenderer.invoke('save-library-data', data),
   scanLibrary:        (folders)       => ipcRenderer.invoke('scan-library', folders),
-  readAlbumArt:       (filePath)      => ipcRenderer.invoke('read-album-art', filePath),
+  readAlbumArt:       (filePath, maxSize) => ipcRenderer.invoke('read-album-art', filePath, maxSize),
   readTrackMetadata:  (filePath)      => ipcRenderer.invoke('read-track-metadata', filePath),
   writeTrackMetadata: (filePath, meta) => ipcRenderer.invoke('write-track-metadata', filePath, meta),
 

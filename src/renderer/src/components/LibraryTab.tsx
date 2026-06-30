@@ -7,6 +7,13 @@ import {
 import { useStore } from '../store/useStore'
 import { LibraryTrack, LocalPlaylist } from '../types'
 import MetadataEditor from './MetadataEditor'
+import { useVirtualWindow } from '../hooks/useVirtualWindow'
+
+// Row geometry for windowed lists/grids (kept in sync with the markup below).
+const SONG_ROW_H = 52      // height of one SongRow incl. its padding
+const ALBUM_GAP = 20       // grid gap-5 / p-5 padding, in px
+const ALBUM_MIN_COL = 160  // grid minmax min column width
+const ALBUM_TEXT_H = 64    // fixed album-card text block + image margin, in px
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -240,9 +247,12 @@ function AlbumCard({ album, onPlay, onOpen }: { album: Album; onPlay: () => void
           </button>
         </div>
       </div>
-      <p className="text-[var(--text-primary)] text-sm font-medium truncate">{album.name}</p>
-      <p className="text-[var(--text-muted)] text-xs truncate">{album.artist}{album.year ? ` · ${album.year}` : ''}</p>
-      <p className="text-[var(--text-muted)] text-[11px]">{album.tracks.length} {album.tracks.length === 1 ? 'song' : 'songs'}</p>
+      {/* Fixed height keeps the virtualized row stride deterministic (ALBUM_TEXT_H) */}
+      <div className="h-[54px] overflow-hidden">
+        <p className="text-[var(--text-primary)] text-sm font-medium truncate leading-5">{album.name}</p>
+        <p className="text-[var(--text-muted)] text-xs truncate leading-4">{album.artist}{album.year ? ` · ${album.year}` : ''}</p>
+        <p className="text-[var(--text-muted)] text-[11px] leading-4">{album.tracks.length} {album.tracks.length === 1 ? 'song' : 'songs'}</p>
+      </div>
     </div>
   )
 }
@@ -564,6 +574,108 @@ function EmptyState({ onOpenSettings }: { onOpenSettings: () => void }): JSX.Ele
   )
 }
 
+// ─── Virtualized song list ────────────────────────────────────────────────────
+// Only rows in (or near) the viewport are mounted, so a multi-thousand-track
+// library doesn't create thousands of rows and decoded album-art bitmaps at once.
+
+function VirtualSongList({ tracks, header, onEdit, onAddToPlaylist }: {
+  tracks: LibraryTrack[]
+  header: JSX.Element
+  onEdit: (t: LibraryTrack) => void
+  onAddToPlaylist: (t: LibraryTrack) => void
+}): JSX.Element {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const { start, end, totalHeight } = useVirtualWindow(scrollRef, contentRef, tracks.length, SONG_ROW_H)
+
+  return (
+    <div ref={scrollRef} className="flex-1 overflow-y-auto py-2 px-2 relative">
+      {header}
+      {tracks.length === 0 ? (
+        <p className="text-[var(--text-muted)] text-sm text-center py-16">No songs found</p>
+      ) : (
+        <div ref={contentRef} style={{ height: totalHeight, position: 'relative' }}>
+          {tracks.slice(start, end).map((t, i) => {
+            const index = start + i
+            return (
+              <div key={t.id} style={{ position: 'absolute', top: index * SONG_ROW_H, left: 0, right: 0, height: SONG_ROW_H }}>
+                <SongRow track={t} index={index} queue={tracks} onEdit={onEdit} onAddToPlaylist={onAddToPlaylist} />
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Virtualized album grid ───────────────────────────────────────────────────
+
+function VirtualAlbumGrid({ albums, onOpen, onPlayAlbum }: {
+  albums: Album[]
+  onOpen: (a: Album) => void
+  onPlayAlbum: (a: Album) => void
+}): JSX.Element {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [cols, setCols] = useState(1)
+  const [colW, setColW] = useState(ALBUM_MIN_COL)
+
+  // Measure available width → column count + column width (mirrors the prior
+  // `repeat(auto-fill, minmax(160px, 1fr))` behavior) so the row stride is exact.
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const compute = (): void => {
+      const w = el.clientWidth - ALBUM_GAP * 2 // p-5 left + right
+      const c = Math.max(1, Math.floor((w + ALBUM_GAP) / (ALBUM_MIN_COL + ALBUM_GAP)))
+      setCols(c)
+      setColW((w - (c - 1) * ALBUM_GAP) / c)
+    }
+    compute()
+    const ro = new ResizeObserver(compute)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const rowStride = colW + ALBUM_TEXT_H + ALBUM_GAP
+  const numRows = Math.ceil(albums.length / cols)
+  const { start, end, totalHeight } = useVirtualWindow(scrollRef, contentRef, numRows, rowStride)
+
+  return (
+    <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 relative">
+      {albums.length === 0 ? (
+        <p className="text-[var(--text-muted)] text-sm text-center py-16">No albums found</p>
+      ) : (
+        <div ref={contentRef} style={{ height: totalHeight, position: 'relative' }}>
+          {Array.from({ length: end - start }, (_, r) => {
+            const rowIndex = start + r
+            const rowAlbums = albums.slice(rowIndex * cols, rowIndex * cols + cols)
+            return (
+              <div
+                key={rowIndex}
+                style={{
+                  position: 'absolute', top: rowIndex * rowStride, left: 0, right: 0,
+                  display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: ALBUM_GAP,
+                }}
+              >
+                {rowAlbums.map((alb) => (
+                  <AlbumCard
+                    key={`${alb.name}__${alb.artist}`}
+                    album={alb}
+                    onPlay={() => onPlayAlbum(alb)}
+                    onOpen={() => onOpen(alb)}
+                  />
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main LibraryTab ──────────────────────────────────────────────────────────
 
 type LibView = 'albums' | 'songs'
@@ -723,51 +835,37 @@ export default function LibraryTab(): JSX.Element {
         ) : selectedAlbum ? (
           <AlbumDetail album={selectedAlbum} onBack={() => setSelectedAlbum(null)} onEdit={setEditingTrack} onAddToPlaylist={setAddToPlaylistTrack} />
         ) : libView === 'albums' ? (
-          <div className="flex-1 overflow-y-auto p-5">
-            {filteredAlbums.length === 0 ? (
-              <p className="text-[var(--text-muted)] text-sm text-center py-16">No albums found</p>
-            ) : (
-              <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
-                {filteredAlbums.map((alb) => (
-                  <AlbumCard
-                    key={`${alb.name}__${alb.artist}`}
-                    album={alb}
-                    onPlay={() => {
-                      const q = [...alb.tracks].sort((a,b) => (a.trackNumber ?? 999)-(b.trackNumber ?? 999)).map(libraryTrackToQueueTrack)
-                      playTrack(q[0], q)
-                    }}
-                    onOpen={() => setSelectedAlbum(alb)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          <VirtualAlbumGrid
+            albums={filteredAlbums}
+            onOpen={setSelectedAlbum}
+            onPlayAlbum={(alb) => {
+              const q = [...alb.tracks].sort((a, b) => (a.trackNumber ?? 999) - (b.trackNumber ?? 999)).map(libraryTrackToQueueTrack)
+              playTrack(q[0], q)
+            }}
+          />
         ) : (
-          /* Songs list */
-          <div className="flex-1 overflow-y-auto py-2 px-2">
-            {/* Header row — click to sort */}
-            <div className="flex items-center gap-3 px-4 py-1 mb-1">
-              <div className="w-5 text-[10px] text-[var(--text-muted)] uppercase tracking-wider text-center">#</div>
-              <div className="w-9 shrink-0" />
-              <button onClick={() => toggleSort('title')} className="flex-1 flex items-center gap-1 text-[10px] text-[var(--text-muted)] uppercase tracking-wider hover:text-[var(--text-primary)] transition-colors">
-                Title {sortField === 'title' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
-              </button>
-              <button onClick={() => toggleSort('album')} className="hidden lg:flex items-center gap-1 w-[160px] text-[10px] text-[var(--text-muted)] uppercase tracking-wider hover:text-[var(--text-primary)] transition-colors">
-                Album {sortField === 'album' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
-              </button>
-              <button onClick={() => toggleSort('duration')} className="flex items-center gap-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0">
-                <Clock size={11} /> {sortField === 'duration' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
-              </button>
-              <div className="w-5" />
-            </div>
-            {sortedTracks.length === 0 ? (
-              <p className="text-[var(--text-muted)] text-sm text-center py-16">No songs found</p>
-            ) : (
-              sortedTracks.map((t, i) => (
-                <SongRow key={t.id} track={t} index={i} queue={sortedTracks} onEdit={setEditingTrack} onAddToPlaylist={setAddToPlaylistTrack} />
-              ))
-            )}
-          </div>
+          <VirtualSongList
+            tracks={sortedTracks}
+            onEdit={setEditingTrack}
+            onAddToPlaylist={setAddToPlaylistTrack}
+            header={
+              /* Header row — click to sort */
+              <div className="flex items-center gap-3 px-4 py-1 mb-1">
+                <div className="w-5 text-[10px] text-[var(--text-muted)] uppercase tracking-wider text-center">#</div>
+                <div className="w-9 shrink-0" />
+                <button onClick={() => toggleSort('title')} className="flex-1 flex items-center gap-1 text-[10px] text-[var(--text-muted)] uppercase tracking-wider hover:text-[var(--text-primary)] transition-colors">
+                  Title {sortField === 'title' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
+                </button>
+                <button onClick={() => toggleSort('album')} className="hidden lg:flex items-center gap-1 w-[160px] text-[10px] text-[var(--text-muted)] uppercase tracking-wider hover:text-[var(--text-primary)] transition-colors">
+                  Album {sortField === 'album' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
+                </button>
+                <button onClick={() => toggleSort('duration')} className="flex items-center gap-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0">
+                  <Clock size={11} /> {sortField === 'duration' && (sortDir === 'asc' ? <ChevronUp size={10} /> : <ChevronDown size={10} />)}
+                </button>
+                <div className="w-5" />
+              </div>
+            }
+          />
         )}
       </div>
 

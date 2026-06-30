@@ -19,6 +19,7 @@ interface AppSettings {
   autoDownload: boolean
   minimizeToTray: boolean
   startupView: string
+  discordRpcEnabled: boolean
 }
 
 export default function Settings(): JSX.Element {
@@ -54,6 +55,7 @@ export default function Settings(): JSX.Element {
     autoDownload: true,
     minimizeToTray: false,
     startupView: 'api-tracker',
+    discordRpcEnabled: true,
   })
 
   useEffect(() => {
@@ -411,7 +413,7 @@ export default function Settings(): JSX.Element {
                   <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${appSettings.autoDownload ? 'left-5' : 'left-0.5'}`} />
                 </button>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Minus size={14} className="text-text-muted" />
                   <span className="text-text-primary text-sm">Minimize to tray on close</span>
@@ -421,6 +423,18 @@ export default function Settings(): JSX.Element {
                   className={`relative w-10 h-5 rounded-full transition-colors ${appSettings.minimizeToTray ? 'bg-accent' : 'bg-surface-overlay'}`}
                 >
                   <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${appSettings.minimizeToTray ? 'left-5' : 'left-0.5'}`} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MessageCircle size={14} className="text-text-muted" />
+                  <span className="text-text-primary text-sm">Show Discord Status</span>
+                </div>
+                <button
+                  onClick={() => setSetting('discordRpcEnabled', !appSettings.discordRpcEnabled)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${appSettings.discordRpcEnabled ? 'bg-accent' : 'bg-surface-overlay'}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${appSettings.discordRpcEnabled ? 'left-5' : 'left-0.5'}`} />
                 </button>
               </div>
             </section>
