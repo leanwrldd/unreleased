@@ -122,7 +122,7 @@ function fmtTime(sec) {
  * facts. Keeps Discord's activity shape (timestamps, image keys, ActivityType)
  * out of the renderer — it only needs to report what's playing.
  *
- * @param {{ title: string, artist?: string, isPlaying: boolean, currentTime: number, duration: number, isRadio?: boolean }} info
+ * @param {{ title: string, artist?: string, isPlaying: boolean, currentTime: number, duration: number, isRadio?: boolean, coverUrl?: string | null }} info
  */
 function setNowPlaying(info) {
   if (!enabled) return
@@ -140,6 +140,16 @@ function setNowPlaying(info) {
     largeImageKey: LARGE_IMAGE_KEY,
     largeImageText: info.isRadio ? '999 FM' : 'Unreleased',
     instance: false,
+  }
+
+  // Per-track cover art. Classic RPC's `large_image` only accepts a
+  // pre-uploaded asset key by default, but Discord also accepts a direct
+  // external image URL via `large_url` — that's what shows the actual song
+  // cover instead of always falling back to the static app logo. Only real
+  // http(s) URLs work here; local files' covers are base64 data URIs with no
+  // public address, so those just keep the logo.
+  if (info.coverUrl && /^https?:\/\//.test(info.coverUrl)) {
+    activity.largeImageUrl = info.coverUrl
   }
 
   if (info.isPlaying && info.duration > 0) {
