@@ -39,12 +39,21 @@ function AddSongModal({ onClose, onSubmitted }: { onClose: () => void; onSubmitt
   const [cat,     setCat]     = useState('')
   const [album,   setAlbum]   = useState('')
   const [eraId,   setEraId]   = useState('')
+  const [imageUrl, setImageUrl] = useState('')
+  const [altNames, setAltNames] = useState('')
+  const [lyrics,   setLyrics]   = useState('')
+  const [syncedLyrics, setSyncedLyrics] = useState('')
   const [prod,     setProd]     = useState('')
   const [engineer, setEngineer] = useState('')
   const [location, setLocation] = useState('')
+  const [filePath, setFilePath] = useState('')
+  const [previewDate, setPreviewDate] = useState('')
   const [leakType, setLeakType] = useState('')
   const [recDate,  setRecDate]  = useState('')
   const [relDate,  setRelDate]  = useState('')
+  const [instrumentals,     setInstrumentals]     = useState('')
+  const [instrumentalNames, setInstrumentalNames] = useState('')
+  const [addInfo,  setAddInfo]  = useState('')
   const [notes,    setNotes]    = useState('')
   const [edNotes, setEdNotes] = useState('')
   const [showMore, setShowMore] = useState(false)
@@ -65,13 +74,24 @@ function AddSongModal({ onClose, onSubmitted }: { onClose: () => void; onSubmitt
   if (album)   proposed.album              = album
   if (cat)     proposed.category           = cat
   if (eraId)   proposed.era_id             = Number(eraId)
+  if (imageUrl) proposed.image_url = imageUrl
+  if (altNames) proposed.track_titles = altNames.split('\n').map(s => s.trim()).filter(Boolean)
+  if (lyrics) proposed.lyrics = lyrics
+  if (syncedLyrics) proposed.synced_lyrics = syncedLyrics
   if (prod)     proposed.producers           = prod
   if (engineer) proposed.engineers           = engineer
   if (location) proposed.recording_locations = location
+  if (filePath) proposed.path                = filePath
   if (leakType) proposed.leak_type     = leakType
   if (recDate)  proposed.record_dates  = recDate
-  if (relDate) proposed.release_date       = relDate
-  if (notes)   proposed.notes              = notes
+  if (relDate) proposed.release_date        = relDate
+  if (previewDate) proposed.preview_date    = previewDate
+  if (instrumentals)     proposed.instrumentals      = instrumentals
+  if (instrumentalNames) proposed.instrumental_names = instrumentalNames
+  // "Additional info" maps to additional_information — distinct from `notes`,
+  // which previously had this textarea's value submitted under the wrong key.
+  if (addInfo) proposed.additional_information = addInfo
+  if (notes)   proposed.notes                  = notes
 
   const handleSubmit = async (): Promise<void> => {
     if (!name.trim() || submitState === 'submitting') return
@@ -110,6 +130,14 @@ function AddSongModal({ onClose, onSubmitted }: { onClose: () => void; onSubmitt
           <Field label="Title *" value={name} onChange={setName} placeholder="Song title" />
           <Field label="Artists" value={artists} onChange={setArtists} placeholder="Juice WRLD ft. …" />
           <Field label="Album" value={album} onChange={setAlbum} placeholder="Album name" />
+          <Field label="Cover URL" value={imageUrl} onChange={setImageUrl} placeholder="https://…" mono />
+          <div className="px-4 py-2 border-l-2 border-transparent">
+            <div className="grid grid-cols-[80px_1fr] gap-x-3 items-start">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-60 select-none pt-1.5">Alt names</span>
+              <textarea rows={2} value={altNames} onChange={e => setAltNames(e.target.value)} placeholder="One name per line"
+                className="w-full bg-transparent text-sm text-text-primary focus:outline-none placeholder:text-text-muted placeholder:opacity-25 min-w-0 border-b border-[var(--border)] pb-px focus:border-accent transition-colors resize-none" />
+            </div>
+          </div>
 
           {/* Category pills */}
           <div className="px-4 py-2 border-l-2 border-transparent">
@@ -152,12 +180,31 @@ function AddSongModal({ onClose, onSubmitted }: { onClose: () => void; onSubmitt
               <Field label="Producers" value={prod}     onChange={setProd}     placeholder="Producer names" />
               <Field label="Engineer"  value={engineer} onChange={setEngineer} placeholder="Engineer name" />
               <Field label="Location"  value={location} onChange={setLocation} placeholder="Recording location" />
+              <Field label="File URL"  value={filePath} onChange={setFilePath} placeholder="Path/URL to the audio file" mono />
               <Field label="Leak type" value={leakType} onChange={setLeakType} placeholder="e.g. Stem, Master, Video…" />
               <Field label="Recorded"  value={recDate}  onChange={setRecDate}  placeholder="YYYY-MM-DD" mono />
               <Field label="Released"  value={relDate}  onChange={setRelDate}  placeholder="YYYY-MM-DD" mono />
+              <Field label="Preview"   value={previewDate} onChange={setPreviewDate} placeholder="YYYY-MM-DD" mono />
+              <Field label="Instrumentals" value={instrumentals} onChange={setInstrumentals} placeholder="Instrumental versions available" />
+              <Field label="Inst. names" value={instrumentalNames} onChange={setInstrumentalNames} placeholder="Instrumental file names" />
+              <div className="px-4 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-60 mb-1.5">Lyrics</p>
+                <textarea rows={4} value={lyrics} onChange={e => setLyrics(e.target.value)} placeholder="Plain lyrics…"
+                  className="w-full bg-[var(--surface-overlay)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted placeholder:opacity-25 font-mono" />
+              </div>
+              <div className="px-4 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-60 mb-1.5">Synced lyrics</p>
+                <textarea rows={4} value={syncedLyrics} onChange={e => setSyncedLyrics(e.target.value)} placeholder="[mm:ss.xx] line…"
+                  className="w-full bg-[var(--surface-overlay)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted placeholder:opacity-25 font-mono" />
+              </div>
               <div className="px-4 py-2">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-60 mb-1.5">Additional info</p>
-                <textarea rows={3} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any other notes…"
+                <textarea rows={3} value={addInfo} onChange={e => setAddInfo(e.target.value)} placeholder="Any other info…"
+                  className="w-full bg-[var(--surface-overlay)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted placeholder:opacity-25" />
+              </div>
+              <div className="px-4 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-60 mb-1.5">Notes</p>
+                <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Internal notes…"
                   className="w-full bg-[var(--surface-overlay)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm text-text-primary focus:outline-none resize-none placeholder:text-text-muted placeholder:opacity-25" />
               </div>
             </>
@@ -255,7 +302,8 @@ export default function EditorProfileView(): JSX.Element {
   }
 
   const handleEdit = (p: SongEditProposal): void => {
-    if (!p.song) return
+    // p.song is null for 'create' proposals (new song, no backing record yet) —
+    // EditorPage handles that case, so don't block it here.
     setPendingEditProposal({ id: p.id, songId: p.song, proposedData: p.proposed_data, editorNotes: p.editor_notes || '' })
     setPendingEditorSongId(p.song)
     setActiveView('editor')

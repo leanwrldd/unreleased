@@ -88,7 +88,7 @@ interface AppState {
 
   // Editor
   pendingEditorSongId: number | null
-  pendingEditProposal: { id: number; songId: number; proposedData: Record<string, unknown>; editorNotes: string } | null
+  pendingEditProposal: { id: number; songId: number | null; proposedData: Record<string, unknown>; editorNotes: string } | null
 
 
   // Library (Electron only)
@@ -149,7 +149,7 @@ interface AppActions {
   refreshPlaylists: () => Promise<void>
 
   setPendingEditorSongId: (id: number | null) => void
-  setPendingEditProposal: (p: { id: number; songId: number; proposedData: Record<string, unknown>; editorNotes: string } | null) => void
+  setPendingEditProposal: (p: { id: number; songId: number | null; proposedData: Record<string, unknown>; editorNotes: string } | null) => void
 
 
   setLibraryTracks: (tracks: LibraryTrack[]) => void

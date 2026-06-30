@@ -36,8 +36,13 @@ import { LibraryTrack } from '../types'
 
 let _seek: ((t: number) => void) | null = null
 let _getAudioDuration: (() => number) | null = null
+let _getAudioCurrentTime: (() => number) | null = null
 export function seekAudio(t: number): void { _seek?.(t) }
 export function getAudioDuration(): number { return _getAudioDuration?.() ?? 0 }
+// Live audio.currentTime, not the Zustand-stored value (which only updates on
+// the native 'timeupdate' event, ~4x/sec) — used to drive smooth per-frame
+// synced-lyrics highlighting instead of choppy ~250ms jumps.
+export function getAudioCurrentTime(): number { return _getAudioCurrentTime?.() ?? 0 }
 
 export default function Player(): JSX.Element {
   const {
@@ -211,13 +216,20 @@ export default function Player(): JSX.Element {
       if (audio.duration) setProgress(t / audio.duration)
     }
     _getAudioDuration = () => getActive()?.duration ?? 0
-    return () => { _seek = null; _getAudioDuration = null }
+    _getAudioCurrentTime = () => getActive()?.currentTime ?? 0
+    return () => { _seek = null; _getAudioDuration = null; _getAudioCurrentTime = null }
   }, []) // stable — only depends on refs
 
   // Load full metadata when track changes or currentTrackFull is cleared
   useEffect(() => {
     if (!currentTrack) return
     if (currentTrackFull) return  // already populated — skip
+    // Guard against stale async responses: if the track changes again before
+    // a fetch resolves, that response must not overwrite the new track's
+    // metadata (this is what caused a finished song's metadata to bleed
+    // into the next one).
+    const trackId = currentTrack.id
+    const isStale = (): boolean => useStore.getState().currentTrack?.id !== trackId
     // Build synthetic FullTrack immediately so cover art + artist show
     const synthetic: FullTrack = {
       ...currentTrack,
@@ -242,6 +254,7 @@ export default function Player(): JSX.Element {
           if (!syncedLyrics && isEditor) {
             syncedLyrics = await getApprovedSyncedLyrics(songId, isAdmin)
           }
+          if (isStale()) return
           setCurrentTrackFull({
             ...synthetic,
             lyrics: song.lyrics || null,
@@ -254,12 +267,14 @@ export default function Player(): JSX.Element {
       const el = (window as any).electron
       if (el && currentTrack.path) {
         el.readTrackMetadata(currentTrack.path).then((meta: Record<string, any> | null) => {
+          if (isStale()) return
           if (meta && !meta.error) {
             setCurrentTrackFull(prev => prev ? { ...prev, lyrics: meta.lyrics || null, syncedLyrics: meta.syncedLyrics || null } : prev)
           }
         }).catch(() => {})
         if (!currentTrack.imageUrl) {
-          el.readAlbumArt(currentTrack.path).then((a: string | null) => {
+          el.readAlbumArt(currentTrack.path, 512).then((a: string | null) => {
+            if (isStale()) return
             if (a) {
               updateLibraryTrack(currentTrack.id, { albumArt: a })
               setCurrentTrackFull(prev => prev ? { ...prev, albumArt: a } : prev)
@@ -534,7 +549,14 @@ export default function Player(): JSX.Element {
       return
     }
 
-    // Normal (no crossfade) track end
+    // Normal (no crossfade) track end.
+    // Guard against a paused crossfade boundary race: if the user pauses mid-
+    // crossfade, the [isPlaying] effect runs cancelCF() which clears cfActive
+    // BEFORE the outgoing element's already-queued `ended` event is handled.
+    // That `ended` then lands here instead of the crossfade branch above — and
+    // a paused player must never auto-advance into playback.
+    if (!useStore.getState().isPlaying) return
+
     if (repeat === 'one') {
       const a = getActive()
       if (a) { a.currentTime = 0; a.volume = volumeRef.current; a.play().catch(console.error) }
@@ -702,6 +724,10 @@ export default function Player(): JSX.Element {
         onError={(e) => console.error('Audio error (slotB):', e)}
       />
 
+      {/* Bottom bar hidden on the WRLD page — it has its own full playback controls.
+          Audio elements above stay mounted regardless so playback is unaffected. */}
+      {activeView !== 'wrld' && (
+      <>
       {/* ── Mobile player ── */}
       <div className="md:hidden bg-surface border-t border-[var(--border)] shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} onContextMenu={(e) => { e.preventDefault(); if (currentTrack) setShowContextMenu(v => !v) }}>
         {/* Thin progress bar */}
@@ -1041,7 +1067,7 @@ export default function Player(): JSX.Element {
             )}
           </button>}
 
-          {!radioFmActive && activeView !== 'wrld' && <button onClick={() => setShowNowPlaying(!showNowPlaying)}
+          {!radioFmActive && <button onClick={() => setShowNowPlaying(!showNowPlaying)}
             className={`transition-colors ${showNowPlaying ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}`}
             title="Now Playing">
             <Maximize2 size={16} />
@@ -1053,7 +1079,12 @@ export default function Player(): JSX.Element {
               {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
             </button>
 
-            <div className="w-20 progress-track flex items-center">
+            <div className="relative w-20 progress-track flex items-center group/vol">
+              <span
+                className="absolute -top-6 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-md bg-surface-highest border border-[var(--border)] text-text-primary text-[10px] tabular-nums opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
+              >
+                {Math.round(volume * 100)}%
+              </span>
               <input type="range" min={0} max={1} step={0.01} value={volume}
                 onChange={handleVolumeChange} className="w-full block"
                 style={{ '--val': `${volume * 100}%` } as React.CSSProperties} />
@@ -1117,6 +1148,8 @@ export default function Player(): JSX.Element {
           document.body
         )}
       </div>
+      </>
+      )}
     </>
   )
 }
