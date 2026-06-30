@@ -312,8 +312,14 @@ export default function Player(): JSX.Element {
     if (isPlaying) {
       audio.play().catch(console.error)
     } else {
+      // Pause must stop BOTH slots. Mid-crossfade the incoming slot is also
+      // playing, and a boundary race (the outgoing's `ended` firing around the
+      // same tick) can clear cfActive before this effect runs — so relying on
+      // cancelCF() alone to stop the incoming element isn't race-proof.
+      // Pausing both elements unconditionally guarantees nothing keeps playing.
       if (cfActive.current) cancelCF()
-      audio.pause()
+      slotA.current?.pause()
+      slotB.current?.pause()
     }
   }, [isPlaying])
 
@@ -439,8 +445,11 @@ export default function Player(): JSX.Element {
       return
     }
 
-    // Start crossfade when approaching end
-    if (crossfadeEnabled && crossfadeDuration > 0 && !cfActive.current) {
+    // Start crossfade when approaching end. A queued timeupdate event can
+    // still fire right after the user pauses (it was already in flight),
+    // so without this guard a crossfade — and the next song's playback —
+    // could kick off even though playback was just paused.
+    if (crossfadeEnabled && crossfadeDuration > 0 && !cfActive.current && useStore.getState().isPlaying) {
       const remaining = audio.duration - audio.currentTime
 
       if (remaining > 0 && remaining <= crossfadeDuration) {

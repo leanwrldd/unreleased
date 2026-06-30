@@ -112,6 +112,11 @@ function clearActivity() {
   applyOp({ clear: true })
 }
 
+function fmtTime(sec) {
+  const s = Math.max(0, Math.floor(sec || 0))
+  return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
+}
+
 /**
  * Build and apply a Rich Presence activity from app-domain "now playing"
  * facts. Keeps Discord's activity shape (timestamps, image keys, ActivityType)
@@ -132,15 +137,20 @@ function setNowPlaying(info) {
     instance: false,
   }
 
-  // Timestamps drive Discord's own live progress bar — only set while
-  // actually playing, and only when we have a real duration to anchor to,
-  // so we don't need to keep re-sending updates every second.
   if (info.isPlaying && info.duration > 0) {
+    // Timestamps drive Discord's own live (animating) progress bar.
     const startMs = Date.now() - Math.max(0, info.currentTime) * 1000
     activity.startTimestamp = startMs
     activity.endTimestamp = startMs + info.duration * 1000
   } else {
-    activity.details = `${info.title} (paused)`
+    // Paused: Discord's progress bar is always wall-clock driven, so it can't
+    // be frozen — supplying timestamps would keep it ticking, omitting them
+    // makes it vanish. Show the frozen position as text instead so it neither
+    // advances nor resets to 0:00.
+    const pos = info.duration > 0
+      ? `${fmtTime(info.currentTime)} / ${fmtTime(info.duration)}`
+      : fmtTime(info.currentTime)
+    activity.state = info.artist ? `⏸ ${pos} · ${info.artist}` : `⏸ ${pos}`
   }
 
   setActivity(activity)
