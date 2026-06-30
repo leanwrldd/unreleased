@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useMemo, useState, memo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, ChevronDown, ChevronLeft, Play, Pause, SkipBack, SkipForward as SkipFwd, Shuffle, Repeat, Repeat1, Volume2, VolumeX, MoreHorizontal, ListEnd, ListPlus, Info, Heart } from 'lucide-react'
+import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, ChevronDown, ChevronLeft, Play, Pause, SkipBack, SkipForward as SkipFwd, Shuffle, Repeat, Repeat1, Volume2, VolumeX, MoreHorizontal, ListPlus, Info, Heart, Maximize2, Minimize2 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { useShallow } from 'zustand/react/shallow'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
@@ -60,6 +60,17 @@ export default function WrldView(): JSX.Element {
   const activeRef    = useRef<HTMLDivElement>(null)
   const [artError, setArtError] = useState(false)
   const [fmTab, setFmTab] = useState<'radio' | 'lyrics'>('radio')
+  // Fullscreen renders the page through a portal so it covers the sidebar and
+  // other chrome instead of being squeezed into the normal content column.
+  const [fullscreen, setFullscreen] = useState(false)
+  const isElectronApp = navigator.userAgent.includes('Electron')
+
+  useEffect(() => {
+    if (!fullscreen) return
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setFullscreen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullscreen])
   const [suggestQuery, setSuggestQuery]     = useState('')
   const [suggestResults, setSuggestResults] = useState<JWApiSong[]>([])
   const [suggestLoading, setSuggestLoading] = useState(false)
@@ -521,8 +532,25 @@ export default function WrldView(): JSX.Element {
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
-  return (
+  const inner = (
     <div className="relative flex flex-col md:flex-row flex-1 h-full w-full overflow-hidden">
+
+      {/* Lets the OS window be dragged from the top of the fullscreen overlay,
+          since it now covers the normal draggable title-bar strip underneath. */}
+      {fullscreen && isElectronApp && (
+        <div className="absolute top-0 left-0 right-0 h-7 z-20 select-none mr-[132px]" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
+      )}
+
+      {/* Fullscreen toggle */}
+      <button
+        onClick={() => setFullscreen(v => !v)}
+        className="absolute z-30 flex items-center justify-center w-8 h-8 rounded-full transition-all
+          top-3 right-12 md:top-4 md:right-4
+          bg-black/10 dark:bg-black/25 text-black/50 dark:text-white/50 hover:text-black/80 dark:hover:text-white/90 hover:bg-black/20 dark:hover:bg-black/50 backdrop-blur-sm"
+        title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+      >
+        {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+      </button>
 
       {/* 999 FM toggle */}
       <button
@@ -965,6 +993,17 @@ export default function WrldView(): JSX.Element {
       </div>
     </div>
   )
+
+  if (fullscreen) {
+    // Portaled above everything except the OS window-control buttons
+    // (z-[10000]), so it covers the sidebar/nav instead of being squeezed
+    // into the normal content column.
+    return createPortal(
+      <div className="fixed inset-0 z-[150] bg-black">{inner}</div>,
+      document.body,
+    )
+  }
+  return inner
 }
 
 // ── ProgressBar — module-level so currentTime ticks don't re-render WrldView ──
@@ -976,13 +1015,12 @@ import { memo as _memo2, useRef as _useRef2, useCallback as _cb2 } from 'react'
 // (like LyricsPanel/FmProgressBar) so it reads the store directly instead of
 // drilling props from WrldView.
 const SongMenu = memo(function SongMenu({ light }: { light: boolean }): JSX.Element {
-  const { currentTrack, radioFmActive, radioFmNowPlaying, likedTrackIds, toggleLike, playNext } = useStore(useShallow(s => ({
+  const { currentTrack, radioFmActive, radioFmNowPlaying, likedTrackIds, toggleLike } = useStore(useShallow(s => ({
     currentTrack: s.currentTrack,
     radioFmActive: s.radioFmActive,
     radioFmNowPlaying: s.radioFmNowPlaying,
     likedTrackIds: s.likedTrackIds,
     toggleLike: s.toggleLike,
-    playNext: s.playNext,
   })))
 
   const [open, setOpen] = useState(false)
@@ -1031,15 +1069,6 @@ const SongMenu = memo(function SongMenu({ light }: { light: boolean }): JSX.Elem
                 {radioFmActive ? (radioFmNowPlaying?.artist ?? '') : (currentTrack?.artist ?? '')}
               </p>
             </div>
-
-            {!radioFmActive && currentTrack && (
-              <button
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-                onClick={() => { playNext(currentTrack); setOpen(false) }}
-              >
-                <ListEnd size={14} /> Play Next
-              </button>
-            )}
 
             {!radioFmActive && currentTrack && (
               <button
@@ -1309,20 +1338,32 @@ const LyricsPanel = memo(function LyricsPanel({
             const isActive = i === currentLineIdx
             const isPast   = i < currentLineIdx
             const dist     = Math.abs(i - currentLineIdx)
+            // The active line grows via `transform: scale()`, not a literal
+            // font-size change. font-size is a layout property — animating it
+            // keeps reflowing this line's box (and shifting every line below
+            // it) for the whole 0.4s, which raced the translateY centering
+            // calculation above: that math runs once off the pre-growth
+            // offsetTop/offsetHeight, so the line kept growing for a few more
+            // frames after the scroll settled, reading as a sudden late pop.
+            // A transform never affects layout/offsetHeight, so the centering
+            // stays correct for the whole transition with no second jump.
+            const baseFontSize = padded ? '1.4rem' : '1.15rem'
+            const scale = isActive ? (padded ? 1.25 : 1.217) : 1
             return (
               <div
                 key={i}
                 ref={isActive ? activeRef : undefined}
                 onClick={() => seekAudio(line.time)}
-                className="cursor-pointer select-none"
+                className="cursor-pointer select-none origin-left"
                 style={{
-                  fontSize:   padded ? (isActive ? '1.75rem' : '1.4rem') : (isActive ? '1.4rem' : '1.15rem'),
+                  fontSize:   baseFontSize,
                   fontWeight: isActive ? 800 : dist === 1 ? 600 : 400,
                   lineHeight: 1.25,
                   color:      isActive ? txtPri : txtSec,
                   opacity:    isActive ? 1 : dist === 1 ? 0.55 : dist === 2 ? 0.35 : 0.2,
                   filter:     (!isActive && !isPast && dist >= 2) ? 'blur(0.6px)' : 'none',
-                  transition: 'opacity 0.4s cubic-bezier(0.4,0,0.2,1), color 0.4s cubic-bezier(0.4,0,0.2,1), font-size 0.4s cubic-bezier(0.4,0,0.2,1), font-weight 0.4s cubic-bezier(0.4,0,0.2,1), filter 0.4s cubic-bezier(0.4,0,0.2,1)',
+                  transform:  `scale(${scale})`,
+                  transition: 'opacity 0.4s cubic-bezier(0.4,0,0.2,1), color 0.4s cubic-bezier(0.4,0,0.2,1), transform 0.4s cubic-bezier(0.4,0,0.2,1), font-weight 0.4s cubic-bezier(0.4,0,0.2,1), filter 0.4s cubic-bezier(0.4,0,0.2,1)',
                   textShadow: isActive ? '0 0 30px rgba(255,255,255,0.12)' : 'none',
                 }}
               >
