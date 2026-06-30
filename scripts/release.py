@@ -341,6 +341,20 @@ def step_build():
     section(4, TOTAL, "Build Electron app")
     warn("This takes ~2 minutes — output streams below")
     print()
+
+    # 1. Rebuild the renderer FIRST (tsc --noEmit && vite build) so dist/ is
+    #    fresh. electron-builder only packages whatever is already in dist/ —
+    #    skipping this ships a stale renderer (old bugs) under a new version.
+    info("Compiling renderer (npm run build)…")
+    renderer = subprocess.run("npm run build", shell=True, cwd=ROOT)
+    print()
+    if renderer.returncode != 0:
+        die("Renderer build failed (tsc / vite). See output above.")
+    ok("Renderer compiled → dist/")
+    print()
+
+    # 2. Package the Electron installer from the freshly built dist/.
+    info("Packaging installer (electron-builder)…")
     result = subprocess.run(
         r"node_modules\.bin\electron-builder.cmd --win --publish never",
         shell=True, cwd=ROOT,

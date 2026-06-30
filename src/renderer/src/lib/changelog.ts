@@ -6,6 +6,23 @@
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.10.2',
+    date: '2026-06-30',
+    changes: [
+      { type: 'fix',     text: 'Desktop installer now ships the latest code — previous builds packaged a stale renderer, so recent fixes never reached the app' },
+      { type: 'fix',     text: 'Pausing mid-crossfade no longer lets the next song keep playing' },
+      { type: 'fix',     text: '999 FM playback recovers after the app is backgrounded on mobile instead of going silent' },
+      { type: 'fix',     text: 'Songs no longer fail to advance after the app is backgrounded on mobile' },
+      { type: 'fix',     text: 'Play/Pause button no longer desyncs while 999 FM is active in the WRLD page' },
+      { type: 'fix',     text: 'Editing a newly-created song proposal now opens correctly instead of showing a blank page' },
+      { type: 'fix',     text: 'Submitting a new-song proposal no longer errors on the Engineer and Location fields' },
+      { type: 'fix',     text: 'Context menu items no longer flicker while hovering' },
+      { type: 'fix',     text: 'Typing in the "Become an editor" form no longer unfocuses the field on each keystroke' },
+      { type: 'improve', text: 'Add-to-playlist menu in the tracker now shows which playlists already contain the song' },
+      { type: 'improve', text: 'Synced-lyrics line transitions are smoother in the WRLD page' },
+    ],
+  },
+  {
     version: '1.8.8',
     date: '2026-06-25',
     changes: [
