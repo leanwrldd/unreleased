@@ -8,6 +8,7 @@ import {
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
 import type { EditorApplication, SongEditProposal, AdminUser, ProposalStatus } from '../lib/userApi'
+import { invalidateLyricsCache } from './Player'
 
 type Tab = 'proposals' | 'applications' | 'users' | 'stats' | 'security'
 
@@ -513,16 +514,23 @@ function ProposalsTab({ proposals, status, setStatus, onChanged }: {
     setRevising(false)
   }, [proposals])
 
+  // Approving/reversing a proposal changes a song's live data — drop its
+  // cached lyrics so the next play reflects it.
+  const dropCache = (id: number) => {
+    const songId = proposals.find(p => p.id === id)?.song
+    if (songId != null) invalidateLyricsCache(songId)
+  }
+
   const doReview = async (id: number, action: 'approve' | 'reject') => {
     setActionId(id)
-    try { await userApi.adminReviewProposal(id, { action, review_notes: notes[id] || '' }); onChanged() }
+    try { await userApi.adminReviewProposal(id, { action, review_notes: notes[id] || '' }); dropCache(id); onChanged() }
     catch {} finally { setActionId(null) }
   }
 
   const doReverse = async (id: number) => {
     if (!confirm('Reverse this approval?')) return
     setActionId(id)
-    try { await userApi.adminReverseProposal(id); onChanged() }
+    try { await userApi.adminReverseProposal(id); dropCache(id); onChanged() }
     catch {} finally { setActionId(null) }
   }
 

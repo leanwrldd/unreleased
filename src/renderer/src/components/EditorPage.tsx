@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo } from 'react'
+import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import {
   Loader2, Check, AlertCircle, LogIn, Clock, X, ChevronDown,
   ChevronUp, Award, Music2, FileText, Pencil, Plus,
@@ -6,6 +6,7 @@ import {
 import { useStore } from '../store/useStore'
 import { apiFetch, JWApiSong, JWApiEra, buildImageUrl, CATEGORY_LABELS } from '../lib/juicewrldApi'
 import * as userApi from '../lib/userApi'
+import { invalidateLyricsCache } from './Player'
 import type { EditorApplication } from '../lib/userApi'
 
 type SubmitState = 'idle' | 'submitting' | 'submitted' | 'error'
@@ -181,6 +182,14 @@ export default function EditorPage(): JSX.Element {
   const [song,    setSong]    = useState<JWApiSong | null>(null)
   const [loading, setLoading] = useState(false)
   const [eras,    setEras]    = useState<JWApiEra[]>([])
+  // Set synchronously the instant a manual load (Edit click / proposal open)
+  // is kicked off, before the async fetch resolves into `song`. Without this,
+  // there's a render in between where pendingEditorSongId has already been
+  // cleared to null but `song` hasn't been set yet — during that window the
+  // "prefill from currently-playing track" effect below would incorrectly
+  // fire and race the manual load, sometimes clobbering it with whatever's
+  // currently playing.
+  const manualLoadRef = useRef(false)
 
   const [name,     setName]     = useState('')
   const [artists,  setArtists]  = useState('')
@@ -279,7 +288,13 @@ export default function EditorPage(): JSX.Element {
       const s = await apiFetch<JWApiSong>(`/songs/${id}/`)
       setSong(s)
       populate(s)
-    } catch {} finally { setLoading(false) }
+    } catch {} finally {
+      setLoading(false)
+      // Once a load completes (success or failure), `song` (if set) already
+      // blocks the currently-playing prefill effect on its own — the ref's
+      // job was only to cover the race window while this was in flight.
+      manualLoadRef.current = false
+    }
   }, [populate])
 
   useEffect(() => {
@@ -291,6 +306,7 @@ export default function EditorPage(): JSX.Element {
 
   useEffect(() => {
     if (!pendingEditorSongId || !isEditor) return
+    manualLoadRef.current = true
     const id = pendingEditorSongId
     setPendingEditorSongId(null)
     loadSong(id)
@@ -300,8 +316,12 @@ export default function EditorPage(): JSX.Element {
     // Don't hijack a new-song draft (or an about-to-be-applied edit proposal)
     // with whatever happens to be playing — this raced with the
     // pendingEditProposal effect below and clobbered the draft once the
-    // currently-playing track's fetch resolved a moment later.
-    if (!isEditor || song || pendingEditorSongId || isNewSongDraft || pendingEditProposal) return
+    // currently-playing track's fetch resolved a moment later. manualLoadRef
+    // closes a second race: pendingEditorSongId/pendingEditProposal clear to
+    // null synchronously before their loadSong() promise resolves into
+    // `song`, leaving a render where this effect's guard would otherwise
+    // wrongly see "nothing pending" and prefill from whatever's playing.
+    if (!isEditor || song || pendingEditorSongId || isNewSongDraft || pendingEditProposal || manualLoadRef.current) return
     if (!currentTrack) return
     const id = userApi.trackIdToSongId(currentTrack.id)
     if (id) loadSong(id)
@@ -309,6 +329,7 @@ export default function EditorPage(): JSX.Element {
 
   useEffect(() => {
     if (!pendingEditProposal || !isEditor) return
+    manualLoadRef.current = true
     const { id, songId, proposedData: d, editorNotes } = pendingEditProposal
     setPendingEditProposal(null)
     setEditingPropId(id)
@@ -399,6 +420,9 @@ export default function EditorPage(): JSX.Element {
           title: name || song.name, proposed_data: patch, editor_notes: edNotes,
         })
       }
+      // Lyrics may have changed (and auto-approve admins make it live instantly)
+      // — drop the cached copy so the next play reflects the edit.
+      if (song && ('lyrics' in patch || 'synced_lyrics' in patch)) invalidateLyricsCache(song.id)
       setSubmitState('submitted')
       setTimeout(() => setSubmitState('idle'), 3000)
     } catch (e) {

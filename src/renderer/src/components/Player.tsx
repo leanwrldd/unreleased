@@ -44,6 +44,14 @@ export function getAudioDuration(): number { return _getAudioDuration?.() ?? 0 }
 // synced-lyrics highlighting instead of choppy ~250ms jumps.
 export function getAudioCurrentTime(): number { return _getAudioCurrentTime?.() ?? 0 }
 
+// Session cache of the API-derived lyrics for tracker songs, keyed by numeric
+// song id. The metadata-load effect runs on every track change; without this,
+// replaying or revisiting a song re-hits `/songs/{id}/` and (for editors/admins)
+// the proposals endpoint every single time. Cached per session — cleared on
+// reload, which is fine since lyrics rarely change mid-session.
+const lyricsCache = new Map<number, { lyrics: string | null; syncedLyrics: string | null }>()
+export function invalidateLyricsCache(songId: number): void { lyricsCache.delete(songId) }
+
 export default function Player(): JSX.Element {
   const {
     currentTrack,
@@ -245,23 +253,28 @@ export default function Player(): JSX.Element {
     const match = currentTrack.id.match(/^jw-(\d+)$/)
     if (match) {
       const songId = Number(match[1])
-      const isEditor = account?.is_editor || account?.is_administrator
-      const isAdmin = !!account?.is_administrator
-      apiFetch<JWApiSong>(`/songs/${songId}/`)
-        .then(async (song) => {
-          let syncedLyrics = song.synced_lyrics || null
-          // Public API never populates synced_lyrics — fall back to approved proposals
-          if (!syncedLyrics && isEditor) {
-            syncedLyrics = await getApprovedSyncedLyrics(songId, isAdmin)
-          }
-          if (isStale()) return
-          setCurrentTrackFull({
-            ...synthetic,
-            lyrics: song.lyrics || null,
-            syncedLyrics,
+      // Serve from session cache to avoid re-hitting /songs/ and the proposals
+      // endpoint when replaying or revisiting a song.
+      const cached = lyricsCache.get(songId)
+      if (cached) {
+        setCurrentTrackFull({ ...synthetic, lyrics: cached.lyrics, syncedLyrics: cached.syncedLyrics })
+      } else {
+        const isEditor = account?.is_editor || account?.is_administrator
+        const isAdmin = !!account?.is_administrator
+        apiFetch<JWApiSong>(`/songs/${songId}/`)
+          .then(async (song) => {
+            let syncedLyrics = song.synced_lyrics || null
+            // Public API never populates synced_lyrics — fall back to approved proposals
+            if (!syncedLyrics && isEditor) {
+              syncedLyrics = await getApprovedSyncedLyrics(songId, isAdmin)
+            }
+            const lyrics = song.lyrics || null
+            lyricsCache.set(songId, { lyrics, syncedLyrics })
+            if (isStale()) return
+            setCurrentTrackFull({ ...synthetic, lyrics, syncedLyrics })
           })
-        })
-        .catch(() => {/* no lyrics — that's fine */})
+          .catch(() => {/* no lyrics — that's fine */})
+      }
     } else {
       // Local track — load lyrics + cover art from IPC
       const el = (window as any).electron
@@ -453,12 +466,18 @@ export default function Player(): JSX.Element {
       const remaining = audio.duration - audio.currentTime
 
       if (remaining > 0 && remaining <= crossfadeDuration) {
-        // In radio mode use radioNext; otherwise compute from queue
+        // In radio mode use radioNext; otherwise compute from queue. Compute
+        // the index ONCE and reuse it for both the track data (what actually
+        // gets loaded into the next audio slot) and nextIdx (what queueIndex
+        // becomes once the crossfade completes). With shuffle on, calling
+        // computeNextIdx() twice re-rolls a new random pick each time, so the
+        // audio that plays and the metadata/queue position that gets set
+        // could end up referring to two different tracks.
         const isRadio = useStore.getState().radioMode
+        const nextIdx = isRadio ? -1 : computeNextIdx()
         const nextTrackData = isRadio
           ? useStore.getState().radioNext
-          : (() => { const i = computeNextIdx(); return (i >= 0 && i < queue.length) ? queue[i] : null })()
-        const nextIdx = isRadio ? -1 : computeNextIdx()
+          : (nextIdx >= 0 && nextIdx < queue.length) ? queue[nextIdx] : null
         const na = getNext()
 
         if (na && nextTrackData) {
@@ -895,7 +914,7 @@ export default function Player(): JSX.Element {
                     </>
                   )}
 
-                  {showContextMenu && currentTrack && (
+                  {showContextMenu && !radioFmActive && currentTrack && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setShowContextMenu(false)} />
                       <div className="absolute bottom-7 left-0 z-50 w-48 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 overflow-hidden">

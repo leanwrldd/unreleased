@@ -1,5 +1,6 @@
-import { useEffect, useRef, useMemo, useState, memo, useCallback } from 'react'
-import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, ChevronDown, ChevronLeft, Play, Pause, SkipBack, SkipForward as SkipFwd, Shuffle, Repeat, Repeat1, Volume2, VolumeX } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useMemo, useState, memo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
+import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, ChevronDown, ChevronLeft, Play, Pause, SkipBack, SkipForward as SkipFwd, Shuffle, Repeat, Repeat1, Volume2, VolumeX, MoreHorizontal, ListEnd, ListPlus, Info, Heart } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { useShallow } from 'zustand/react/shallow'
 import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
@@ -8,6 +9,8 @@ import { buildImageUrl, apiFetch, songToTrack, JWAPI_BASE, playlistCoverUrl } fr
 import { getActiveRadioClient } from '../lib/radioSocketService'
 import type { JWApiSong } from '../lib/juicewrldApi'
 import * as userApi from '../lib/userApi'
+import AddToPlaylistMenu from './AddToPlaylistMenu'
+import SongInfoModal from './SongInfoModal'
 
 // ── WrldData types ────────────────────────────────────────────────────────────
 
@@ -234,6 +237,10 @@ export default function WrldView(): JSX.Element {
   const displayTitle  = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.title  : currentTrack?.title
   const displayArtist = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.artist : currentTrack?.artist
   const displayAlbum  = radioFmActive && radioFmNowPlaying ? radioFmNowPlaying.album  : currentTrack?.album
+
+  // Nothing to control — gray out and disable the transport so it doesn't
+  // look interactive when there's no track loaded (and FM isn't filling in).
+  const noTrack = !radioFmActive && !currentTrack
 
   const ArtBox = ({ mobile }: { mobile: boolean }) => (
     <div
@@ -561,6 +568,7 @@ export default function WrldView(): JSX.Element {
                 {displayAlbum  && <p className="text-xs mt-0.5 truncate" style={{ color: txtTer }}>{displayAlbum}</p>}
                 {radioFmActive && !radioFmNowPlaying && <p className="text-xs mt-0.5" style={{ color: txtTer }}>Tuning in…</p>}
               </div>
+              <SongMenu light={textIsDark} />
             </div>
 
             {/* Tab bar (FM mode) or divider line */}
@@ -590,12 +598,14 @@ export default function WrldView(): JSX.Element {
                 this is the only way to control playback here. FM has no
                 local play/pause/seek, so that mode is volume-only. */}
             <div className="shrink-0 px-4 pt-2" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}>
+              {radioFmActive && <FmProgressBar txtPri={txtPri} txtTer={txtTer} />}
               {!radioFmActive && (
                 <>
                   <ProgressBar txtPri={txtPri} txtTer={txtTer} />
-                  <div className="flex items-center justify-between mt-2 mb-1">
+                  <div className={`flex items-center justify-between mt-2 mb-1 transition-opacity ${noTrack ? 'opacity-35 pointer-events-none' : ''}`}>
                     <button
                       onClick={toggleShuffle}
+                      disabled={noTrack}
                       title={shuffle ? 'Shuffle on' : 'Shuffle off'}
                       className="p-2 rounded-full transition-colors"
                       style={{ color: shuffle ? txtPri : txtTer, opacity: shuffle ? 1 : 0.6 }}
@@ -604,6 +614,7 @@ export default function WrldView(): JSX.Element {
                     </button>
                     <button
                       onClick={() => prevTrack()}
+                      disabled={noTrack}
                       className="p-2 rounded-full transition-opacity hover:opacity-70"
                       style={{ color: txtPri }}
                       title="Previous"
@@ -612,6 +623,7 @@ export default function WrldView(): JSX.Element {
                     </button>
                     <button
                       onClick={() => setIsPlaying(!isPlaying)}
+                      disabled={noTrack}
                       className="w-12 h-12 rounded-full flex items-center justify-center shadow-xl transition-opacity hover:opacity-80 active:scale-95"
                       style={{ background: txtPri, color: textIsDark ? 'white' : 'black' }}
                     >
@@ -621,6 +633,7 @@ export default function WrldView(): JSX.Element {
                     </button>
                     <button
                       onClick={() => nextTrack()}
+                      disabled={noTrack}
                       className="p-2 rounded-full transition-opacity hover:opacity-70"
                       style={{ color: txtPri }}
                       title="Next"
@@ -629,6 +642,7 @@ export default function WrldView(): JSX.Element {
                     </button>
                     <button
                       onClick={toggleRepeat}
+                      disabled={noTrack}
                       title={repeat === 'none' ? 'No repeat' : repeat === 'all' ? 'Repeat all' : 'Repeat one'}
                       className="p-2 rounded-full transition-colors"
                       style={{ color: repeat !== 'none' ? txtPri : txtTer, opacity: repeat !== 'none' ? 1 : 0.6 }}
@@ -712,15 +726,16 @@ export default function WrldView(): JSX.Element {
                     {displayArtist && <p className="text-sm mt-0.5 truncate" style={{ color: txtSec }}>{displayArtist}</p>}
                     {radioFmActive && !radioFmNowPlaying && <p className="text-sm mt-0.5" style={{ color: txtTer }}>Tuning in…</p>}
                   </div>
+                  <SongMenu light={textIsDark} />
                 </div>
               </div>
 
-              {/* Progress bar (hidden during FM — no scrubbing on live radio) */}
-              {!radioFmActive && (
-                <div className="w-full" style={{ maxWidth: 320 }}>
-                  <ProgressBar txtPri={txtPri} txtTer={txtTer} />
-                </div>
-              )}
+              {/* Progress bar — FM gets a read-only version (no scrubbing on live radio) */}
+              <div className="w-full" style={{ maxWidth: 320 }}>
+                {radioFmActive
+                  ? <FmProgressBar txtPri={txtPri} txtTer={txtTer} />
+                  : <ProgressBar txtPri={txtPri} txtTer={txtTer} />}
+              </div>
 
               {/* Playback controls */}
               <div className="w-full flex flex-col gap-4" style={{ maxWidth: 320 }}>
@@ -728,10 +743,11 @@ export default function WrldView(): JSX.Element {
                     nothing here to locally play/pause/seek. Voting to skip
                     lives in the FM panel itself instead of a repurposed button. */}
                 {!radioFmActive && (
-                <div className="flex items-center justify-between">
+                <div className={`flex items-center justify-between transition-opacity ${noTrack ? 'opacity-35 pointer-events-none' : ''}`}>
                   {/* Shuffle */}
                   <button
                     onClick={toggleShuffle}
+                    disabled={noTrack}
                     title={shuffle ? 'Shuffle on' : 'Shuffle off'}
                     className="p-2 rounded-full transition-colors"
                     style={{ color: shuffle ? txtPri : txtTer, opacity: shuffle ? 1 : 0.6 }}
@@ -742,6 +758,7 @@ export default function WrldView(): JSX.Element {
                   {/* Prev */}
                   <button
                     onClick={() => prevTrack()}
+                    disabled={noTrack}
                     className="p-2 rounded-full transition-opacity hover:opacity-70"
                     style={{ color: txtPri }}
                     title="Previous"
@@ -752,6 +769,7 @@ export default function WrldView(): JSX.Element {
                   {/* Play / Pause */}
                   <button
                     onClick={() => setIsPlaying(!isPlaying)}
+                    disabled={noTrack}
                     className="w-14 h-14 rounded-full flex items-center justify-center shadow-xl transition-opacity hover:opacity-80 active:scale-95"
                     style={{ background: txtPri, color: textIsDark ? 'white' : 'black' }}
                   >
@@ -763,6 +781,7 @@ export default function WrldView(): JSX.Element {
                   {/* Next */}
                   <button
                     onClick={() => nextTrack()}
+                    disabled={noTrack}
                     className="p-2 rounded-full transition-opacity hover:opacity-70"
                     style={{ color: txtPri }}
                     title="Next"
@@ -773,6 +792,7 @@ export default function WrldView(): JSX.Element {
                   {/* Repeat */}
                   <button
                     onClick={toggleRepeat}
+                    disabled={noTrack}
                     title={repeat === 'none' ? 'No repeat' : repeat === 'all' ? 'Repeat all' : 'Repeat one'}
                     className="p-2 rounded-full transition-colors"
                     style={{ color: repeat !== 'none' ? txtPri : txtTer, opacity: repeat !== 'none' ? 1 : 0.6 }}
@@ -952,6 +972,171 @@ export default function WrldView(): JSX.Element {
 import { memo as _memo2, useRef as _useRef2, useCallback as _cb2 } from 'react'
 // (re-exports already imported above; using same imports)
 
+// Apple Music-style "···" context menu for the current track. Module-level
+// (like LyricsPanel/FmProgressBar) so it reads the store directly instead of
+// drilling props from WrldView.
+const SongMenu = memo(function SongMenu({ light }: { light: boolean }): JSX.Element {
+  const { currentTrack, radioFmActive, radioFmNowPlaying, likedTrackIds, toggleLike, playNext } = useStore(useShallow(s => ({
+    currentTrack: s.currentTrack,
+    radioFmActive: s.radioFmActive,
+    radioFmNowPlaying: s.radioFmNowPlaying,
+    likedTrackIds: s.likedTrackIds,
+    toggleLike: s.toggleLike,
+    playNext: s.playNext,
+  })))
+
+  const [open, setOpen] = useState(false)
+  const [showAddToPlaylist, setShowAddToPlaylist] = useState(false)
+  const [addToPlaylistPos, setAddToPlaylistPos] = useState<{ top: number; left: number } | null>(null)
+  const [showSongInfo, setShowSongInfo] = useState(false)
+  const [songInfoData, setSongInfoData] = useState<JWApiSong | null>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+
+  const currentSongId = !radioFmActive && currentTrack ? userApi.trackIdToSongId(currentTrack.id) : null
+  const fmSongId = radioFmActive ? (radioFmNowPlaying?.song_id ?? null) : null
+  const hasTarget = radioFmActive ? fmSongId != null : !!currentTrack
+
+  const openInfo = (songId: number): void => {
+    setOpen(false)
+    setSongInfoData(null)
+    setShowSongInfo(true)
+    apiFetch<JWApiSong>(`/songs/${songId}/`)
+      .then(song => setSongInfoData(song))
+      .catch(() => setShowSongInfo(false))
+  }
+
+  if (!hasTarget) return <></>
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        ref={btnRef}
+        onClick={() => setOpen(v => !v)}
+        title="More options"
+        className="p-1.5 rounded-full transition-colors hover:bg-white/10"
+        style={{ color: light ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.55)' }}
+      >
+        <MoreHorizontal size={18} />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute top-full right-0 mt-1.5 z-50 w-48 bg-black/90 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl py-1 overflow-hidden">
+            <div className="px-3 py-2 border-b border-white/10 mb-1">
+              <p className="text-white/90 text-xs font-semibold truncate">
+                {radioFmActive ? (radioFmNowPlaying?.title ?? '') : (currentTrack?.title ?? '')}
+              </p>
+              <p className="text-white/40 text-[10px] truncate">
+                {radioFmActive ? (radioFmNowPlaying?.artist ?? '') : (currentTrack?.artist ?? '')}
+              </p>
+            </div>
+
+            {!radioFmActive && currentTrack && (
+              <button
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                onClick={() => { playNext(currentTrack); setOpen(false) }}
+              >
+                <ListEnd size={14} /> Play Next
+              </button>
+            )}
+
+            {!radioFmActive && currentTrack && (
+              <button
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                onClick={() => { toggleLike(currentTrack.id); setOpen(false) }}
+              >
+                <Heart size={14} fill={likedTrackIds.includes(currentTrack.id) ? 'currentColor' : 'none'} className={likedTrackIds.includes(currentTrack.id) ? 'text-accent' : ''} />
+                {likedTrackIds.includes(currentTrack.id) ? 'Unlike' : 'Like'}
+              </button>
+            )}
+
+            {!radioFmActive && currentSongId != null && (
+              <button
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                onClick={() => {
+                  if (btnRef.current) {
+                    const r = btnRef.current.getBoundingClientRect()
+                    const menuH = 340
+                    setAddToPlaylistPos({ top: Math.max(8, r.bottom - menuH), left: Math.max(8, Math.min(r.left, window.innerWidth - 256)) })
+                  }
+                  setShowAddToPlaylist(true)
+                  setOpen(false)
+                }}
+              >
+                <ListPlus size={14} /> Add to playlist
+              </button>
+            )}
+
+            {(currentSongId != null || fmSongId != null) && (
+              <button
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                onClick={() => openInfo((radioFmActive ? fmSongId : currentSongId) as number)}
+              >
+                <Info size={14} /> Song info
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {showAddToPlaylist && currentSongId != null && addToPlaylistPos != null && createPortal(
+        <div className="fixed z-[9999]" style={{ top: addToPlaylistPos.top, left: addToPlaylistPos.left }}>
+          <AddToPlaylistMenu songId={currentSongId} anchorClass="relative" onClose={() => { setShowAddToPlaylist(false); setAddToPlaylistPos(null) }} />
+        </div>,
+        document.body
+      )}
+
+      {showSongInfo && createPortal(
+        <SongInfoModal song={songInfoData} onClose={() => { setShowSongInfo(false); setSongInfoData(null) }} />,
+        document.body
+      )}
+    </div>
+  )
+})
+
+// Read-only playback bar for 999FM — it's a live stream, so no scrubbing,
+// but elapsed/duration are still known (from the radio WS) and ticked
+// locally between updates the same way the bottom Player bar does.
+const FmProgressBar = memo(function FmProgressBar({ txtPri, txtTer }: { txtPri: string; txtTer: string }) {
+  const radioFmNowPlaying = useStore(s => s.radioFmNowPlaying)
+  const [elapsedMs, setElapsedMs] = useState(0)
+  const baseRef = useRef<{ elapsed: number; at: number }>({ elapsed: 0, at: 0 })
+
+  useEffect(() => {
+    if (!radioFmNowPlaying?.elapsed_ms) { setElapsedMs(0); return }
+    baseRef.current = { elapsed: radioFmNowPlaying.elapsed_ms, at: Date.now() }
+    setElapsedMs(radioFmNowPlaying.elapsed_ms)
+    const t = setInterval(() => {
+      const { elapsed, at } = baseRef.current
+      setElapsedMs(elapsed + (Date.now() - at))
+    }, 500)
+    return () => clearInterval(t)
+  }, [radioFmNowPlaying])
+
+  const fmt = (s: number) => {
+    if (!isFinite(s) || isNaN(s) || s < 0) return '0:00'
+    const m = Math.floor(s / 60)
+    const sec = Math.floor(s % 60)
+    return `${m}:${sec.toString().padStart(2, '0')}`
+  }
+
+  const durationMs = radioFmNowPlaying?.duration_ms ?? 0
+  const pct = durationMs > 0 ? Math.min(100, (elapsedMs / durationMs) * 100) : 0
+
+  return (
+    <div className="w-full flex flex-col gap-1.5 select-none">
+      <div className="relative h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.18)' }}>
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: txtPri }} />
+      </div>
+      <div className="flex justify-between">
+        <span className="text-[10px] tabular-nums" style={{ color: txtTer }}>{fmt(elapsedMs / 1000)}</span>
+        <span className="text-[10px] tabular-nums" style={{ color: txtTer }}>{durationMs > 0 ? fmt(durationMs / 1000) : '-∞'}</span>
+      </div>
+    </div>
+  )
+})
+
 const ProgressBar = memo(function ProgressBar({ txtPri, txtTer }: { txtPri: string; txtTer: string }) {
   const { progress, currentTime } = useStore(useShallow(s => ({ progress: s.progress, currentTime: s.currentTime })))
   const dragging = useRef(false)
@@ -1022,7 +1207,9 @@ const LyricsPanel = memo(function LyricsPanel({
   radioFmActive, currentTrack, isEditor,
   txtPri, txtSec, txtTer,
 }: LyricsPanelProps) {
-  const activeRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const linesRef    = useRef<HTMLDivElement>(null)
+  const activeRef   = useRef<HTMLDivElement>(null)
 
   // Driven by requestAnimationFrame against the LIVE audio.currentTime rather
   // than the Zustand-stored value (which only updates on the native
@@ -1050,9 +1237,32 @@ const LyricsPanel = memo(function LyricsPanel({
     return () => cancelAnimationFrame(raf)
   }, [isSynced, syncedLines])
 
-  useEffect(() => {
-    activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [currentLineIdx])
+  // Center the active line by translating the whole lyric column rather than
+  // using native `scrollIntoView({behavior:'smooth'})`. Native smooth-scroll
+  // steps in discrete chunks and visibly fights the active line's font-size
+  // reflow, which read as a choppy, low-fps animation. A GPU-composited
+  // transform with a CSS transition glides at the display's full refresh rate.
+  const [translateY, setTranslateY] = useState(0)
+  const [vpHalf, setVpHalf] = useState(0)
+
+  useLayoutEffect(() => {
+    const vp = viewportRef.current
+    if (!vp) return
+    const measure = (): void => setVpHalf(vp.clientHeight / 2)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(vp)
+    return () => ro.disconnect()
+  }, [isSynced, syncedLines.length])
+
+  useLayoutEffect(() => {
+    if (currentLineIdx < 0) { setTranslateY(0); return }
+    const active = activeRef.current
+    if (!active) return
+    // offsetTop is relative to linesRef (position: relative), unaffected by the
+    // transform — so this stays correct mid-animation.
+    setTranslateY(active.offsetTop + active.offsetHeight / 2 - vpHalf)
+  }, [currentLineIdx, vpHalf])
 
   if (!rawLyrics) {
     return (
@@ -1072,44 +1282,55 @@ const LyricsPanel = memo(function LyricsPanel({
   }
 
   if (isSynced && syncedLines.length > 0) {
+    // Edge fade is done with a mask on the lines themselves, not an opaque
+    // overlay — painting flat rgba(0,0,0,0.55) bands on top added darkness
+    // confined to this panel's box, creating a visible "aura" rectangle that
+    // didn't match the rest of the tab's background. A mask instead fades the
+    // text to transparent, letting the page's own blurred-art background
+    // show through underneath, exactly like the rest of the tab.
+    const edgeMask = 'linear-gradient(to bottom, transparent, black 80px, black calc(100% - 80px), transparent)'
     return (
-      <div className="relative flex-1 min-h-0 overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 z-10 pointer-events-none" style={{ height: 80, background: 'linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)' }} />
-        <div className="absolute bottom-0 left-0 right-0 z-10 pointer-events-none" style={{ height: 80, background: 'linear-gradient(to top, rgba(0,0,0,0.55), transparent)' }} />
+      <div ref={viewportRef} className="relative flex-1 min-h-0 overflow-hidden">
         <div
-          className={`h-full overflow-y-auto ${padded ? 'py-24 px-10' : 'py-20 px-5 md:px-8'}`}
-          style={{ scrollbarWidth: 'none' }}
+          ref={linesRef}
+          className={`relative flex flex-col ${padded ? 'gap-5 px-10' : 'gap-4 px-5 md:px-8'}`}
+          style={{
+            transform: `translateY(${-translateY}px)`,
+            transition: 'transform 0.6s cubic-bezier(0.22,1,0.36,1)',
+            willChange: 'transform',
+            WebkitMaskImage: edgeMask,
+            maskImage: edgeMask,
+          }}
         >
-          <style>{`::-webkit-scrollbar{display:none}`}</style>
-          <div className={`flex flex-col ${padded ? 'gap-5' : 'gap-4'}`}>
-            {syncedLines.map((line, i) => {
-              if (!line.text) return <div key={i} className="h-3" />
-              const isActive = i === currentLineIdx
-              const isPast   = i < currentLineIdx
-              const dist     = Math.abs(i - currentLineIdx)
-              return (
-                <div
-                  key={i}
-                  ref={isActive ? activeRef : undefined}
-                  onClick={() => seekAudio(line.time)}
-                  className="cursor-pointer select-none"
-                  style={{
-                    fontSize:   padded ? (isActive ? '1.75rem' : '1.4rem') : (isActive ? '1.4rem' : '1.15rem'),
-                    fontWeight: isActive ? 800 : dist === 1 ? 600 : 400,
-                    lineHeight: 1.25,
-                    color:      isActive ? txtPri : txtSec,
-                    opacity:    isActive ? 1 : dist === 1 ? 0.55 : dist === 2 ? 0.35 : 0.2,
-                    filter:     (!isActive && !isPast && dist >= 2) ? 'blur(0.6px)' : 'none',
-                    transition: 'opacity 0.4s cubic-bezier(0.4,0,0.2,1), color 0.4s cubic-bezier(0.4,0,0.2,1), font-size 0.4s cubic-bezier(0.4,0,0.2,1), font-weight 0.4s cubic-bezier(0.4,0,0.2,1), filter 0.4s cubic-bezier(0.4,0,0.2,1)',
-                    textShadow: isActive ? '0 0 30px rgba(255,255,255,0.12)' : 'none',
-                  }}
-                >
-                  {line.text}
-                </div>
-              )
-            })}
-            <div className={padded ? 'h-40' : 'h-28'} />
-          </div>
+          {/* Half-viewport spacers so the first and last lines can sit at center. */}
+          <div style={{ height: vpHalf }} />
+          {syncedLines.map((line, i) => {
+            if (!line.text) return <div key={i} className="h-3" />
+            const isActive = i === currentLineIdx
+            const isPast   = i < currentLineIdx
+            const dist     = Math.abs(i - currentLineIdx)
+            return (
+              <div
+                key={i}
+                ref={isActive ? activeRef : undefined}
+                onClick={() => seekAudio(line.time)}
+                className="cursor-pointer select-none"
+                style={{
+                  fontSize:   padded ? (isActive ? '1.75rem' : '1.4rem') : (isActive ? '1.4rem' : '1.15rem'),
+                  fontWeight: isActive ? 800 : dist === 1 ? 600 : 400,
+                  lineHeight: 1.25,
+                  color:      isActive ? txtPri : txtSec,
+                  opacity:    isActive ? 1 : dist === 1 ? 0.55 : dist === 2 ? 0.35 : 0.2,
+                  filter:     (!isActive && !isPast && dist >= 2) ? 'blur(0.6px)' : 'none',
+                  transition: 'opacity 0.4s cubic-bezier(0.4,0,0.2,1), color 0.4s cubic-bezier(0.4,0,0.2,1), font-size 0.4s cubic-bezier(0.4,0,0.2,1), font-weight 0.4s cubic-bezier(0.4,0,0.2,1), filter 0.4s cubic-bezier(0.4,0,0.2,1)',
+                  textShadow: isActive ? '0 0 30px rgba(255,255,255,0.12)' : 'none',
+                }}
+              >
+                {line.text}
+              </div>
+            )
+          })}
+          <div style={{ height: vpHalf }} />
         </div>
       </div>
     )
