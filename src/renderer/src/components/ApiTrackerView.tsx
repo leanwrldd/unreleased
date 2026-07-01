@@ -2,15 +2,15 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Search, Play, Loader2, Music2, X, Check,
   LayoutList, LayoutGrid, Info, Download, ListPlus, PanelLeft,
-  ChevronUp, ChevronDown, MoreHorizontal, Folder, Pencil, Plus, ListMusic, HardDrive,
+  ChevronUp, ChevronDown, MoreHorizontal, Folder, Pencil, Plus, ListMusic, HardDrive, PackageOpen,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { useShallow } from 'zustand/react/shallow'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 import SongInfoModal from './SongInfoModal'
 import {
-  apiFetch, songToTrack, parseDuration, CATEGORY_LABELS, buildStreamUrl,
-  JWApiSong, JWApiPaginatedResponse, JWApiStats, JWApiEra,
+  apiFetch, songToTrack, parseDuration, CATEGORY_LABELS, buildStreamUrl, findSessionZips,
+  JWApiSong, JWApiPaginatedResponse, JWApiStats, JWApiEra, JWApiFileEntry,
 } from '../lib/juicewrldApi'
 import { fisherYates } from '../store/queueSlice'
 import { Track } from '../types'
@@ -43,6 +43,18 @@ function downloadSong(song: JWApiSong): void {
   const a = document.createElement('a')
   a.href = url
   a.download = (song.track_titles?.[0] || song.name) + '.mp3'
+  a.target = '_blank'
+  a.rel = 'noopener noreferrer'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
+function downloadZipEntry(entry: JWApiFileEntry): void {
+  const url = buildStreamUrl(entry.path)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = entry.name
   a.target = '_blank'
   a.rel = 'noopener noreferrer'
   document.body.appendChild(a)
@@ -206,7 +218,30 @@ function SongContextMenu({
   const [addingToLib, setAddingToLib] = useState(false)
   const [addedToLib, setAddedToLib] = useState(false)
   const [contained, setContained] = useState<Set<number>>(new Set())
+  const [zipLoading, setZipLoading] = useState(false)
+  const [zipCandidates, setZipCandidates] = useState<JWApiFileEntry[] | null>(null)
+  const [showZipList, setShowZipList] = useState(false)
   const el = (window as any).electron
+
+  const loadSessionZips = async (): Promise<void> => {
+    if (zipLoading) return
+    setZipLoading(true)
+    try {
+      const candidates = await findSessionZips(state.song)
+      if (candidates.length === 1) {
+        downloadZipEntry(candidates[0])
+        onClose()
+      } else {
+        setZipCandidates(candidates)
+        setShowZipList(true)
+      }
+    } catch {
+      setZipCandidates([])
+      setShowZipList(true)
+    } finally {
+      setZipLoading(false)
+    }
+  }
 
   useEffect(() => {
     const handle = (e: MouseEvent): void => {
@@ -261,8 +296,8 @@ function SongContextMenu({
   }
 
   // Adjust to stay on screen
-  const menuWidth = state.showPlaylists ? 208 : 208
-  const menuHeight = state.showPlaylists ? 320 : 200
+  const menuWidth = 208
+  const menuHeight = state.showPlaylists || showZipList ? 320 : 200
   const top = Math.max(8, Math.min(state.y, window.innerHeight - menuHeight - 8))
   const left = Math.max(8, Math.min(state.x, window.innerWidth - menuWidth - 8))
 
@@ -350,6 +385,34 @@ function SongContextMenu({
             </div>
           )}
         </>
+      ) : showZipList ? (
+        /* Recording-session ZIP candidates — shown when the search found
+           more than one .zip match and we can't safely auto-pick. */
+        <>
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowZipList(false) }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-muted hover:text-text-primary transition-colors"
+          >
+            <ChevronDown size={12} className="rotate-90" /> Back
+          </button>
+          {zipCandidates && zipCandidates.length > 0 ? (
+            <div className="max-h-44 overflow-y-auto">
+              <p className="px-3 pb-1 text-[10px] text-text-muted">Multiple matches found — pick one:</p>
+              {zipCandidates.map(c => (
+                <button
+                  key={c.path}
+                  onClick={(e) => { e.stopPropagation(); downloadZipEntry(c); onClose() }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                >
+                  <PackageOpen size={13} className="shrink-0 text-text-muted" />
+                  <span className="flex-1 truncate text-xs">{c.name}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="px-3 py-3 text-xs text-text-muted">No matching ZIP found for this session.</p>
+          )}
+        </>
       ) : (
         /* Main menu */
         <>
@@ -365,6 +428,16 @@ function SongContextMenu({
           )}
           {canEdit && (
             <MenuItem icon={<Pencil size={14} />} label="Edit" onClick={() => { onEdit(); onClose() }} />
+          )}
+          {!state.song.path && state.song.category === 'recording_session' && (
+            <>
+              <div className="my-1 border-t border-[var(--border)]" />
+              <MenuItem
+                icon={zipLoading ? <Loader2 size={14} className="animate-spin" /> : <PackageOpen size={14} />}
+                label={zipLoading ? 'Finding files…' : 'Download session (ZIP)'}
+                onClick={loadSessionZips}
+              />
+            </>
           )}
           {state.song.path && (
             <>

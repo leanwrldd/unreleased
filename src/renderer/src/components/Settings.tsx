@@ -18,22 +18,34 @@ type Tab = 'appearance' | 'playback' | 'library' | 'app' | 'about'
 // ── Flat row primitive — no card/box, just an icon + label on the left and
 // a control on the right, separated by a hairline. Used inside each tab's
 // content pane (macOS System Settings' detail-pane idiom, not the boxed
-// inset-grouped list). ──
+// inset-grouped list). The icon sits in a colored badge (iOS Settings-style)
+// — a fixed color + white icon reads correctly in both themes, unlike the
+// plain `text-muted` icon this replaced, which nearly disappeared in light
+// mode. ──
 
-function Row({ icon: Icon, label, sub, children }: {
+function Row({ icon: Icon, iconColor, label, sub, labelExtra, children }: {
   icon: ElementType
+  iconColor: string
   label: string
   sub?: string
+  // Rendered immediately after the label, on the left — for controls that
+  // are conceptually part of the label (e.g. an on/off toggle right next
+  // to "Crossfade"), as opposed to `children`, which sits at the row's
+  // right edge (e.g. the crossfade duration slider).
+  labelExtra?: ReactNode
   children?: ReactNode
 }): JSX.Element {
   return (
     <div className="flex items-center justify-between gap-3 py-3 border-b border-[var(--border)] last:border-b-0">
       <div className="flex items-center gap-2.5 min-w-0">
-        <Icon size={14} className="text-text-muted shrink-0" />
+        <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: iconColor }}>
+          <Icon size={13} className="text-white" strokeWidth={2.25} />
+        </div>
         <div className="min-w-0">
           <p className="text-text-primary text-sm truncate">{label}</p>
           {sub && <p className="text-text-muted text-[11px] truncate">{sub}</p>}
         </div>
+        {labelExtra}
       </div>
       {children}
     </div>
@@ -264,7 +276,7 @@ export default function Settings(): JSX.Element {
             {tab === 'appearance' && (
               <div>
                 <h3 className="text-text-primary text-lg font-bold mb-4">Appearance</h3>
-                <Row icon={theme === 'dark' ? Moon : Sun} label="Theme">
+                <Row icon={theme === 'dark' ? Moon : Sun} iconColor="#4b5563" label="Theme">
                   <div className="flex rounded-lg bg-[var(--surface-overlay)] p-0.5 gap-0.5">
                     {(['dark', 'light'] as const).map((t) => (
                       <button
@@ -282,10 +294,12 @@ export default function Settings(): JSX.Element {
                 </Row>
                 <div className="py-3 border-b border-[var(--border)] last:border-b-0">
                   <div className="flex items-center gap-2.5 mb-2.5">
-                    <Palette size={14} className="text-text-muted shrink-0" />
+                    <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: '#ec4899' }}>
+                      <Palette size={13} className="text-white" strokeWidth={2.25} />
+                    </div>
                     <span className="text-text-primary text-sm">Accent color</span>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap pl-[26px]">
+                  <div className="flex items-center gap-2 flex-wrap pl-[34px]">
                     {ACCENT_PRESETS.map((c) => (
                       <button
                         key={c}
@@ -315,7 +329,7 @@ export default function Settings(): JSX.Element {
               <div>
                 <h3 className="text-text-primary text-lg font-bold mb-4">Playback</h3>
                 {devices.length > 0 && (
-                  <Row icon={Volume2} label="Audio output">
+                  <Row icon={Volume2} iconColor="#2563eb" label="Audio output">
                     <select
                       value={audioOutput}
                       onChange={(e) => setAudioOutput(e.target.value)}
@@ -328,7 +342,7 @@ export default function Settings(): JSX.Element {
                     </select>
                   </Row>
                 )}
-                <Row icon={Zap} label="Playback speed">
+                <Row icon={Zap} iconColor="#f59e0b" label="Playback speed">
                   <div className="flex items-center gap-2">
                     <span className="text-text-muted text-xs tabular-nums w-8 text-right">{playbackSpeed.toFixed(2)}x</span>
                     <input
@@ -339,23 +353,25 @@ export default function Settings(): JSX.Element {
                     />
                   </div>
                 </Row>
-                <Row icon={Zap} label="Crossfade">
-                  <div className="flex items-center gap-3">
-                    {crossfadeEnabled && (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="range" min={1} max={12} step={1}
-                          value={crossfadeDuration}
-                          onChange={(e) => setCrossfade(true, parseInt(e.target.value))}
-                          className="w-20 accent-[var(--accent)]"
-                        />
-                        <span className="text-text-muted text-xs w-6">{crossfadeDuration}s</span>
-                      </div>
-                    )}
-                    <Toggle on={crossfadeEnabled} onClick={() => setCrossfade(!crossfadeEnabled, crossfadeDuration)} />
-                  </div>
+                <Row
+                  icon={Zap}
+                  iconColor="#7c3aed"
+                  label="Crossfade"
+                  labelExtra={<div className="ml-2"><Toggle on={crossfadeEnabled} onClick={() => setCrossfade(!crossfadeEnabled, crossfadeDuration)} /></div>}
+                >
+                  {crossfadeEnabled && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range" min={1} max={12} step={1}
+                        value={crossfadeDuration}
+                        onChange={(e) => setCrossfade(true, parseInt(e.target.value))}
+                        className="w-20 accent-[var(--accent)]"
+                      />
+                      <span className="text-text-muted text-xs w-6">{crossfadeDuration}s</span>
+                    </div>
+                  )}
                 </Row>
-                <Row icon={Clock} label="Sleep timer">
+                <Row icon={Clock} iconColor="#4f46e5" label="Sleep timer">
                   <div className="flex items-center gap-2">
                     {sleepTimerEnd ? (
                       <span className="text-accent text-xs font-medium">
@@ -434,10 +450,12 @@ export default function Settings(): JSX.Element {
                 <h3 className="text-text-primary text-lg font-bold mb-4">App</h3>
                 <div className="py-3 border-b border-[var(--border)]">
                   <div className="flex items-center gap-2.5 mb-2">
-                    <FolderOpen size={14} className="text-text-muted shrink-0" />
+                    <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: '#0891b2' }}>
+                      <FolderOpen size={13} className="text-white" strokeWidth={2.25} />
+                    </div>
                     <span className="text-text-primary text-sm">Download folder</span>
                   </div>
-                  <div className="flex items-center gap-2 pl-[26px]">
+                  <div className="flex items-center gap-2 pl-[34px]">
                     <span className="flex-1 text-text-muted text-xs truncate bg-[var(--surface-overlay)] rounded-lg px-3 py-2 border border-[var(--border)]" title={appSettings.downloadPath}>
                       {appSettings.downloadPath || 'Default Downloads folder'}
                     </span>
@@ -449,7 +467,7 @@ export default function Settings(): JSX.Element {
                     </button>
                   </div>
                 </div>
-                <Row icon={Monitor} label="Start on">
+                <Row icon={Monitor} iconColor="#6b7280" label="Start on">
                   <select
                     value={appSettings.startupView}
                     onChange={(e) => setSetting('startupView', e.target.value)}
@@ -462,13 +480,13 @@ export default function Settings(): JSX.Element {
                     <option value="playlists">Playlists</option>
                   </select>
                 </Row>
-                <Row icon={BellOff} label="Auto-download updates">
+                <Row icon={BellOff} iconColor="#16a34a" label="Auto-download updates">
                   <Toggle on={appSettings.autoDownload} onClick={() => setSetting('autoDownload', !appSettings.autoDownload)} />
                 </Row>
-                <Row icon={Minus} label="Minimize to tray on close">
+                <Row icon={Minus} iconColor="#6b7280" label="Minimize to tray on close">
                   <Toggle on={appSettings.minimizeToTray} onClick={() => setSetting('minimizeToTray', !appSettings.minimizeToTray)} />
                 </Row>
-                <Row icon={MessageCircle} label="Show Discord Status">
+                <Row icon={MessageCircle} iconColor="#5865f2" label="Show Discord Status">
                   <Toggle on={appSettings.discordRpcEnabled} onClick={() => setSetting('discordRpcEnabled', !appSettings.discordRpcEnabled)} />
                 </Row>
               </div>

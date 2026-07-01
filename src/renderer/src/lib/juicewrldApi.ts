@@ -107,6 +107,33 @@ export function buildCoverArtUrl(path: string): string {
   return `${JWAPI_BASE}/files/cover-art/?path=${encodeURIComponent(path)}`
 }
 
+// ─── Recording session ZIP lookup ──────────────────────────────────────────────
+//
+// "recording_session" songs have no `path` — the actual Pro Tools/Logic
+// project is a pre-built .zip sitting elsewhere in the file tree (under
+// "Studio Sessions/..."), not a single streamable audio file. There's no
+// field on the song object that points at it directly, so this falls back to
+// /files/browse/'s recursive `search` param (matched against the song's
+// name/original_key) and picks out the .zip results.
+export async function findSessionZips(song: JWApiSong): Promise<JWApiFileEntry[]> {
+  const term = song.original_key || song.name
+  if (!term) return []
+  const data = await apiFetch<JWApiBrowseResponse>('/files/browse/', { search: term })
+  const entries = Array.isArray(data) ? data : (data?.items ?? [])
+  const zips = entries.filter(e => e.type === 'file' && e.name.toLowerCase().endsWith('.zip'))
+  if (zips.length <= 1) return zips
+
+  // Same search term can turn up session zips for unrelated songs that
+  // happen to share a prefix (e.g. "Money Hunt" vs "Money Hunt (with Dripface
+  // Hottie)") — only auto-pick when exactly one candidate's name (stripped of
+  // extension and any trailing parenthetical/bracket qualifier) matches the
+  // song title exactly; otherwise let the caller show all candidates.
+  const strip = (name: string): string => name.replace(/\.[^.]+$/, '').replace(/\s*[[(].*$/, '').trim().toLowerCase()
+  const target = term.trim().toLowerCase()
+  const exact = zips.filter(z => strip(z.name) === target)
+  return exact.length === 1 ? exact : zips
+}
+
 export function buildImageUrl(imageUrl: string | null | undefined): string | undefined {
   if (!imageUrl) return undefined
   if (imageUrl.startsWith('http') || imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) return imageUrl
