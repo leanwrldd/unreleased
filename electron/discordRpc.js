@@ -122,7 +122,7 @@ function fmtTime(sec) {
  * facts. Keeps Discord's activity shape (timestamps, image keys, ActivityType)
  * out of the renderer — it only needs to report what's playing.
  *
- * @param {{ title: string, artist?: string, isPlaying: boolean, currentTime: number, duration: number, isRadio?: boolean, coverUrl?: string | null }} info
+ * @param {{ title: string, artist?: string, isPlaying: boolean, currentTime: number, duration: number, isRadio?: boolean, era?: string, coverUrl?: string | null }} info
  */
 function setNowPlaying(info) {
   if (!enabled) return
@@ -138,7 +138,10 @@ function setNowPlaying(info) {
     details: info.title,
     state: info.artist || undefined,
     largeImageKey: LARGE_IMAGE_KEY,
-    largeImageText: info.isRadio ? '999 FM' : 'Unreleased',
+    // Hover tooltip on the cover art — the song's era when known (e.g. "999
+    // Reloaded"), falling back to a generic label for radio/local files with
+    // no era data.
+    largeImageText: info.era || (info.isRadio ? '999 FM' : 'Unreleased'),
     instance: false,
   }
 

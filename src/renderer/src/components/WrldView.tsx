@@ -588,12 +588,14 @@ export default function WrldView(): JSX.Element {
 
       {/* Fullscreen toggle. The Electron window-control buttons (minimize/
           maximize/close) are a fixed 132px-wide bar pinned to the top-right
-          corner at all times (see WindowControls in App.tsx) — clear it,
-          otherwise this sits underneath those buttons (z-[10000]). */}
+          corner at all times (see WindowControls in App.tsx), and the global
+          Downloads trigger (see DownloadManager.tsx) sits immediately left of
+          those, another 36px wide — clear both, otherwise this button sits
+          underneath them (z-[10000] / z-[9990]). */}
       <button
         onClick={() => (fullscreen ? exitFullscreen() : enterFullscreen())}
         className={`absolute z-30 flex items-center justify-center w-8 h-8 rounded-full transition-all top-3 md:top-4
-          ${isElectronApp ? 'right-[140px]' : 'right-12 md:right-4'}
+          ${isElectronApp ? 'right-[176px]' : 'right-12 md:right-4'}
           bg-black/10 dark:bg-black/25 text-black/50 dark:text-white/50 hover:text-black/80 dark:hover:text-white/90 hover:bg-black/20 dark:hover:bg-black/50 backdrop-blur-sm`}
         title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
       >
@@ -946,7 +948,7 @@ export default function WrldView(): JSX.Element {
                   taking its own side column, matching Apple Music. */}
               {showQueue && !radioFmActive && (
                 <div className="w-full" style={{ maxWidth: 320 }}>
-                  <WrldQueuePanel variant="inline" artSrc={artSrc} onClose={() => setShowQueue(false)} />
+                  <WrldQueuePanel variant="inline" onClose={() => setShowQueue(false)} />
                 </div>
               )}
             </div>
@@ -955,7 +957,7 @@ export default function WrldView(): JSX.Element {
             {radioFmActive && <div className="w-px bg-white/10 shrink-0 my-10" />}
 
             {/* Right column */}
-            <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
               {radioFmActive ? (
                 <>
                   <div className="flex items-center gap-1 px-6 pt-5 pb-3 shrink-0">
@@ -1075,7 +1077,7 @@ export default function WrldView(): JSX.Element {
           a live stream with nothing to queue/reorder. */}
       {showQueue && !radioFmActive && (
         <div className="md:hidden">
-          <WrldQueuePanel variant="sheet" artSrc={artSrc} onClose={() => setShowQueue(false)} />
+          <WrldQueuePanel variant="sheet" onClose={() => setShowQueue(false)} />
         </div>
       )}
     </div>
@@ -1102,13 +1104,17 @@ import { memo as _memo2, useRef as _useRef2, useCallback as _cb2 } from 'react'
 // (like LyricsPanel/FmProgressBar) so it reads the store directly instead of
 // drilling props from WrldView.
 const SongMenu = memo(function SongMenu({ light }: { light: boolean }): JSX.Element {
-  const { currentTrack, radioFmActive, radioFmNowPlaying, likedTrackIds, toggleLike } = useStore(useShallow(s => ({
+  const { currentTrack, radioFmActive, radioFmNowPlaying, likedTrackIds, toggleLike, account, setActiveView, setPendingEditorSongId } = useStore(useShallow(s => ({
     currentTrack: s.currentTrack,
     radioFmActive: s.radioFmActive,
     radioFmNowPlaying: s.radioFmNowPlaying,
     likedTrackIds: s.likedTrackIds,
     toggleLike: s.toggleLike,
+    account: s.account,
+    setActiveView: s.setActiveView,
+    setPendingEditorSongId: s.setPendingEditorSongId,
   })))
+  const canEdit = !!(account?.is_editor || account?.is_administrator)
 
   const [open, setOpen] = useState(false)
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false)
@@ -1204,7 +1210,15 @@ const SongMenu = memo(function SongMenu({ light }: { light: boolean }): JSX.Elem
       )}
 
       {showSongInfo && createPortal(
-        <SongInfoModal song={songInfoData} onClose={() => { setShowSongInfo(false); setSongInfoData(null) }} />,
+        <SongInfoModal
+          song={songInfoData}
+          onClose={() => { setShowSongInfo(false); setSongInfoData(null) }}
+          onEdit={canEdit ? (songId) => {
+            setShowSongInfo(false); setSongInfoData(null)
+            setPendingEditorSongId(songId)
+            setActiveView('editor')
+          } : undefined}
+        />,
         document.body
       )}
     </div>
@@ -1215,9 +1229,8 @@ const SongMenu = memo(function SongMenu({ light }: { light: boolean }): JSX.Elem
 // panel matching the rest of the page instead of the app-wide QueuePanel's
 // light theme (which App.tsx suppresses while this page is active, mirroring
 // how it already suppresses the standalone NowPlaying panel here).
-const WrldQueuePanel = memo(function WrldQueuePanel({ onClose, artSrc, variant }: {
+const WrldQueuePanel = memo(function WrldQueuePanel({ onClose, variant }: {
   onClose: () => void
-  artSrc?: string | null
   // 'inline' pops up directly under the interface column on desktop (the
   // Apple Music behavior this is modeled on); 'sheet' is a full-screen
   // overlay, used on mobile where there's no side-by-side room for it.
@@ -1252,19 +1265,12 @@ const WrldQueuePanel = memo(function WrldQueuePanel({ onClose, artSrc, variant }
       style={variant === 'inline' ? { maxHeight: 300 } : undefined}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Apple Music-style colored backdrop, matched to the current track's
-          art — not a flat dark glass panel, which read as a mismatched,
-          generic overlay against the rest of this page's colorful theming.
-          No ring/shadow around the panel — it should read as part of the
-          page's own background, not a floating card dropped on top of it. */}
-      <div className="absolute inset-0 overflow-hidden">
-        {artSrc ? (
-          <img src={artSrc} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'blur(30px) saturate(1.9) brightness(0.45)', transform: 'scale(1.4)' }} />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-black" />
-        )}
-        <div className="absolute inset-0 bg-black/25" />
-      </div>
+      {/* Glassy frosted panel — blurs whatever's actually behind it rather
+          than compositing its own copy of the (brighter) album art, which
+          made the panel read as lighter than the rest of the page's own
+          darker blurred-art background instead of blending into it. */}
+      <div className="absolute inset-0 bg-black/45 backdrop-blur-2xl" />
+      <div className="absolute inset-0 ring-1 ring-inset ring-white/10" />
 
       <div className="relative z-10 flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-white/10">
         <div className="flex items-center gap-2">
@@ -1530,6 +1536,45 @@ const LyricsPanel = memo(function LyricsPanel({
   const [translateY, setTranslateY] = useState(0)
   const [vpHalf, setVpHalf] = useState(0)
 
+  // Manual-scroll override — the lyric column isn't a native scroll container
+  // (its position is driven by a `transform`, not `scrollTop`), so a plain
+  // wheel/touch drag would otherwise do nothing. When the user scrolls
+  // manually we take over `translateY` here and stop auto-centering the
+  // active line until they opt back in via the "Resume" button.
+  const [autoFollow, setAutoFollow] = useState(true)
+  const [manualTranslateY, setManualTranslateY] = useState(0)
+  const dragRef = useRef<{ startY: number; startTranslate: number } | null>(null)
+
+  const clampTranslate = (v: number): number => {
+    const vp = viewportRef.current
+    const lines = linesRef.current
+    if (!vp || !lines) return Math.max(v, 0)
+    const max = Math.max(0, lines.scrollHeight - vp.clientHeight)
+    return Math.min(Math.max(v, 0), max)
+  }
+
+  const handleWheel = (e: React.WheelEvent): void => {
+    if (!isSynced || syncedLines.length === 0) return
+    e.preventDefault()
+    const base = autoFollow ? translateY : manualTranslateY
+    setManualTranslateY(clampTranslate(base + e.deltaY))
+    if (autoFollow) setAutoFollow(false)
+  }
+
+  const handleTouchStart = (e: React.TouchEvent): void => {
+    if (!isSynced || syncedLines.length === 0) return
+    dragRef.current = { startY: e.touches[0].clientY, startTranslate: autoFollow ? translateY : manualTranslateY }
+  }
+
+  const handleTouchMove = (e: React.TouchEvent): void => {
+    if (!dragRef.current) return
+    const dy = dragRef.current.startY - e.touches[0].clientY
+    setManualTranslateY(clampTranslate(dragRef.current.startTranslate + dy))
+    if (autoFollow) setAutoFollow(false)
+  }
+
+  const handleTouchEnd = (): void => { dragRef.current = null }
+
   useLayoutEffect(() => {
     const vp = viewportRef.current
     if (!vp) return
@@ -1574,14 +1619,22 @@ const LyricsPanel = memo(function LyricsPanel({
     // text to transparent, letting the page's own blurred-art background
     // show through underneath, exactly like the rest of the tab.
     const edgeMask = 'linear-gradient(to bottom, transparent, black 80px, black calc(100% - 80px), transparent)'
+    const displayTranslateY = autoFollow ? translateY : manualTranslateY
     return (
-      <div ref={viewportRef} className="relative flex-1 min-h-0 overflow-hidden">
+      <div
+        ref={viewportRef}
+        className="relative flex-1 min-h-0 overflow-hidden"
+        onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <div
           ref={linesRef}
           className={`relative flex flex-col ${padded ? 'gap-5 px-10' : 'gap-4 px-5 md:px-8'}`}
           style={{
-            transform: `translateY(${-translateY}px)`,
-            transition: 'transform 0.6s cubic-bezier(0.22,1,0.36,1)',
+            transform: `translateY(${-displayTranslateY}px)`,
+            transition: autoFollow ? 'transform 0.6s cubic-bezier(0.22,1,0.36,1)' : 'none',
             willChange: 'transform',
             WebkitMaskImage: edgeMask,
             maskImage: edgeMask,
@@ -1636,6 +1689,16 @@ const LyricsPanel = memo(function LyricsPanel({
           })}
           <div style={{ height: vpHalf }} />
         </div>
+
+        {!autoFollow && (
+          <button
+            onClick={() => setAutoFollow(true)}
+            className="absolute left-1/2 -translate-x-1/2 bottom-4 z-10 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-white/85 text-xs font-medium hover:bg-black/75 transition-colors"
+          >
+            <ChevronDown size={13} />
+            Resume
+          </button>
+        )}
       </div>
     )
   }

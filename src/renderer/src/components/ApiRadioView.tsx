@@ -51,7 +51,8 @@ async function buildRandomQueue(): Promise<JWApiSong[]> {
 }
 
 export default function ApiRadioView(): JSX.Element {
-  const { playTrack, addToQueue, currentTrack, isPlaying } = useStore()
+  const { playTrack, addToQueue, currentTrack, isPlaying, account, setActiveView, setPendingEditorSongId } = useStore()
+  const canEdit = !!(account?.is_editor || account?.is_administrator)
 
   const [queue, setQueue] = useState<JWApiSong[]>([])
   const [song, setSong] = useState<JWApiSong | null>(null)
@@ -255,7 +256,11 @@ export default function ApiRadioView(): JSX.Element {
         <p className="text-text-muted text-xs opacity-40">{queue.length} songs in queue</p>
       )}
 
-      <SongInfoModal song={infoSong} onClose={() => setInfoSong(null)} />
+      <SongInfoModal
+        song={infoSong}
+        onClose={() => setInfoSong(null)}
+        onEdit={canEdit ? (songId) => { setInfoSong(null); setPendingEditorSongId(songId); setActiveView('editor') } : undefined}
+      />
     </div>
   )
 }

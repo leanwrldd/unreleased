@@ -1149,7 +1149,11 @@ export default function PlaylistsView(): JSX.Element {
           </div>
         )}
 
-        <SongInfoModal song={infoSong} onClose={() => setInfoSong(null)} />
+        <SongInfoModal
+          song={infoSong}
+          onClose={() => setInfoSong(null)}
+          onEdit={canEdit ? (songId) => { setInfoSong(null); setPendingEditorSongId(songId); setActiveView('editor') } : undefined}
+        />
       </div>
     )
   }

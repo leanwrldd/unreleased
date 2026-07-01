@@ -27,7 +27,7 @@ import {
 import { useStore } from '../store/useStore'
 import { formatDuration } from '../lib/lyrics'
 import { apiFetch, JWApiSong } from '../lib/juicewrldApi'
-import { trackIdToSongId, getApprovedSyncedLyrics} from '../lib/userApi'
+import { trackIdToSongId } from '../lib/userApi'
 import { FullTrack } from '../types'
 import AddToPlaylistMenu from './AddToPlaylistMenu'
 import SongInfoModal from './SongInfoModal'
@@ -46,9 +46,9 @@ export function getAudioCurrentTime(): number { return _getAudioCurrentTime?.() 
 
 // Session cache of the API-derived lyrics for tracker songs, keyed by numeric
 // song id. The metadata-load effect runs on every track change; without this,
-// replaying or revisiting a song re-hits `/songs/{id}/` and (for editors/admins)
-// the proposals endpoint every single time. Cached per session — cleared on
-// reload, which is fine since lyrics rarely change mid-session.
+// replaying or revisiting a song re-hits `/songs/{id}/` every single time.
+// Cached per session — cleared on reload, which is fine since lyrics rarely
+// change mid-session.
 const lyricsCache = new Map<number, { lyrics: string | null; syncedLyrics: string | null }>()
 export function invalidateLyricsCache(songId: number): void { lyricsCache.delete(songId) }
 
@@ -89,7 +89,8 @@ export default function Player(): JSX.Element {
     toggleLike,
     setActiveView,
     activeView,
-    playNext, account, updateLibraryTrack } = useStore()
+    playNext, account, updateLibraryTrack, setPendingEditorSongId } = useStore()
+  const canEditSong = !!(account?.is_editor || account?.is_administrator)
 
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [showAddToPlaylist, setShowAddToPlaylist] = useState(false)
@@ -253,21 +254,15 @@ export default function Player(): JSX.Element {
     const match = currentTrack.id.match(/^jw-(\d+)$/)
     if (match) {
       const songId = Number(match[1])
-      // Serve from session cache to avoid re-hitting /songs/ and the proposals
-      // endpoint when replaying or revisiting a song.
+      // Serve from session cache to avoid re-hitting /songs/ when replaying
+      // or revisiting a song.
       const cached = lyricsCache.get(songId)
       if (cached) {
         setCurrentTrackFull({ ...synthetic, lyrics: cached.lyrics, syncedLyrics: cached.syncedLyrics })
       } else {
-        const isEditor = account?.is_editor || account?.is_administrator
-        const isAdmin = !!account?.is_administrator
         apiFetch<JWApiSong>(`/songs/${songId}/`)
-          .then(async (song) => {
-            let syncedLyrics = song.synced_lyrics || null
-            // Public API never populates synced_lyrics — fall back to approved proposals
-            if (!syncedLyrics && isEditor) {
-              syncedLyrics = await getApprovedSyncedLyrics(songId, isAdmin)
-            }
+          .then((song) => {
+            const syncedLyrics = song.synced_lyrics || null
             const lyrics = song.lyrics || null
             lyricsCache.set(songId, { lyrics, syncedLyrics })
             if (isStale()) return
@@ -1133,7 +1128,15 @@ export default function Player(): JSX.Element {
 
         {/* Song info modal */}
         {showSongInfo && (
-          <SongInfoModal song={songInfoData} onClose={() => { setShowSongInfo(false); setSongInfoData(null) }} />
+          <SongInfoModal
+            song={songInfoData}
+            onClose={() => { setShowSongInfo(false); setSongInfoData(null) }}
+            onEdit={canEditSong ? (songId) => {
+              setShowSongInfo(false); setSongInfoData(null)
+              setPendingEditorSongId(songId)
+              setActiveView('editor')
+            } : undefined}
+          />
         )}
 
         {editingLocalTrack && (

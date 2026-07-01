@@ -64,6 +64,7 @@ export default function DiscordRpcSync(): JSX.Element | null {
         currentTime,
         duration: (radioFmNowPlaying.duration_ms ?? 0) / 1000,
         isRadio: true,
+        era: radioFmNowPlaying.album || undefined,
         coverUrl: radioFmMatchedSong?.imageUrl ?? buildImageUrl(radioFmNowPlaying.image_url) ?? null,
       })
       return
@@ -78,7 +79,22 @@ export default function DiscordRpcSync(): JSX.Element | null {
       return
     }
 
-    const key = `track:${currentTrack.id}:${isPlaying}`
+    // Paused: clear the Rich Presence entirely rather than showing a "frozen"
+    // card. Discord has no real concept of "paused" for classic RPC — any
+    // activity without timestamps still gets its own auto-ticking elapsed
+    // indicator (the small controller-icon counter), so the only way to show
+    // nothing misleading is to show nothing at all, same as native Spotify
+    // integration does while paused.
+    if (!isPlaying) {
+      if (lastSentKeyRef.current !== null) {
+        el.discordRpcClearActivity?.()
+        lastSentKeyRef.current = null
+        lastSentPosRef.current = null
+      }
+      return
+    }
+
+    const key = `track:${currentTrack.id}:playing`
     if (key === lastSentKeyRef.current) return
     lastSentKeyRef.current = key
     const currentTime = getCurrentTime()
@@ -86,13 +102,14 @@ export default function DiscordRpcSync(): JSX.Element | null {
     el.discordRpcSetActivity({
       title: currentTrack.title,
       artist: currentTrack.artist,
-      isPlaying,
+      isPlaying: true,
       currentTime,
       duration: currentTrack.duration,
       isRadio: false,
+      era: currentTrack.album || undefined,
       coverUrl: buildImageUrl(currentTrack.imageUrl) ?? null,
     })
-  }, [el, currentTrack?.id, currentTrack?.title, currentTrack?.artist, currentTrack?.duration, currentTrack?.imageUrl, isPlaying, radioFmActive, radioFmNowPlaying?.title, radioFmNowPlaying?.artist, radioFmMatchedSong?.imageUrl])
+  }, [el, currentTrack?.id, currentTrack?.title, currentTrack?.artist, currentTrack?.duration, currentTrack?.imageUrl, currentTrack?.album, isPlaying, radioFmActive, radioFmNowPlaying?.title, radioFmNowPlaying?.artist, radioFmNowPlaying?.album, radioFmMatchedSong?.imageUrl])
 
   // Seek detection: periodically compare where Discord thinks playback is
   // (extrapolated from the last update) against the real live position, and
@@ -113,6 +130,7 @@ export default function DiscordRpcSync(): JSX.Element | null {
         currentTime: actual,
         duration: currentTrack.duration,
         isRadio: false,
+        era: currentTrack.album || undefined,
         coverUrl: buildImageUrl(currentTrack.imageUrl) ?? null,
       })
     }, DRIFT_CHECK_MS)

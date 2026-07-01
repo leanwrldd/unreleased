@@ -63,7 +63,7 @@ export default function DownloadManager(): JSX.Element | null {
       <button
         onClick={() => setShowDownloadManager(!showDownloadManager)}
         className={`flex items-center justify-center w-9 h-7 transition-colors ${
-          active > 0 ? 'text-[var(--accent)]' : hasDownloads ? 'text-white/60 hover:text-white' : 'text-white/30 hover:text-white/60'
+          active > 0 ? 'text-[var(--accent)]' : hasDownloads ? 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
         }`}
         title="Downloads"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}

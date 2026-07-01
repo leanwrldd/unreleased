@@ -33,7 +33,7 @@ function formatDuration(seconds: number): string {
 }
 
 export default function LikedSongsView(): JSX.Element {
-  const { account, playTrack, addToQueue, toggleLike, setShowUserAuth, playlists, refreshPlaylists, setActiveView, setPendingEditorSongId, libraryTracks, likedTrackIds } = useStore()
+  const { account, playTrack, playNext, toggleLike, setShowUserAuth, playlists, refreshPlaylists, setActiveView, setPendingEditorSongId, libraryTracks, likedTrackIds } = useStore()
   const canEdit = !!(account?.is_editor || account?.is_administrator)
   const [apiTracks, setApiTracks] = useState<Track[]>([])
   const [loading, setLoading] = useState(true)
@@ -185,7 +185,7 @@ export default function LikedSongsView(): JSX.Element {
           className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
           <Play size={14} className="text-text-muted" /> Play
         </button>
-        <button onClick={() => { addToQueue(ctxMenu.track); setCtxMenu(null) }}
+        <button onClick={() => { playNext(ctxMenu.track); setCtxMenu(null) }}
           className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
           <PlayCircle size={14} className="text-text-muted" /> Play next
         </button>
@@ -239,7 +239,11 @@ export default function LikedSongsView(): JSX.Element {
         </button>
       </div>
     )}
-    <SongInfoModal song={infoSong} onClose={() => setInfoSong(null)} />
+    <SongInfoModal
+      song={infoSong}
+      onClose={() => setInfoSong(null)}
+      onEdit={canEdit ? (songId) => { setInfoSong(null); setPendingEditorSongId(songId); setActiveView('editor') } : undefined}
+    />
     </>
   )
 }
