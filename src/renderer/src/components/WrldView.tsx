@@ -1260,17 +1260,22 @@ const WrldQueuePanel = memo(function WrldQueuePanel({ onClose, variant }: {
   return (
     <div
       className={`relative flex flex-col overflow-hidden ${
-        variant === 'sheet' ? 'fixed inset-0 z-40' : 'w-full mt-2 rounded-2xl'
+        variant === 'sheet' ? 'fixed inset-0 z-40' : 'w-full mt-2 rounded-2xl shadow-2xl'
       }`}
       style={variant === 'inline' ? { maxHeight: 300 } : undefined}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Glassy frosted panel — blurs whatever's actually behind it rather
-          than compositing its own copy of the (brighter) album art, which
-          made the panel read as lighter than the rest of the page's own
-          darker blurred-art background instead of blending into it. */}
-      <div className="absolute inset-0 bg-black/45 backdrop-blur-2xl" />
-      <div className="absolute inset-0 ring-1 ring-inset ring-white/10" />
+      {/* Glassy frosted panel — blurs and lifts whatever's actually behind it
+          (brightness/saturate on the backdrop-filter itself, not a flat black
+          tint) so it reads as a distinct elevated card. A plain blur() alone
+          over this page's already-dark art background just looked like more
+          flat black with no glass effect. */}
+      <div
+        className="absolute inset-0"
+        style={{ backdropFilter: 'blur(40px) saturate(1.8) brightness(1.4)', WebkitBackdropFilter: 'blur(40px) saturate(1.8) brightness(1.4)' }}
+      />
+      <div className="absolute inset-0 bg-white/[0.06]" />
+      <div className="absolute inset-0 ring-1 ring-inset ring-white/15" />
 
       <div className="relative z-10 flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-white/10">
         <div className="flex items-center gap-2">
