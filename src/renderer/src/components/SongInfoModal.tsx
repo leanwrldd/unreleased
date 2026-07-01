@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { X, Music2, Pencil, Link2 } from 'lucide-react'
 import { JWApiSong, CATEGORY_LABELS, buildImageUrl, parseDuration, apiFetch } from '../lib/juicewrldApi'
-import { versionsEnabled, getVersionGroup, linkSongVersion, unlinkSongVersion, setVersionMeta, SongVersionMeta } from '../lib/versionsApi'
+import { versionsEnabled, getVersionGroup, linkSongVersion, unlinkSongVersion, SongVersionMeta } from '../lib/versionsApi'
 import { useStore } from '../store/useStore'
 
 function formatDur(secs: number): string {
@@ -116,20 +116,6 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
       refreshVersions(displaySong.id)
     } catch (e) {
       setLinkError(e instanceof Error ? e.message : 'Failed to unlink version')
-    }
-  }
-
-  const handleUpdateMeta = async (
-    versionId: number,
-    meta: { version?: number | null; versionTitle?: string | null }
-  ): Promise<void> => {
-    if (!displaySong) return
-    setLinkError(null)
-    try {
-      await setVersionMeta(versionId, meta)
-      refreshVersions(displaySong.id)
-    } catch (e) {
-      setLinkError(e instanceof Error ? e.message : 'Failed to update version info')
     }
   }
 
@@ -263,8 +249,8 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
                           >
                             <span className="text-text-primary text-xs truncate block">
                               {v.track_titles?.[0] || v.name}
-                              {meta.version != null && <span className="text-text-muted"> (v{meta.version}{meta.versionTitle ? ` — ${meta.versionTitle}` : ''})</span>}
-                              {meta.version == null && meta.versionTitle && <span className="text-text-muted"> ({meta.versionTitle})</span>}
+                              {meta.version && <span className="text-text-muted"> ({meta.version}{meta.versionTitle ? ` — ${meta.versionTitle}` : ''})</span>}
+                              {!meta.version && meta.versionTitle && <span className="text-text-muted"> ({meta.versionTitle})</span>}
                             </span>
                           </button>
                           {onEdit && (
@@ -277,29 +263,12 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
                             </button>
                           )}
                         </div>
-                        {onEdit ? (
-                          <div className="flex items-center gap-1.5 px-1.5 pb-1">
-                            <input
-                              type="number"
-                              defaultValue={meta.version ?? ''}
-                              placeholder="Version #"
-                              onBlur={(e) => {
-                                const val = e.target.value.trim()
-                                handleUpdateMeta(v.id, { version: val ? Number(val) : null })
-                              }}
-                              className="w-16 bg-surface-overlay border border-[var(--border)] rounded px-1.5 py-0.5 text-[11px] text-text-primary focus:outline-none"
-                            />
-                            <input
-                              type="text"
-                              defaultValue={meta.versionTitle ?? ''}
-                              placeholder="Version title"
-                              onBlur={(e) => handleUpdateMeta(v.id, { versionTitle: e.target.value.trim() || null })}
-                              className="flex-1 min-w-0 bg-surface-overlay border border-[var(--border)] rounded px-1.5 py-0.5 text-[11px] text-text-primary focus:outline-none"
-                            />
-                          </div>
-                        ) : meta.addedBy ? (
+                        {/* Version # and title are set from the editor (Edit song →
+                            Versions), not here — keeps every linked song's title in
+                            sync instead of letting this view drift out of step. */}
+                        {meta.addedBy && (
                           <p className="text-text-muted text-[10px] px-1.5 pb-1">Added by {meta.addedBy}</p>
-                        ) : null}
+                        )}
                       </div>
                     ))}
                   </div>
