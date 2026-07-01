@@ -3,7 +3,7 @@ import {
   Search, Play, Loader2, Music2, X, Check,
   LayoutList, LayoutGrid, Info, Download, ListPlus, PanelLeft,
   ChevronUp, ChevronDown, MoreHorizontal, Folder, Pencil, Plus, ListMusic, HardDrive, PackageOpen,
-  CheckSquare2, Square, Link2,
+  CheckSquare2, Square, Link2, Layers,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { useShallow } from 'zustand/react/shallow'
@@ -16,7 +16,8 @@ import {
 import { fisherYates } from '../store/queueSlice'
 import { Track } from '../types'
 import * as userApi from '../lib/userApi'
-import { versionsEnabled, linkSongVersion } from '../lib/versionsApi'
+import { versionsEnabled, linkSongVersion, getAllVersionGroups } from '../lib/versionsApi'
+import type { SongVersionMeta } from '../lib/versionsApi'
 
 type Category = 'released' | 'unreleased' | 'unsurfaced' | 'recording_session' | ''
 type ViewMode = 'list' | 'grid'
@@ -623,7 +624,7 @@ function SongActions({
 // ─── Song row (list mode) ─────────────────────────────────────────────────────
 function SongRow({
   song, onPlay, onCategoryClick, onEraClick, onInfo, onContextMenu,
-  selectMode, selected, onToggleSelect,
+  selectMode, selected, onToggleSelect, versionLabel,
 }: {
   song: JWApiSong
   onPlay: (song: JWApiSong) => void
@@ -634,6 +635,9 @@ function SongRow({
   selectMode: boolean
   selected: boolean
   onToggleSelect: (song: JWApiSong) => void
+  /** Shown next to the title when this row is a member of a compact-view
+   *  group (e.g. "v1", "TV Mix") — this song's own label within the group. */
+  versionLabel?: string | null
 }): JSX.Element {
   const track = songToTrack(song)
   const title = song.name
@@ -643,7 +647,7 @@ function SongRow({
   return (
     <div
       className={`group flex items-center gap-3 px-3 py-2.5 md:py-2 hover:bg-surface-overlay active:bg-surface-overlay rounded-lg transition-colors cursor-default ${selected ? 'bg-accent/10' : ''}`}
-      onClick={() => { if (selectMode) onToggleSelect(song) }}
+      onClick={() => onToggleSelect(song)}
       onDoubleClick={() => { if (!selectMode) onInfo(song) }}
       onContextMenu={(e) => { e.preventDefault(); onContextMenu(song, e) }}
     >
@@ -671,7 +675,10 @@ function SongRow({
 
       {/* Title */}
       <div className="flex-1 min-w-[100px]">
-        <p className="text-text-primary text-sm font-medium truncate">{title}</p>
+        <p className="text-text-primary text-sm font-medium truncate">
+          {title}
+          {versionLabel && <span className="text-text-muted font-normal"> ({versionLabel})</span>}
+        </p>
         <p className="md:hidden text-text-muted text-xs truncate mt-0.5">
           {song.credited_artists || 'Juice WRLD'}
           {song.era?.name ? ` · ${song.era.name}` : ''}
@@ -746,6 +753,32 @@ function SongRow({
   )
 }
 
+// ─── Version group row (compact view) ─────────────────────────────────────────
+// Collapses every song sharing a version_title into one row; expanding it
+// reveals the individual songs ("versions") nested underneath via SongRow.
+function GroupRow({
+  title, count, expanded, onToggle,
+}: {
+  title: string
+  count: number
+  expanded: boolean
+  onToggle: () => void
+}): JSX.Element {
+  return (
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 hover:bg-surface-overlay rounded-lg transition-colors text-left"
+    >
+      {expanded ? <ChevronUp size={14} className="text-text-muted shrink-0" /> : <ChevronDown size={14} className="text-text-muted shrink-0" />}
+      <div className="shrink-0 w-10 h-10 md:w-9 md:h-9 rounded overflow-hidden bg-surface-overlay flex items-center justify-center">
+        <Layers size={16} className="text-text-muted" />
+      </div>
+      <span className="flex-1 min-w-0 text-text-primary text-sm font-medium truncate">{title}</span>
+      <span className="text-text-muted text-xs shrink-0">{count} version{count === 1 ? '' : 's'}</span>
+    </button>
+  )
+}
+
 // ─── Song card (grid mode) ────────────────────────────────────────────────────
 function SongCard({
   song, onPlay, onCategoryClick, onEraClick, onInfo, onContextMenu,
@@ -768,7 +801,7 @@ function SongCard({
   return (
     <div
       className={`group flex flex-col rounded-xl overflow-hidden bg-surface-overlay hover:bg-surface-raised transition-colors cursor-default ${selected ? 'ring-2 ring-accent' : ''}`}
-      onClick={() => { if (selectMode) onToggleSelect(song) }}
+      onClick={() => onToggleSelect(song)}
       onContextMenu={(e) => { e.preventDefault(); onContextMenu(song, e) }}
     >
       <div className="relative w-full aspect-square bg-surface-raised">
@@ -885,6 +918,7 @@ export default function ApiTrackerView(): JSX.Element {
   const [bulkLinkStatus, setBulkLinkStatus] = useState<'idle' | 'linking' | 'done' | 'error'>('idle')
 
   const toggleSelect = (song: JWApiSong): void => {
+    setSelectMode(true)
     setSelected(prev => {
       const next = new Map(prev)
       if (next.has(song.id)) next.delete(song.id)
@@ -899,6 +933,70 @@ export default function ApiTrackerView(): JSX.Element {
     setBulkZipStatus('idle')
     setShowBulkPlaylists(false)
   }
+
+  // Deselecting the last song (via row/card click, "Clear", context menu
+  // unlink, etc.) turns select mode back off on its own, so there's no
+  // separate "Cancel" affordance needed once you're in it — Escape still
+  // works too (see the effect below).
+  useEffect(() => {
+    if (selectMode && selected.size === 0) setSelectMode(false)
+  }, [selectMode, selected])
+
+  // Compact view — shows only songs grouped into a titled version group,
+  // collapsed to one row per group; expanding it reveals the individual
+  // songs ("versions") nested underneath. Deliberately fetched independently
+  // of the Tracker's own paginated `songs` list (see getAllVersionGroups) —
+  // tying it to sortedSongs previously meant a group's members could be
+  // missed if they hadn't scrolled into view yet, and re-querying on every
+  // page load compounded into serious lag as more pages loaded.
+  interface CompactGroupData {
+    groupId: number
+    title: string
+    members: { song: JWApiSong; meta: SongVersionMeta }[]
+  }
+  const [compactView, setCompactView] = useState(false)
+  const [compactGroups, setCompactGroups] = useState<CompactGroupData[]>([])
+  const [loadingCompact, setLoadingCompact] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set())
+  const toggleGroupExpanded = (groupId: number): void => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      return next
+    })
+  }
+
+  useEffect(() => {
+    if (!compactView || !versionsEnabled) { setCompactGroups([]); return }
+    let cancelled = false
+    setLoadingCompact(true)
+    getAllVersionGroups().then(async (metas) => {
+      const byGroup = new Map<number, SongVersionMeta[]>()
+      for (const m of metas) {
+        if (!byGroup.has(m.groupId)) byGroup.set(m.groupId, [])
+        byGroup.get(m.groupId)!.push(m)
+      }
+      const uniqueIds = [...new Set(metas.map(m => m.songId))]
+      const songMap = new Map<number, JWApiSong>()
+      await Promise.all(uniqueIds.map(id =>
+        apiFetch<JWApiSong>(`/songs/${id}/`).then(s => { songMap.set(id, s) }).catch(() => {})
+      ))
+      if (cancelled) return
+      const groups: CompactGroupData[] = [...byGroup.entries()]
+        .map(([groupId, groupMetas]) => ({
+          groupId,
+          title: groupMetas.find(m => m.versionTitle)?.versionTitle ?? '',
+          members: groupMetas
+            .map(m => ({ song: songMap.get(m.songId), meta: m }))
+            .filter((x): x is { song: JWApiSong; meta: SongVersionMeta } => !!x.song),
+        }))
+        .filter(g => g.members.length > 0)
+      setCompactGroups(groups)
+      setLoadingCompact(false)
+    })
+    return () => { cancelled = true }
+  }, [compactView])
 
   const [stats, setStats] = useState<JWApiStats | null>(null)
   const [eras, setEras] = useState<JWApiEra[]>([])
@@ -1259,35 +1357,39 @@ export default function ApiTrackerView(): JSX.Element {
               <option value="recording_session">Sessions</option>
             </select>
 
-            <button
-              onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
-              className={`flex items-center gap-1.5 px-2.5 py-2.5 md:py-2 rounded-lg text-xs transition-colors shrink-0 ${
-                selectMode
-                  ? 'bg-accent/15 text-accent border border-accent/30'
-                  : 'bg-surface-overlay text-text-muted hover:text-text-secondary border border-transparent'
-              }`}
-              title={selectMode ? 'Exit selection' : 'Select multiple songs'}
-            >
-              <CheckSquare2 size={13} />
-              <span className="hidden sm:inline">{selectMode ? 'Cancel' : 'Select'}</span>
-            </button>
+            {versionsEnabled && (
+              <button
+                onClick={() => { setCompactView(v => !v); setExpandedGroups(new Set()) }}
+                className={`flex items-center gap-1.5 px-2.5 py-2.5 md:py-2 rounded-lg text-xs transition-colors shrink-0 ${
+                  compactView
+                    ? 'bg-accent/15 text-accent border border-accent/30'
+                    : 'bg-surface-overlay text-text-muted hover:text-text-secondary border border-transparent'
+                }`}
+                title="Collapse songs into their version groups"
+              >
+                <Layers size={13} />
+                <span className="hidden sm:inline">Compact</span>
+              </button>
+            )}
 
-            <div className="flex items-center bg-surface-overlay rounded-lg p-0.5 shrink-0 ml-auto">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 md:p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
-                title="List view"
-              >
-                <LayoutList size={16} />
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 md:p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
-                title="Grid view"
-              >
-                <LayoutGrid size={16} />
-              </button>
-            </div>
+            {!compactView && (
+              <div className="flex items-center bg-surface-overlay rounded-lg p-0.5 shrink-0 ml-auto">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 md:p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
+                  title="List view"
+                >
+                  <LayoutList size={16} />
+                </button>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 md:p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-surface-raised text-text-primary' : 'text-text-muted hover:text-text-secondary'}`}
+                  title="Grid view"
+                >
+                  <LayoutGrid size={16} />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Active filter chips */}
@@ -1333,7 +1435,7 @@ export default function ApiTrackerView(): JSX.Element {
 
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           {/* Column headers */}
-          {viewMode === 'list' && (
+          {(viewMode === 'list' || compactView) && (
             <div className="hidden md:block px-5 pb-1 shrink-0">
               {(() => {
                 const SortBtn = ({ field, label, className }: { field: OrderField; label: string; className?: string }): JSX.Element => {
@@ -1367,7 +1469,49 @@ export default function ApiTrackerView(): JSX.Element {
 
           {/* Song list / grid */}
           <div className="flex-1 overflow-y-auto px-3 md:px-5 pb-4">
-            {loading && sortedSongs.length === 0 ? (
+            {compactView ? loadingCompact ? (
+              <div className="flex items-center justify-center h-40 gap-2 text-text-muted">
+                <Loader2 size={18} className="animate-spin" />
+                <span className="text-sm">Loading version groups…</span>
+              </div>
+            ) : compactGroups.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-2">
+                <Layers size={32} className="text-text-muted opacity-30" />
+                <p className="text-text-muted text-sm">No version groups yet</p>
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {compactGroups.map((group) => (
+                  <div key={group.groupId}>
+                    <GroupRow
+                      title={group.title}
+                      count={group.members.length}
+                      expanded={expandedGroups.has(group.groupId)}
+                      onToggle={() => toggleGroupExpanded(group.groupId)}
+                    />
+                    {expandedGroups.has(group.groupId) && (
+                      <div className="ml-4 pl-4 border-l border-[var(--border)] space-y-0.5">
+                        {group.members.map(({ song: member, meta }) => (
+                          <SongRow
+                            key={member.id}
+                            song={member}
+                            onPlay={handlePlay}
+                            onCategoryClick={handleCategoryClick}
+                            onEraClick={handleEraClick}
+                            onInfo={handleInfo}
+                            onContextMenu={handleContextMenu}
+                            selectMode={selectMode}
+                            selected={selected.has(member.id)}
+                            onToggleSelect={toggleSelect}
+                            versionLabel={meta.version}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : loading && sortedSongs.length === 0 ? (
               <div className="flex items-center justify-center h-40 gap-2 text-text-muted">
                 <Loader2 size={18} className="animate-spin" />
                 <span className="text-sm">{orderField ? 'Loading full library for sorting…' : 'Loading…'}</span>
@@ -1568,7 +1712,7 @@ export default function ApiTrackerView(): JSX.Element {
           onEdit={() => { setPendingEditorSongId(contextMenu.song.id); setActiveView('editor') }}
           canEdit={canEdit}
           onTogglePlaylists={() => setContextMenu((prev) => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null)}
-          onSelect={() => { setSelectMode(true); toggleSelect(contextMenu.song) }}
+          onSelect={() => toggleSelect(contextMenu.song)}
         />
       )}
 
