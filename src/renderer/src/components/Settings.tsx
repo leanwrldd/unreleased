@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef, ReactNode, ElementType } from 'react'
 import {
   X, Moon, Sun, Palette, Volume2, Zap, Clock, Info, Github, MessageCircle,
   PenLine, BookOpen, Copy, Eye, EyeOff, ChevronDown, KeyRound, Globe, RefreshCw, DownloadCloud,
@@ -13,6 +13,50 @@ const ACCENT_PRESETS = [
 ]
 
 type UpdateState = 'idle' | 'checking' | 'available' | 'latest' | 'downloading' | 'downloaded' | 'error'
+
+// ── Grouped-list primitives — Apple's inset-grouped settings list (iOS
+// Settings / macOS System Settings), which is the idiom Apple Music's own
+// settings panels borrow. Replaces the previous flat, ungrouped rows. ──
+
+function SettingsGroup({ children }: { children: ReactNode }): JSX.Element {
+  return (
+    <div className="rounded-2xl overflow-hidden border border-[var(--border)] divide-y divide-[var(--border)] bg-[var(--surface-raised)]">
+      {children}
+    </div>
+  )
+}
+
+function SettingsRow({ icon: Icon, iconColor, label, sub, children }: {
+  icon: ElementType
+  iconColor: string
+  label: string
+  sub?: string
+  children?: ReactNode
+}): JSX.Element {
+  return (
+    <div className="flex items-center gap-3 px-3.5 py-2.5 min-h-[46px]">
+      <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: iconColor }}>
+        <Icon size={13} className="text-white" strokeWidth={2.25} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-text-primary text-sm truncate">{label}</p>
+        {sub && <p className="text-text-muted text-[11px] truncate">{sub}</p>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function Toggle({ on, onClick }: { on: boolean; onClick: () => void }): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative w-10 h-5 rounded-full shrink-0 transition-colors ${on ? 'bg-accent' : 'bg-[var(--surface-overlay)]'}`}
+    >
+      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${on ? 'left-5' : 'left-0.5'}`} />
+    </button>
+  )
+}
 
 interface AppSettings {
   downloadPath: string
@@ -122,11 +166,11 @@ export default function Settings(): JSX.Element {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => { if (e.target === overlayRef.current) setShowSettings(false) }}
     >
-      <div className="bg-surface border border-[var(--border)] rounded-2xl shadow-2xl w-full max-w-[520px] mx-3 max-h-[88vh] md:max-h-[80vh] flex flex-col overflow-hidden">
+      <div className="bg-[var(--surface)]/95 backdrop-blur-xl border border-[var(--border)] rounded-3xl shadow-2xl w-full max-w-[540px] mx-3 max-h-[88vh] md:max-h-[80vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] shrink-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-text-primary font-bold text-lg">Settings</h2>
+            <h2 className="text-text-primary font-black text-xl tracking-tight">Settings</h2>
             {isElectron && (
               <button
                 disabled={updateState === 'checking' || updateState === 'downloading'}
@@ -177,154 +221,140 @@ export default function Settings(): JSX.Element {
           </button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-8">
+        <div className="overflow-y-auto flex-1 px-5 py-5 space-y-7">
 
           {/* Appearance */}
           <section>
-            <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest mb-4">Appearance</h3>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-text-primary text-sm">Theme</span>
-              <div className="flex rounded-lg bg-surface-overlay p-0.5 gap-0.5">
-                {(['dark', 'light'] as const).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTheme(t)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                      theme === t ? 'bg-surface text-text-primary shadow-sm' : 'text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    {t === 'dark' ? <Moon size={12} /> : <Sun size={12} />}
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Palette size={14} className="text-text-muted" />
-                <span className="text-text-primary text-sm">Accent color</span>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                {ACCENT_PRESETS.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => { setAccentColor(c); setCustomAccent(c) }}
-                    className="w-7 h-7 rounded-full transition-all hover:scale-110"
-                    style={{ backgroundColor: c, outline: accentColor === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }}
+            <h3 className="text-text-muted text-xs font-semibold uppercase tracking-widest mb-2 px-1">Appearance</h3>
+            <SettingsGroup>
+              <SettingsRow icon={theme === 'dark' ? Moon : Sun} iconColor="#4b5563" label="Theme">
+                <div className="flex rounded-lg bg-[var(--surface-overlay)] p-0.5 gap-0.5">
+                  {(['dark', 'light'] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTheme(t)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        theme === t ? 'bg-surface text-text-primary shadow-sm' : 'text-text-muted hover:text-text-primary'
+                      }`}
+                    >
+                      {t === 'dark' ? <Moon size={12} /> : <Sun size={12} />}
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </SettingsRow>
+              <div className="px-3.5 py-3">
+                <div className="flex items-center gap-3 mb-2.5">
+                  <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: '#ec4899' }}>
+                    <Palette size={13} className="text-white" strokeWidth={2.25} />
+                  </div>
+                  <span className="text-text-primary text-sm">Accent color</span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap pl-9">
+                  {ACCENT_PRESETS.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => { setAccentColor(c); setCustomAccent(c) }}
+                      className="w-7 h-7 rounded-full transition-transform hover:scale-110"
+                      style={{ backgroundColor: c, outline: accentColor === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }}
+                    />
+                  ))}
+                  <input
+                    type="color"
+                    value={customAccent}
+                    onChange={(e) => {
+                      setCustomAccent(e.target.value)
+                      if (accentDebounceRef.current) clearTimeout(accentDebounceRef.current)
+                      accentDebounceRef.current = setTimeout(() => setAccentColor(e.target.value), 80)
+                    }}
+                    className="w-7 h-7 rounded-full cursor-pointer border-0 p-0 bg-transparent"
+                    title="Custom color"
                   />
-                ))}
-                <input
-                  type="color"
-                  value={customAccent}
-                  onChange={(e) => {
-                    setCustomAccent(e.target.value)
-                    if (accentDebounceRef.current) clearTimeout(accentDebounceRef.current)
-                    accentDebounceRef.current = setTimeout(() => setAccentColor(e.target.value), 80)
-                  }}
-                  className="w-7 h-7 rounded-full cursor-pointer border-0 p-0 bg-transparent"
-                  title="Custom color"
-                />
+                </div>
               </div>
-            </div>
+            </SettingsGroup>
           </section>
 
           {/* Playback */}
           <section>
-            <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest mb-4">Playback</h3>
-            {devices.length > 0 && (
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Volume2 size={14} className="text-text-muted" />
-                  <span className="text-text-primary text-sm">Audio output</span>
-                </div>
-                <select
-                  value={audioOutput}
-                  onChange={(e) => setAudioOutput(e.target.value)}
-                  className="bg-surface-overlay text-text-primary text-xs rounded-lg px-2 py-1.5 border border-[var(--border)] max-w-[180px] truncate"
-                >
-                  <option value="">Default</option>
-                  {devices.map((d) => (
-                    <option key={d.deviceId} value={d.deviceId}>{d.label || `Device ${d.deviceId.slice(0, 6)}`}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Zap size={14} className="text-text-muted" />
-                <span className="text-text-primary text-sm">Playback speed</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-text-muted text-xs">{playbackSpeed.toFixed(2)}x</span>
-                <input
-                  type="range" min={0.5} max={2} step={0.05}
-                  value={playbackSpeed}
-                  onChange={(e) => setPlaybackSpeed(parseFloat(e.target.value))}
-                  className="w-24 accent-[var(--accent)]"
-                />
-              </div>
-            </div>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-text-primary text-sm">Crossfade</span>
-              <div className="flex items-center gap-3">
-                {crossfadeEnabled && (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="range" min={1} max={12} step={1}
-                      value={crossfadeDuration}
-                      onChange={(e) => setCrossfade(true, parseInt(e.target.value))}
-                      className="w-20 accent-[var(--accent)]"
-                    />
-                    <span className="text-text-muted text-xs w-6">{crossfadeDuration}s</span>
-                  </div>
-                )}
-                <button
-                  onClick={() => setCrossfade(!crossfadeEnabled, crossfadeDuration)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${crossfadeEnabled ? 'bg-accent' : 'bg-surface-overlay'}`}
-                >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${crossfadeEnabled ? 'left-5' : 'left-0.5'}`} />
-                </button>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock size={14} className="text-text-muted" />
-                <span className="text-text-primary text-sm">Sleep timer</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {sleepTimerEnd ? (
-                  <span className="text-accent text-xs">
-                    {Math.max(0, Math.ceil((sleepTimerEnd - Date.now()) / 60000))} min left
-                  </span>
-                ) : (
+            <h3 className="text-text-muted text-xs font-semibold uppercase tracking-widest mb-2 px-1">Playback</h3>
+            <SettingsGroup>
+              {devices.length > 0 && (
+                <SettingsRow icon={Volume2} iconColor="#2563eb" label="Audio output">
                   <select
-                    value={sleepMinutes}
-                    onChange={(e) => setSleepMinutes(parseInt(e.target.value))}
-                    className="bg-surface-overlay text-text-primary text-xs rounded px-2 py-1 border border-[var(--border)]"
+                    value={audioOutput}
+                    onChange={(e) => setAudioOutput(e.target.value)}
+                    className="bg-[var(--surface-overlay)] text-text-primary text-xs rounded-lg px-2 py-1.5 border border-[var(--border)] max-w-[160px] truncate"
                   >
-                    {[15, 30, 45, 60, 90].map((m) => <option key={m} value={m}>{m} min</option>)}
+                    <option value="">Default</option>
+                    {devices.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>{d.label || `Device ${d.deviceId.slice(0, 6)}`}</option>
+                    ))}
                   </select>
-                )}
-                <button
-                  onClick={toggleSleepTimer}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                    sleepTimerEnd ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25' : 'bg-accent/15 text-accent hover:bg-accent/25'
-                  }`}
-                >
-                  {sleepTimerEnd ? 'Cancel' : 'Start'}
-                </button>
-              </div>
-            </div>
+                </SettingsRow>
+              )}
+              <SettingsRow icon={Zap} iconColor="#f59e0b" label="Playback speed">
+                <div className="flex items-center gap-2">
+                  <span className="text-text-muted text-xs tabular-nums w-8 text-right">{playbackSpeed.toFixed(2)}x</span>
+                  <input
+                    type="range" min={0.5} max={2} step={0.05}
+                    value={playbackSpeed}
+                    onChange={(e) => setPlaybackSpeed(parseFloat(e.target.value))}
+                    className="w-24 accent-[var(--accent)]"
+                  />
+                </div>
+              </SettingsRow>
+              <SettingsRow icon={Zap} iconColor="#7c3aed" label="Crossfade">
+                <div className="flex items-center gap-3">
+                  {crossfadeEnabled && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range" min={1} max={12} step={1}
+                        value={crossfadeDuration}
+                        onChange={(e) => setCrossfade(true, parseInt(e.target.value))}
+                        className="w-20 accent-[var(--accent)]"
+                      />
+                      <span className="text-text-muted text-xs w-6">{crossfadeDuration}s</span>
+                    </div>
+                  )}
+                  <Toggle on={crossfadeEnabled} onClick={() => setCrossfade(!crossfadeEnabled, crossfadeDuration)} />
+                </div>
+              </SettingsRow>
+              <SettingsRow icon={Clock} iconColor="#4f46e5" label="Sleep timer">
+                <div className="flex items-center gap-2">
+                  {sleepTimerEnd ? (
+                    <span className="text-accent text-xs font-medium">
+                      {Math.max(0, Math.ceil((sleepTimerEnd - Date.now()) / 60000))} min left
+                    </span>
+                  ) : (
+                    <select
+                      value={sleepMinutes}
+                      onChange={(e) => setSleepMinutes(parseInt(e.target.value))}
+                      className="bg-[var(--surface-overlay)] text-text-primary text-xs rounded-lg px-2 py-1.5 border border-[var(--border)]"
+                    >
+                      {[15, 30, 45, 60, 90].map((m) => <option key={m} value={m}>{m} min</option>)}
+                    </select>
+                  )}
+                  <button
+                    onClick={toggleSleepTimer}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      sleepTimerEnd ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25' : 'bg-accent/15 text-accent hover:bg-accent/25'
+                    }`}
+                  >
+                    {sleepTimerEnd ? 'Cancel' : 'Start'}
+                  </button>
+                </div>
+              </SettingsRow>
+            </SettingsGroup>
           </section>
-
 
           {/* Library Folders */}
           {isElectron && (
             <section>
-              <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest mb-4">Library Folders</h3>
+              <h3 className="text-text-muted text-xs font-semibold uppercase tracking-widest mb-2 px-1">Library Folders</h3>
               <div className="space-y-2 mb-3">
                 {libraryFolders.length === 0 && (
-                  <p className="text-text-muted text-xs">No folders added yet.</p>
+                  <p className="text-text-muted text-xs px-1">No folders added yet.</p>
                 )}
                 {libraryFolders.map((folder) => (
                   <div key={folder} className="flex items-center gap-2 bg-surface-overlay rounded-lg px-3 py-2 border border-[var(--border)]">
@@ -342,7 +372,7 @@ export default function Settings(): JSX.Element {
               <div className="flex items-center gap-2">
                 <button
                   onClick={async () => { if (!el) return; const p = await el.pickFolder(); if (p) addLibraryFolder(p) }}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-surface-overlay border border-[var(--border)] text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[var(--surface-overlay)] border border-[var(--border)] text-text-secondary hover:text-text-primary hover:bg-[var(--surface-raised)] transition-colors"
                 >
                   <FolderPlus size={13} /> Add Folder
                 </button>
@@ -356,7 +386,7 @@ export default function Settings(): JSX.Element {
                 </button>
               </div>
               {libraryLastScanned && (
-                <p className="text-text-muted text-[10px] mt-2">
+                <p className="text-text-muted text-[10px] mt-2 px-1">
                   Last scanned: {new Date(libraryLastScanned).toLocaleString()} · {libraryTracks.length} tracks
                 </p>
               )}
@@ -366,87 +396,59 @@ export default function Settings(): JSX.Element {
           {/* App (Electron only) */}
           {isElectron && (
             <section>
-              <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest mb-4">App</h3>
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <FolderOpen size={14} className="text-text-muted" />
-                  <span className="text-text-primary text-sm">Download folder</span>
+              <h3 className="text-text-muted text-xs font-semibold uppercase tracking-widest mb-2 px-1">App</h3>
+              <SettingsGroup>
+                <div className="px-3.5 py-3">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: '#0891b2' }}>
+                      <FolderOpen size={13} className="text-white" strokeWidth={2.25} />
+                    </div>
+                    <span className="text-text-primary text-sm">Download folder</span>
+                  </div>
+                  <div className="flex items-center gap-2 pl-9">
+                    <span className="flex-1 text-text-muted text-xs truncate bg-[var(--surface-overlay)] rounded-lg px-3 py-2 border border-[var(--border)]" title={appSettings.downloadPath}>
+                      {appSettings.downloadPath || 'Default Downloads folder'}
+                    </span>
+                    <button
+                      onClick={pickDownloadFolder}
+                      className="shrink-0 px-3 py-2 rounded-lg text-xs font-medium bg-[var(--surface-overlay)] hover:bg-[var(--surface-raised)] border border-[var(--border)] text-text-secondary transition-colors"
+                    >
+                      Change
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="flex-1 text-text-muted text-xs truncate bg-surface-overlay rounded-lg px-3 py-2 border border-[var(--border)]" title={appSettings.downloadPath}>
-                    {appSettings.downloadPath || 'Default Downloads folder'}
-                  </span>
-                  <button
-                    onClick={pickDownloadFolder}
-                    className="shrink-0 px-3 py-2 rounded-lg text-xs font-medium bg-surface-overlay hover:bg-surface-raised border border-[var(--border)] text-text-secondary transition-colors"
+                <SettingsRow icon={Monitor} iconColor="#6b7280" label="Start on">
+                  <select
+                    value={appSettings.startupView}
+                    onChange={(e) => setSetting('startupView', e.target.value)}
+                    className="bg-[var(--surface-overlay)] text-text-primary text-xs rounded-lg px-2 py-1.5 border border-[var(--border)]"
                   >
-                    Change
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Monitor size={14} className="text-text-muted" />
-                  <span className="text-text-primary text-sm">Start on</span>
-                </div>
-                <select
-                  value={appSettings.startupView}
-                  onChange={(e) => setSetting('startupView', e.target.value)}
-                  className="bg-surface-overlay text-text-primary text-xs rounded-lg px-2 py-1.5 border border-[var(--border)]"
-                >
-                  <option value="api-tracker">Tracker</option>
-                  <option value="api-files">Files</option>
-                  <option value="api-categories">Categories</option>
-                  <option value="liked">Liked Songs</option>
-                  <option value="playlists">Playlists</option>
-                </select>
-              </div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <BellOff size={14} className="text-text-muted" />
-                  <span className="text-text-primary text-sm">Auto-download updates</span>
-                </div>
-                <button
-                  onClick={() => setSetting('autoDownload', !appSettings.autoDownload)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${appSettings.autoDownload ? 'bg-accent' : 'bg-surface-overlay'}`}
-                >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${appSettings.autoDownload ? 'left-5' : 'left-0.5'}`} />
-                </button>
-              </div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Minus size={14} className="text-text-muted" />
-                  <span className="text-text-primary text-sm">Minimize to tray on close</span>
-                </div>
-                <button
-                  onClick={() => setSetting('minimizeToTray', !appSettings.minimizeToTray)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${appSettings.minimizeToTray ? 'bg-accent' : 'bg-surface-overlay'}`}
-                >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${appSettings.minimizeToTray ? 'left-5' : 'left-0.5'}`} />
-                </button>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MessageCircle size={14} className="text-text-muted" />
-                  <span className="text-text-primary text-sm">Show Discord Status</span>
-                </div>
-                <button
-                  onClick={() => setSetting('discordRpcEnabled', !appSettings.discordRpcEnabled)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${appSettings.discordRpcEnabled ? 'bg-accent' : 'bg-surface-overlay'}`}
-                >
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${appSettings.discordRpcEnabled ? 'left-5' : 'left-0.5'}`} />
-                </button>
-              </div>
+                    <option value="api-tracker">Tracker</option>
+                    <option value="api-files">Files</option>
+                    <option value="api-categories">Categories</option>
+                    <option value="liked">Liked Songs</option>
+                    <option value="playlists">Playlists</option>
+                  </select>
+                </SettingsRow>
+                <SettingsRow icon={BellOff} iconColor="#16a34a" label="Auto-download updates">
+                  <Toggle on={appSettings.autoDownload} onClick={() => setSetting('autoDownload', !appSettings.autoDownload)} />
+                </SettingsRow>
+                <SettingsRow icon={Minus} iconColor="#6b7280" label="Minimize to tray on close">
+                  <Toggle on={appSettings.minimizeToTray} onClick={() => setSetting('minimizeToTray', !appSettings.minimizeToTray)} />
+                </SettingsRow>
+                <SettingsRow icon={MessageCircle} iconColor="#5865f2" label="Show Discord Status">
+                  <Toggle on={appSettings.discordRpcEnabled} onClick={() => setSetting('discordRpcEnabled', !appSettings.discordRpcEnabled)} />
+                </SettingsRow>
+              </SettingsGroup>
             </section>
           )}
 
           {/* About */}
           <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Info size={14} className="text-text-muted" />
-              <h3 className="text-text-secondary text-xs font-semibold uppercase tracking-widest">About</h3>
-            </div>
-            <p className="text-text-muted text-xs mb-3">
+            <h3 className="text-text-muted text-xs font-semibold uppercase tracking-widest mb-2 px-1 flex items-center gap-1.5">
+              <Info size={12} /> About
+            </h3>
+            <p className="text-text-muted text-xs mb-3 px-1">
               unreleased v{__APP_VERSION__} &mdash; powered by{' '}
               <a href="https://juicewrldapi.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                 juicewrldapi.com
@@ -457,7 +459,7 @@ export default function Settings(): JSX.Element {
                 href="https://github.com/leanwrldd/unreleased"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors px-2.5 py-1.5 rounded-lg bg-surface-overlay hover:bg-surface-raised border border-[var(--border)]"
+                className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors px-3 py-1.5 rounded-full bg-[var(--surface-overlay)] hover:bg-[var(--surface-raised)] border border-[var(--border)]"
               >
                 <Github size={13} />
                 GitHub
@@ -466,7 +468,7 @@ export default function Settings(): JSX.Element {
                 href="https://discord.gg/jwa"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors px-2.5 py-1.5 rounded-lg bg-surface-overlay hover:bg-surface-raised border border-[var(--border)]"
+                className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors px-3 py-1.5 rounded-full bg-[var(--surface-overlay)] hover:bg-[var(--surface-raised)] border border-[var(--border)]"
               >
                 <MessageCircle size={13} />
                 Discord
@@ -475,7 +477,7 @@ export default function Settings(): JSX.Element {
                 href="https://juicewrldapi.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors px-2.5 py-1.5 rounded-lg bg-surface-overlay hover:bg-surface-raised border border-[var(--border)]"
+                className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors px-3 py-1.5 rounded-full bg-[var(--surface-overlay)] hover:bg-[var(--surface-raised)] border border-[var(--border)]"
               >
                 <Globe size={13} />
                 API
@@ -492,7 +494,7 @@ export default function Settings(): JSX.Element {
               </button>
             )}
             {account && (
-              <div className="mt-2 rounded-xl border border-[var(--border)] overflow-hidden">
+              <div className="mt-2 rounded-2xl border border-[var(--border)] overflow-hidden">
                 <button
                   onClick={() => setShowToken(v => !v)}
                   className="flex items-center gap-2 w-full px-3 py-2.5 bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] text-text-secondary text-sm font-medium transition-colors"
@@ -533,7 +535,7 @@ export default function Settings(): JSX.Element {
               API Docs
             </button>
 
-            <div className="mt-4 rounded-xl border border-[var(--border)] overflow-hidden divide-y divide-[var(--border)]">
+            <div className="mt-4 rounded-2xl border border-[var(--border)] overflow-hidden divide-y divide-[var(--border)]">
               {([
                 {
                   q: 'What is this?',

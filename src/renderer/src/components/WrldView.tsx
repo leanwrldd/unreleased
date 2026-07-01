@@ -795,9 +795,11 @@ export default function WrldView(): JSX.Element {
           {/* Desktop layout */}
           <div className="hidden md:flex relative z-10 flex-1 h-full overflow-hidden">
 
-            {/* Left column — Apple Music style */}
-            <div className="flex flex-col items-center justify-center shrink-0 px-8 xl:px-12 gap-5"
-              style={{ width: '40%', minWidth: 260, maxWidth: 440 }}>
+            {/* Left column — Apple Music style. A true 50/50 split with the
+                lyrics column, not a narrow fixed-width sidebar next to a huge
+                mostly-empty lyrics pane. */}
+            <div className="flex flex-col items-center justify-center shrink-0 px-8 xl:px-12 gap-5 overflow-y-auto"
+              style={{ width: '50%', minWidth: 320 }}>
 
               {/* Album art */}
               <div className="w-full" style={{ maxWidth: 320 }}>
@@ -939,6 +941,14 @@ export default function WrldView(): JSX.Element {
                   </div>
                 </div>
               </div>
+
+              {/* Queue — pops up directly under the interface instead of
+                  taking its own side column, matching Apple Music. */}
+              {showQueue && !radioFmActive && (
+                <div className="w-full" style={{ maxWidth: 320 }}>
+                  <WrldQueuePanel variant="inline" artSrc={artSrc} onClose={() => setShowQueue(false)} />
+                </div>
+              )}
             </div>
 
             {/* Divider — FM only */}
@@ -1060,11 +1070,14 @@ export default function WrldView(): JSX.Element {
         <div className="w-[5px] group-hover:w-[3px] h-16 group-hover:h-24 rounded-l-full bg-white/20 group-hover:bg-white/50 transition-all duration-200 ease-out shrink-0" />
       </div>
 
-      {/* Queue — hidden during 999FM, which is a live stream with nothing to
-          queue/reorder. A real flex sibling (not absolutely positioned) on
-          desktop, so it takes its own column and the layout beside it shrinks
-          to fit, matching Apple Music's "Playing Next" panel. */}
-      {showQueue && !radioFmActive && <WrldQueuePanel onClose={() => setShowQueue(false)} />}
+      {/* Mobile queue — full-screen sheet (there's no side-by-side room for
+          an inline drawer like the desktop layout gets). Hidden during 999FM,
+          a live stream with nothing to queue/reorder. */}
+      {showQueue && !radioFmActive && (
+        <div className="md:hidden">
+          <WrldQueuePanel variant="sheet" artSrc={artSrc} onClose={() => setShowQueue(false)} />
+        </div>
+      )}
     </div>
   )
 
@@ -1202,7 +1215,14 @@ const SongMenu = memo(function SongMenu({ light }: { light: boolean }): JSX.Elem
 // panel matching the rest of the page instead of the app-wide QueuePanel's
 // light theme (which App.tsx suppresses while this page is active, mirroring
 // how it already suppresses the standalone NowPlaying panel here).
-const WrldQueuePanel = memo(function WrldQueuePanel({ onClose }: { onClose: () => void }): JSX.Element {
+const WrldQueuePanel = memo(function WrldQueuePanel({ onClose, artSrc, variant }: {
+  onClose: () => void
+  artSrc?: string | null
+  // 'inline' pops up directly under the interface column on desktop (the
+  // Apple Music behavior this is modeled on); 'sheet' is a full-screen
+  // overlay, used on mobile where there's no side-by-side room for it.
+  variant: 'inline' | 'sheet'
+}): JSX.Element {
   const { queue, queueIndex, currentTrack, isPlaying, shuffle, playTrack, removeFromQueue, clearQueue, reorderQueue } = useStore(useShallow(s => ({
     queue: s.queue,
     queueIndex: s.queueIndex,
@@ -1226,36 +1246,51 @@ const WrldQueuePanel = memo(function WrldQueuePanel({ onClose }: { onClose: () =
 
   return (
     <div
-      className="absolute md:static inset-0 md:inset-auto z-40 flex flex-col md:w-[320px] md:shrink-0 h-full bg-black/85 backdrop-blur-2xl md:border-l border-white/10"
+      className={`relative flex flex-col overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10 ${
+        variant === 'sheet' ? 'fixed inset-0 z-40 rounded-none ring-0' : 'w-full mt-2'
+      }`}
+      style={variant === 'inline' ? { maxHeight: 300 } : undefined}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center justify-between px-4 pt-5 pb-3 shrink-0 border-b border-white/10">
+      {/* Apple Music-style colored backdrop, matched to the current track's
+          art — not a flat dark glass panel, which read as a mismatched,
+          generic overlay against the rest of this page's colorful theming. */}
+      <div className="absolute inset-0 overflow-hidden">
+        {artSrc ? (
+          <img src={artSrc} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'blur(30px) saturate(1.9) brightness(0.45)', transform: 'scale(1.4)' }} />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-black" />
+        )}
+        <div className="absolute inset-0 bg-black/25" />
+      </div>
+
+      <div className="relative z-10 flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-white/10">
         <div className="flex items-center gap-2">
-          <ListMusic size={14} className="text-white/50" />
+          <ListMusic size={14} className="text-white/60" />
           <h2 className="text-white/90 font-semibold text-xs uppercase tracking-widest">Playing Next</h2>
         </div>
         <div className="flex items-center gap-3">
           {upcoming.length > 0 && (
-            <button onClick={clearQueue} className="text-white/50 hover:text-red-400 transition-colors text-xs flex items-center gap-1">
+            <button onClick={clearQueue} className="text-white/60 hover:text-red-400 transition-colors text-xs flex items-center gap-1">
               <Trash2 size={12} /> Clear
             </button>
           )}
-          <button onClick={onClose} className="text-white/50 hover:text-white/90 transition-colors">
+          <button onClick={onClose} className="text-white/60 hover:text-white/90 transition-colors">
             <X size={16} />
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+      <div className="relative z-10 flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
         {currentTrack ? (
           <div className="px-3 py-3">
-            <p className="text-white/40 text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold">Now Playing</p>
+            <p className="text-white/50 text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold">Now Playing</p>
             <WrldQueueRow track={currentTrack} isActive isPlaying={isPlaying} />
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-40 gap-2 text-center px-8">
-            <ListMusic className="text-white/20 w-8 h-8" />
-            <p className="text-white/50 text-sm">Queue is empty</p>
+            <ListMusic className="text-white/30 w-8 h-8" />
+            <p className="text-white/60 text-sm">Queue is empty</p>
           </div>
         )}
 
@@ -1263,7 +1298,7 @@ const WrldQueuePanel = memo(function WrldQueuePanel({ onClose }: { onClose: () =
 
         {upcoming.length > 0 ? (
           <div className="px-3 pt-3 pb-6">
-            <p className="text-white/40 text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold">
+            <p className="text-white/50 text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold">
               {shuffle ? 'Shuffle' : 'Up Next'} · {upcoming.length}
             </p>
             {upcoming.map((track, i) => (
@@ -1288,7 +1323,7 @@ const WrldQueuePanel = memo(function WrldQueuePanel({ onClose }: { onClose: () =
             ))}
           </div>
         ) : currentTrack ? (
-          <p className="text-white/40 text-xs text-center py-4">Nothing up next</p>
+          <p className="text-white/50 text-xs text-center py-4">Nothing up next</p>
         ) : null}
       </div>
     </div>

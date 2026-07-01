@@ -670,21 +670,21 @@ export default function PlaylistsView(): JSX.Element {
       const localQTracks: Track[] = localTracks.map(libTrackToTrack)
       return (
         <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden">
-          <div className="px-6 pt-5 shrink-0">
-            <button onClick={() => setLocalSelectedId(null)} className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-sm transition-colors mb-4">
-              <ArrowLeft size={15} /> Playlists
-            </button>
-          </div>
           <div className="relative overflow-hidden px-6 pb-6 shrink-0">
             <HeroBackdrop src={localPl.coverImage ?? localTracks.find(t => t.albumArt)?.albumArt ?? null} />
+            <div className="relative z-10 pt-5">
+              <button onClick={() => setLocalSelectedId(null)} className="flex items-center gap-1.5 text-white/60 hover:text-white text-sm transition-colors">
+                <ArrowLeft size={15} /> Playlists
+              </button>
+            </div>
             <div className="relative z-10 flex gap-6 items-end pt-6">
               <div className="shrink-0 rounded-xl shadow-2xl overflow-hidden bg-surface-overlay flex items-center justify-center" style={{ width: 180, height: 180 }}>
                 <LocalPlaylistMosaic trackIds={localPl.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
               </div>
               <div className="pb-2">
-                <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-1">Local Playlist</p>
-                <h1 className="text-text-primary text-3xl font-black mb-1">{localPl.name}</h1>
-                <p className="text-text-muted text-sm">{localTracks.length} songs</p>
+                <p className="text-[11px] font-semibold text-white/60 uppercase tracking-wider mb-1">Local Playlist</p>
+                <h1 className="text-white text-3xl font-black mb-1">{localPl.name}</h1>
+                <p className="text-white/60 text-sm">{localTracks.length} songs</p>
               </div>
             </div>
             <div className="relative z-10 flex items-center gap-3 mt-5">
@@ -785,19 +785,23 @@ export default function PlaylistsView(): JSX.Element {
 
     return (
       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden" onClick={() => { setTrackMenu(null); setShowAddAllMenu(false) }}>
-        {/* Back */}
-        <div className="px-6 pt-5 shrink-0">
-          <button onClick={() => {
-            setSelectedId(null); setRenaming(false)
-            if (isSharedView) { setIsSharedView(false); window.history.pushState({}, '', '/playlists') }
-          }} className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-sm transition-colors mb-4">
-            <ArrowLeft size={15} /> Playlists
-          </button>
-        </div>
-
-        {/* ── Hero (shown immediately using summary data) ── */}
+        {/* ── Hero (shown immediately using summary data) — the backdrop now
+            extends behind the back button too, instead of leaving a plain
+            theme-background strip above the gradient. Text in this section
+            is fixed to a light palette regardless of app theme, since the
+            backdrop is always a dark blurred image — theme-aware text colors
+            (which flip to dark-on-light in light mode) were unreadable here. ── */}
         <div className="relative overflow-hidden px-6 pb-6 shrink-0">
           <HeroBackdrop src={playlistCoverUrl(coverData ?? {}) ?? tracks[0]?.imageUrl ?? null} />
+
+          <div className="relative z-10 px-0 pt-5">
+            <button onClick={() => {
+              setSelectedId(null); setRenaming(false)
+              if (isSharedView) { setIsSharedView(false); window.history.pushState({}, '', '/playlists') }
+            }} className="flex items-center gap-1.5 text-white/60 hover:text-white text-sm transition-colors">
+              <ArrowLeft size={15} /> Playlists
+            </button>
+          </div>
 
           {/* Hidden file input */}
           <input
@@ -851,20 +855,20 @@ export default function PlaylistsView(): JSX.Element {
             </div>
 
             <div className="min-w-0 flex-1 pb-1">
-              <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-2">Playlist</p>
+              <p className="text-white/60 text-xs uppercase tracking-widest font-semibold mb-2">Playlist</p>
               {renaming ? (
                 <div className="flex items-center gap-2 mb-3">
-                  <input value={renameValue} onChange={e => setRenameValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && renameSelected()} autoFocus className="bg-surface-overlay border border-[var(--border)] rounded-lg px-3 py-2 text-text-primary text-2xl font-black focus:outline-none focus:border-accent/50 w-full" />
+                  <input value={renameValue} onChange={e => setRenameValue(e.target.value)} onKeyDown={e => e.key === 'Enter' && renameSelected()} autoFocus className="bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-white text-2xl font-black focus:outline-none focus:border-accent/50 w-full" />
                   <button onClick={renameSelected} className="p-2 rounded-lg bg-accent/15 text-accent shrink-0"><Check size={16} /></button>
-                  <button onClick={() => setRenaming(false)} className="p-2 rounded-lg text-text-muted hover:text-text-primary shrink-0"><X size={16} /></button>
+                  <button onClick={() => setRenaming(false)} className="p-2 rounded-lg text-white/60 hover:text-white shrink-0"><X size={16} /></button>
                 </div>
               ) : (
-                <h1 className="text-text-primary text-3xl md:text-4xl font-black truncate mb-2">
-                  {detail?.name ?? summary?.name ?? <span className="bg-surface-overlay rounded animate-pulse text-transparent select-none">Loading…</span>}
+                <h1 className="text-white text-3xl md:text-4xl font-black truncate mb-2">
+                  {detail?.name ?? summary?.name ?? <span className="bg-white/10 rounded animate-pulse text-transparent select-none">Loading…</span>}
                 </h1>
               )}
-              <div className="flex items-center gap-1.5 text-text-muted text-sm mb-2">
-                <span className="font-medium text-text-secondary">{account.discord_username}</span>
+              <div className="flex items-center gap-1.5 text-white/60 text-sm mb-2">
+                <span className="font-medium text-white/85">{account.discord_username}</span>
                 {!loadingDetail && (
                   <>
                     <span>·</span>
@@ -885,16 +889,16 @@ export default function PlaylistsView(): JSX.Element {
                     autoFocus
                     rows={2}
                     placeholder="Add a description…"
-                    className="flex-1 bg-surface-overlay border border-[var(--border)] rounded-lg px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent/50 resize-none"
+                    className="flex-1 bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-accent/50 resize-none placeholder:text-white/40"
                   />
                   <div className="flex flex-col gap-1 shrink-0">
                     <button onClick={saveDescription} className="p-1.5 rounded-lg bg-accent/15 text-accent"><Check size={14} /></button>
-                    <button onClick={() => setEditingDesc(false)} className="p-1.5 rounded-lg text-text-muted hover:text-text-primary"><X size={14} /></button>
+                    <button onClick={() => setEditingDesc(false)} className="p-1.5 rounded-lg text-white/60 hover:text-white"><X size={14} /></button>
                   </div>
                 </div>
               ) : isSharedView ? (
                 detail?.description ? (
-                  <p className="text-text-muted text-sm line-clamp-2 mb-3">{detail.description}</p>
+                  <p className="text-white/60 text-sm line-clamp-2 mb-3">{detail.description}</p>
                 ) : null
               ) : (
                 <button
@@ -903,11 +907,11 @@ export default function PlaylistsView(): JSX.Element {
                 >
                   {detail?.description ? (
                     <>
-                      <p className="text-text-muted text-sm line-clamp-2 group-hover/desc:text-text-secondary transition-colors">{detail.description}</p>
-                      <Pencil size={11} className="text-text-muted opacity-0 group-hover/desc:opacity-60 transition-opacity shrink-0 mt-1" />
+                      <p className="text-white/60 text-sm line-clamp-2 group-hover/desc:text-white/80 transition-colors">{detail.description}</p>
+                      <Pencil size={11} className="text-white/60 opacity-0 group-hover/desc:opacity-60 transition-opacity shrink-0 mt-1" />
                     </>
                   ) : (
-                    <p className="text-text-muted text-sm opacity-40 hover:opacity-70 transition-opacity italic">+ Add description</p>
+                    <p className="text-white/60 text-sm opacity-40 hover:opacity-70 transition-opacity italic">+ Add description</p>
                   )}
                 </button>
               )}
@@ -918,25 +922,25 @@ export default function PlaylistsView(): JSX.Element {
                 {tracks.length > 1 && <HeroShuffleButton onClick={playShuffle} />}
                 <button onClick={() => handleZipDownload(tracks, detail?.name ?? summary?.name ?? 'playlist')} disabled={zipState === 'loading' || tracks.length === 0}
                   title={zipState === 'done' ? 'Download started!' : zipState === 'error' ? 'Failed' : 'Download all as ZIP'}
-                  className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${zipState === 'done' ? 'text-accent bg-accent/10' : zipState === 'error' ? 'text-red-400 bg-red-400/10' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
+                  className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${zipState === 'done' ? 'text-accent bg-accent/10' : zipState === 'error' ? 'text-red-400 bg-red-400/10' : 'text-white/60 hover:text-white hover:bg-white/10'}`}>
                   {zipState === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <Archive size={16} />}
                 </button>
                 <button onClick={() => handleShare()} disabled={tracks.length === 0 || isSharedView}
                   title={shareCopied ? 'Link copied!' : 'Copy share link'}
-                  className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${shareCopied ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
+                  className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${shareCopied ? 'text-accent bg-accent/10' : 'text-white/60 hover:text-white hover:bg-white/10'}`}>
                   {shareCopied ? <Check size={16} /> : <Share2 size={16} />}
                 </button>
                 {!isSharedView && (
                   <button onClick={handleTogglePublic} disabled={togglingPublic}
                     title={detail?.is_public ? 'Public — click to make private' : 'Private — click to make public'}
-                    className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${detail?.is_public ? 'text-accent bg-accent/10' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
+                    className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${detail?.is_public ? 'text-accent bg-accent/10' : 'text-white/60 hover:text-white hover:bg-white/10'}`}>
                     {togglingPublic ? <Loader2 size={16} className="animate-spin" /> : detail?.is_public ? <Globe size={16} /> : <Lock size={16} />}
                   </button>
                 )}
                 {!isSharedView && otherPlaylists.length > 0 && tracks.length > 0 && detail && (
                   <div className="relative" ref={addAllMenuRef} onClick={e => e.stopPropagation()}>
                     <button onClick={() => setShowAddAllMenu(v => !v)} title="Add all to playlist" disabled={addingAll}
-                      className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${addingAll ? 'text-accent' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
+                      className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${addingAll ? 'text-accent' : 'text-white/60 hover:text-white hover:bg-white/10'}`}>
                       {addingAll ? <Loader2 size={16} className="animate-spin" /> : <FolderInput size={16} />}
                     </button>
                     {showAddAllMenu && (
@@ -969,12 +973,12 @@ export default function PlaylistsView(): JSX.Element {
                   </button>
                 )}
                 {!isSharedView && !renaming && detail && (
-                  <button onClick={() => { setRenameValue(detail.name); setRenaming(true) }} className="p-2.5 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-overlay text-sm transition-colors">
+                  <button onClick={() => { setRenameValue(detail.name); setRenaming(true) }} className="p-2.5 rounded-full text-white/60 hover:text-white hover:bg-white/10 text-sm transition-colors">
                     <Pencil size={15} />
                   </button>
                 )}
                 {!isSharedView && (
-                  <button onClick={deleteSelected} className="p-2.5 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 text-sm transition-colors">
+                  <button onClick={deleteSelected} className="p-2.5 rounded-full text-white/60 hover:text-red-400 hover:bg-red-500/10 text-sm transition-colors">
                     <Trash2 size={15} />
                   </button>
                 )}
@@ -1161,16 +1165,14 @@ export default function PlaylistsView(): JSX.Element {
 
     return (
       <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden">
-        {/* Back */}
-        <div className="px-6 pt-5 shrink-0">
-          <button onClick={() => setLocalSelectedId(null)} className="flex items-center gap-1.5 text-text-muted hover:text-text-primary text-sm transition-colors mb-4">
-            <ArrowLeft size={15} /> Playlists
-          </button>
-        </div>
-
         {/* Hero */}
         <div className="relative overflow-hidden px-6 pb-6 shrink-0">
           <HeroBackdrop src={localPl.coverImage ?? localTracks.find(t => t.albumArt)?.albumArt ?? null} />
+          <div className="relative z-10 pt-5">
+            <button onClick={() => setLocalSelectedId(null)} className="flex items-center gap-1.5 text-white/60 hover:text-white text-sm transition-colors">
+              <ArrowLeft size={15} /> Playlists
+            </button>
+          </div>
           <div className="relative z-10 flex gap-6 items-end pt-6">
             <div
               className="shrink-0 rounded-xl shadow-2xl overflow-hidden relative group cursor-pointer"
@@ -1192,19 +1194,19 @@ export default function PlaylistsView(): JSX.Element {
               </div>
             </div>
             <div className="min-w-0 flex-1 pb-1">
-              <p className="text-text-muted text-xs uppercase tracking-widest font-semibold mb-2">Local Playlist</p>
+              <p className="text-white/60 text-xs uppercase tracking-widest font-semibold mb-2">Local Playlist</p>
               {localRenaming ? (
                 <div className="flex items-center gap-2 mb-3">
                   <input value={localRenameVal} onChange={e => setLocalRenameVal(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { renameLocalPlaylist(localPl.id, localRenameVal.trim() || localPl.name); setLocalRenaming(false) } }}
-                    autoFocus className="bg-surface-overlay border border-[var(--border)] rounded-lg px-3 py-2 text-text-primary text-2xl font-black focus:outline-none focus:border-accent/50 w-full" />
+                    autoFocus className="bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-white text-2xl font-black focus:outline-none focus:border-accent/50 w-full" />
                   <button onClick={() => { renameLocalPlaylist(localPl.id, localRenameVal.trim() || localPl.name); setLocalRenaming(false) }} className="p-2 rounded-lg bg-accent/15 text-accent shrink-0"><Check size={16} /></button>
-                  <button onClick={() => setLocalRenaming(false)} className="p-2 rounded-lg text-text-muted hover:text-text-primary shrink-0"><X size={16} /></button>
+                  <button onClick={() => setLocalRenaming(false)} className="p-2 rounded-lg text-white/60 hover:text-white shrink-0"><X size={16} /></button>
                 </div>
               ) : (
-                <h1 className="text-text-primary text-3xl md:text-4xl font-black truncate mb-2">{localPl.name}</h1>
+                <h1 className="text-white text-3xl md:text-4xl font-black truncate mb-2">{localPl.name}</h1>
               )}
-              <div className="flex items-center gap-1.5 text-text-muted text-sm mb-4">
+              <div className="flex items-center gap-1.5 text-white/60 text-sm mb-4">
                 <HardDrive size={12} className="shrink-0" />
                 <span>Local</span>
                 <span>·</span>
@@ -1217,16 +1219,16 @@ export default function PlaylistsView(): JSX.Element {
                   <HeroShuffleButton onClick={() => { const s = [...localQTracks].sort(() => Math.random() - 0.5); playTrack(s[0], s) }} />
                 )}
                 {!localRenaming && (
-                  <button onClick={() => { setLocalRenameVal(localPl.name); setLocalRenaming(true) }} className="p-2.5 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-overlay text-sm transition-colors" title="Rename">
+                  <button onClick={() => { setLocalRenameVal(localPl.name); setLocalRenaming(true) }} className="p-2.5 rounded-full text-white/60 hover:text-white hover:bg-white/10 text-sm transition-colors" title="Rename">
                     <Pencil size={15} />
                   </button>
                 )}
                 {localPl.coverImage && (
-                  <button onClick={() => updateLocalPlaylist(localPl.id, { coverImage: null })} className="p-2.5 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-overlay text-sm transition-colors" title="Remove custom cover">
+                  <button onClick={() => updateLocalPlaylist(localPl.id, { coverImage: null })} className="p-2.5 rounded-full text-white/60 hover:text-white hover:bg-white/10 text-sm transition-colors" title="Remove custom cover">
                     <ImageOff size={15} />
                   </button>
                 )}
-                <button onClick={() => { deleteLocalPlaylist(localPl.id); setLocalSelectedId(null) }} className="p-2.5 rounded-full text-text-muted hover:text-red-400 hover:bg-red-500/10 text-sm transition-colors" title="Delete playlist">
+                <button onClick={() => { deleteLocalPlaylist(localPl.id); setLocalSelectedId(null) }} className="p-2.5 rounded-full text-white/60 hover:text-red-400 hover:bg-red-500/10 text-sm transition-colors" title="Delete playlist">
                   <Trash2 size={15} />
                 </button>
               </div>
@@ -1285,31 +1287,33 @@ export default function PlaylistsView(): JSX.Element {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-y-auto overflow-x-hidden" onClick={() => setCardMenu(null)}>
-      <div className="px-5 pt-5 pb-8">
-        <div className="flex items-center justify-between mb-6">
+      <div className="px-6 pt-6 pb-10">
+        <div className="flex items-center justify-between mb-7">
           <div>
-            <h1 className="text-text-primary text-xl font-bold">Your Library</h1>
-            <p className="text-text-muted text-sm mt-0.5">Playlists and saved songs</p>
+            <h1 className="text-text-primary text-3xl font-black tracking-tight">Your Library</h1>
+            <p className="text-text-muted text-sm mt-1">Playlists and saved songs</p>
           </div>
           {!creating && (
-            <button onClick={() => setCreating(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-accent/15 hover:bg-accent/25 text-accent text-sm font-semibold transition-colors">
-              <Plus size={16} /> New
+            <button onClick={() => setCreating(true)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-accent text-black text-sm font-semibold shadow-sm hover:shadow-md hover:brightness-105 active:scale-[0.97] transition-all">
+              <Plus size={16} strokeWidth={2.5} /> New Playlist
             </button>
           )}
         </div>
 
         {creating && (
-          <div className="flex items-center gap-2 mb-5">
+          <div className="flex items-center gap-2 mb-6 max-w-md">
             <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createPlaylist()} placeholder="Playlist name" autoFocus className="flex-1 bg-surface-overlay border border-[var(--border)] rounded-xl px-3.5 py-2.5 text-text-primary text-sm focus:outline-none focus:border-accent/50" />
             <button onClick={createPlaylist} className="px-4 py-2.5 rounded-xl bg-accent text-black text-sm font-semibold">Create</button>
             <button onClick={() => { setCreating(false); setNewName('') }} className="p-2.5 rounded-xl text-text-muted hover:text-text-primary"><X size={16} /></button>
           </div>
         )}
 
-        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
-          <button onClick={() => setShowLiked(true)} className="group text-left">
-            <div className="aspect-square rounded-xl bg-gradient-to-br from-accent/50 to-accent/10 flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
-              <Heart size={48} className="text-accent" fill="currentColor" />
+        {/* ── Playlists section ── */}
+        <h2 className="text-text-muted text-xs font-semibold uppercase tracking-widest mb-3">Playlists</h2>
+        <div className="grid gap-x-4 gap-y-6" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+          <button onClick={() => setShowLiked(true)} className="group text-left cursor-pointer">
+            <div className="aspect-square rounded-2xl bg-gradient-to-br from-accent/50 to-accent/10 flex items-center justify-center mb-2.5 shadow-md group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-200">
+              <Heart size={44} className="text-accent" fill="currentColor" />
             </div>
             <p className="text-text-primary text-sm font-semibold truncate">Liked Songs</p>
             <p className="text-text-muted text-xs mt-0.5">{likedTrackIds.length} {likedTrackIds.length === 1 ? 'track' : 'tracks'}</p>
@@ -1320,7 +1324,7 @@ export default function PlaylistsView(): JSX.Element {
               onClick={() => setSelectedId(p.id)}
               onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCardMenu({ kind: 'api', playlist: p, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
             >
-              <div className="relative aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
+              <div className="relative aspect-square rounded-2xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 shadow-md group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-200">
                 {covers[p.id] === undefined ? (
                   <div className="w-full h-full bg-surface-raised animate-pulse" />
                 ) : covers[p.id] ? (
@@ -1357,37 +1361,47 @@ export default function PlaylistsView(): JSX.Element {
             </div>
           ))}
 
-          {/* Local playlists */}
-          {localPlaylists.map(lp => (
-            <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCardMenu({ kind: 'local', playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}>
-              <div className="relative aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
-                {lp.coverImage
-                  ? <img src={lp.coverImage} alt="" className="w-full h-full object-cover" />
-                  : <LocalPlaylistMosaic trackIds={lp.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
-                }
-                <CardPlayOverlay onPlay={() => {
-                  const qt = lp.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter((t): t is LibraryTrack => !!t).map(libTrackToTrack)
-                  if (qt.length) playTrack(qt[0], qt)
-                }} />
-              </div>
-              {/* Local badge */}
-              <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-md">
-                <HardDrive size={9} /> Local
-              </span>
-              {/* Context menu button */}
-              <button
-                className="absolute top-1.5 right-1.5 md:opacity-0 md:group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
-                onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setCardMenu({ kind: 'local', playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
-              >
-                <MoreHorizontal size={13} />
-              </button>
-              <p className="text-text-primary text-sm font-semibold truncate">{lp.name}</p>
-              <p className="text-text-muted text-xs mt-0.5">{lp.trackIds.length} {lp.trackIds.length === 1 ? 'track' : 'tracks'}</p>
-            </div>
-          ))}
+          {playlists.length === 0 && (
+            <p className="text-text-muted text-sm col-span-full py-2">No synced playlists yet — click "New Playlist" to create one.</p>
+          )}
         </div>
 
-        {playlists.length === 0 && localPlaylists.length === 0 && <p className="text-text-muted text-sm mt-4">No playlists yet — create one to get started.</p>}
+        {/* ── On This Device section — separated from synced playlists,
+            mirroring Apple Music's split between iCloud and local library. ── */}
+        {localPlaylists.length > 0 && (
+          <>
+            <h2 className="text-text-muted text-xs font-semibold uppercase tracking-widest mb-3 mt-9">On This Device</h2>
+            <div className="grid gap-x-4 gap-y-6" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+              {localPlaylists.map(lp => (
+                <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCardMenu({ kind: 'local', playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}>
+                  <div className="relative aspect-square rounded-2xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 shadow-md group-hover:shadow-xl group-hover:-translate-y-1 transition-all duration-200">
+                    {lp.coverImage
+                      ? <img src={lp.coverImage} alt="" className="w-full h-full object-cover" />
+                      : <LocalPlaylistMosaic trackIds={lp.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
+                    }
+                    <CardPlayOverlay onPlay={() => {
+                      const qt = lp.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter((t): t is LibraryTrack => !!t).map(libTrackToTrack)
+                      if (qt.length) playTrack(qt[0], qt)
+                    }} />
+                  </div>
+                  {/* Local badge */}
+                  <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-md">
+                    <HardDrive size={9} /> Local
+                  </span>
+                  {/* Context menu button */}
+                  <button
+                    className="absolute top-1.5 right-1.5 md:opacity-0 md:group-hover:opacity-100 p-1 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-opacity"
+                    onClick={e => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); setCardMenu({ kind: 'local', playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                  >
+                    <MoreHorizontal size={13} />
+                  </button>
+                  <p className="text-text-primary text-sm font-semibold truncate">{lp.name}</p>
+                  <p className="text-text-muted text-xs mt-0.5">{lp.trackIds.length} {lp.trackIds.length === 1 ? 'track' : 'tracks'}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Unified playlist card context menu */}
