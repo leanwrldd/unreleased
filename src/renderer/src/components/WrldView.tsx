@@ -1246,15 +1246,17 @@ const WrldQueuePanel = memo(function WrldQueuePanel({ onClose, artSrc, variant }
 
   return (
     <div
-      className={`relative flex flex-col overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10 ${
-        variant === 'sheet' ? 'fixed inset-0 z-40 rounded-none ring-0' : 'w-full mt-2'
+      className={`relative flex flex-col overflow-hidden ${
+        variant === 'sheet' ? 'fixed inset-0 z-40' : 'w-full mt-2 rounded-2xl'
       }`}
       style={variant === 'inline' ? { maxHeight: 300 } : undefined}
       onClick={(e) => e.stopPropagation()}
     >
       {/* Apple Music-style colored backdrop, matched to the current track's
           art — not a flat dark glass panel, which read as a mismatched,
-          generic overlay against the rest of this page's colorful theming. */}
+          generic overlay against the rest of this page's colorful theming.
+          No ring/shadow around the panel — it should read as part of the
+          page's own background, not a floating card dropped on top of it. */}
       <div className="absolute inset-0 overflow-hidden">
         {artSrc ? (
           <img src={artSrc} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ filter: 'blur(30px) saturate(1.9) brightness(0.45)', transform: 'scale(1.4)' }} />
