@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import {
   Loader2, Check, AlertCircle, LogIn, Clock, X, ChevronDown,
-  ChevronUp, Award, Music2, FileText, Pencil, Plus,
+  ChevronUp, Award, Music2, FileText, Pencil, Plus, Link2,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { apiFetch, JWApiSong, JWApiEra, buildImageUrl, CATEGORY_LABELS } from '../lib/juicewrldApi'
 import * as userApi from '../lib/userApi'
 import { invalidateLyricsCache } from './Player'
 import type { EditorApplication } from '../lib/userApi'
+import { versionsEnabled, getVersionGroup, getOwnVersionMeta, linkSongVersion, unlinkSongVersion, setVersionMeta } from '../lib/versionsApi'
 
 type SubmitState = 'idle' | 'submitting' | 'submitted' | 'error'
 type LyricsTab = 'lyrics' | 'synced'
@@ -226,6 +227,23 @@ export default function EditorPage(): JSX.Element {
   // True while editing a 'create' proposal (new song) — has no backing song object yet
   const [isNewSongDraft, setIsNewSongDraft] = useState(false)
 
+  // "Other versions" — mirrors the linking UI in SongInfoModal (see
+  // lib/versionsApi.ts for why this is a separate database from
+  // juicewrldapi.com). Lets an editor link/unlink versions without leaving
+  // the edit form.
+  const [versions, setVersions] = useState<JWApiSong[]>([])
+  const [loadingVersions, setLoadingVersions] = useState(false)
+  const [showLinkSearch, setShowLinkSearch] = useState(false)
+  const [linkQuery, setLinkQuery] = useState('')
+  const [linkResults, setLinkResults] = useState<JWApiSong[]>([])
+  const [linking, setLinking] = useState(false)
+  const linkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // This song's own version number/title within its group (separate from the
+  // proposal patch below — these write straight to Supabase on blur, same as
+  // the equivalent fields in SongInfoModal).
+  const [versionNum,   setVersionNum]   = useState('')
+  const [versionTitle, setVersionTitle] = useState('')
+
   const baseline = (s: JWApiSong | null): Record<string, unknown> => {
     if (!s) return {}
     return {
@@ -303,6 +321,64 @@ export default function EditorPage(): JSX.Element {
       .then(d => setEras(Array.isArray(d) ? d : (d as { results: JWApiEra[] }).results ?? []))
       .catch(() => undefined)
   }, [isEditor])
+
+  const refreshVersions = useCallback((id: number): void => {
+    if (!versionsEnabled) return
+    setLoadingVersions(true)
+    getVersionGroup(id)
+      .then(metas => Promise.all(metas.map(meta => apiFetch<JWApiSong>(`/songs/${meta.songId}/`).catch(() => null))))
+      .then(songs => setVersions(songs.filter((s): s is JWApiSong => !!s)))
+      .finally(() => setLoadingVersions(false))
+  }, [])
+
+  useEffect(() => {
+    setShowLinkSearch(false); setLinkQuery(''); setLinkResults([])
+    if (song) refreshVersions(song.id)
+    else setVersions([])
+  }, [song, refreshVersions])
+
+  useEffect(() => {
+    if (!versionsEnabled || !song) { setVersionNum(''); setVersionTitle(''); return }
+    getOwnVersionMeta(song.id).then(meta => {
+      setVersionNum(meta?.version != null ? String(meta.version) : '')
+      setVersionTitle(meta?.versionTitle ?? '')
+    })
+  }, [song])
+
+  const saveVersionMeta = (meta: { version?: number | null; versionTitle?: string | null }): void => {
+    if (!song) return
+    setVersionMeta(song.id, meta).catch(() => {})
+  }
+
+  useEffect(() => {
+    if (linkDebounceRef.current) clearTimeout(linkDebounceRef.current)
+    if (!linkQuery.trim()) { setLinkResults([]); return }
+    linkDebounceRef.current = setTimeout(() => {
+      apiFetch<{ results: JWApiSong[] }>('/songs/', { search: linkQuery.trim(), page_size: 8 })
+        .then(data => setLinkResults((data.results ?? []).filter(r => r.id !== song?.id)))
+        .catch(() => setLinkResults([]))
+    }, 350)
+    return () => { if (linkDebounceRef.current) clearTimeout(linkDebounceRef.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkQuery])
+
+  const handleLink = async (otherId: number): Promise<void> => {
+    if (!song || linking) return
+    setLinking(true)
+    try {
+      await linkSongVersion(song.id, otherId, account?.display_name ?? null)
+      refreshVersions(song.id)
+      setShowLinkSearch(false); setLinkQuery(''); setLinkResults([])
+    } catch {} finally { setLinking(false) }
+  }
+
+  const handleUnlink = async (versionId: number): Promise<void> => {
+    if (!song) return
+    try {
+      await unlinkSongVersion(versionId)
+      refreshVersions(song.id)
+    } catch {}
+  }
 
   useEffect(() => {
     if (!pendingEditorSongId || !isEditor) return
@@ -615,6 +691,102 @@ export default function EditorPage(): JSX.Element {
                 original={(Array.isArray(base.track_titles) ? (base.track_titles as string[]).join('\n') : '')}
                 onChange={setAltNames} rows={2} placeholder="One name per line"
               />
+
+              {versionsEnabled && song && (
+                <div className="px-4 py-2 border-l-2 border-transparent">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted opacity-65 select-none">Versions</span>
+
+                  {versions.length > 0 && (
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <input
+                        type="number"
+                        value={versionNum}
+                        onChange={(e) => setVersionNum(e.target.value)}
+                        onBlur={() => saveVersionMeta({ version: versionNum.trim() ? Number(versionNum) : null })}
+                        placeholder="Version #"
+                        className="w-20 bg-surface-overlay border border-[var(--border)] rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={versionTitle}
+                        onChange={(e) => setVersionTitle(e.target.value)}
+                        onBlur={() => saveVersionMeta({ versionTitle: versionTitle.trim() || null })}
+                        placeholder="Version title"
+                        className="flex-1 min-w-0 bg-surface-overlay border border-[var(--border)] rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
+                      />
+                    </div>
+                  )}
+
+                  <div className="mt-1.5">
+                    {loadingVersions ? (
+                      <p className="text-text-muted opacity-65 text-xs py-0.5">Loading…</p>
+                    ) : versions.length === 0 ? (
+                      <p className="text-text-muted opacity-65 text-xs py-0.5">No other versions linked.</p>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {versions.map(v => (
+                          <div key={v.id} className="group flex items-center gap-2">
+                            <button
+                              onClick={() => loadSong(v.id)}
+                              className="flex-1 min-w-0 text-left hover:bg-white/[0.05] rounded-lg px-1.5 py-1 -mx-1.5 transition-colors"
+                            >
+                              <span className="text-text-primary text-xs truncate block">{v.track_titles?.[0] || v.name}</span>
+                            </button>
+                            <button
+                              onClick={() => handleUnlink(v.id)}
+                              title="Unlink this version"
+                              className="text-text-muted opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity shrink-0 p-0.5"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {showLinkSearch ? (
+                      <div className="mt-1.5 space-y-1.5">
+                        <div className="flex gap-1.5">
+                          <input
+                            value={linkQuery}
+                            onChange={(e) => setLinkQuery(e.target.value)}
+                            placeholder="Search song name…"
+                            autoFocus
+                            className="flex-1 min-w-0 bg-surface-overlay border border-[var(--border)] rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
+                          />
+                          <button
+                            onClick={() => { setShowLinkSearch(false); setLinkQuery(''); setLinkResults([]) }}
+                            className="text-text-muted opacity-65 hover:opacity-100 text-xs px-1"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        {linkResults.length > 0 && (
+                          <div className="max-h-32 overflow-y-auto space-y-0.5">
+                            {linkResults.map(r => (
+                              <button
+                                key={r.id}
+                                disabled={linking}
+                                onClick={() => handleLink(r.id)}
+                                className="w-full text-left px-2 py-1.5 rounded text-xs text-text-muted hover:bg-white/[0.05] hover:text-text-primary transition-colors truncate disabled:opacity-50"
+                              >
+                                {r.track_titles?.[0] || r.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowLinkSearch(true)}
+                        className="mt-1.5 flex items-center gap-1.5 text-accent text-xs hover:underline"
+                      >
+                        <Link2 size={12} /> Link a version
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* CLASSIFICATION */}
               <SectionLabel label="Classification" />

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { X, Music2, Pencil, Link2 } from 'lucide-react'
 import { JWApiSong, CATEGORY_LABELS, buildImageUrl, parseDuration, apiFetch } from '../lib/juicewrldApi'
-import { versionsEnabled, getVersionGroup, linkSongVersion, unlinkSongVersion } from '../lib/versionsApi'
+import { versionsEnabled, getVersionGroup, linkSongVersion, unlinkSongVersion, setVersionMeta, SongVersionMeta } from '../lib/versionsApi'
+import { useStore } from '../store/useStore'
 
 function formatDur(secs: number): string {
   if (!secs) return '—'
@@ -43,6 +45,7 @@ interface Props {
 
 export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Element | null {
   const overlayRef = useRef<HTMLDivElement>(null)
+  const { account } = useStore(useShallow(s => ({ account: s.account })))
 
   // Clicking a linked version swaps the displayed song in place, without the
   // caller needing to manage that — falls back to the `song` prop otherwise.
@@ -53,7 +56,7 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
   // "Other versions" — a separate database from juicewrldapi.com (see
   // lib/versionsApi.ts), since that API has no concept of grouping e.g.
   // "Song (v1)" / "(v2)" / "(TV Mix)" together as the same underlying song.
-  const [versions, setVersions] = useState<JWApiSong[]>([])
+  const [versions, setVersions] = useState<{ song: JWApiSong; meta: SongVersionMeta }[]>([])
   const [loadingVersions, setLoadingVersions] = useState(false)
   const [showLinkSearch, setShowLinkSearch] = useState(false)
   const [linkQuery, setLinkQuery] = useState('')
@@ -65,8 +68,10 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
     if (!versionsEnabled) return
     setLoadingVersions(true)
     getVersionGroup(id)
-      .then(ids => Promise.all(ids.map(vid => apiFetch<JWApiSong>(`/songs/${vid}/`).catch(() => null))))
-      .then(songs => setVersions(songs.filter((s): s is JWApiSong => !!s)))
+      .then(metas => Promise.all(metas.map(meta =>
+        apiFetch<JWApiSong>(`/songs/${meta.songId}/`).then(song => ({ song, meta })).catch(() => null)
+      )))
+      .then(entries => setVersions(entries.filter((e): e is { song: JWApiSong; meta: SongVersionMeta } => !!e)))
       .finally(() => setLoadingVersions(false))
   }
 
@@ -93,7 +98,7 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
     if (!displaySong || linking) return
     setLinking(true)
     try {
-      await linkSongVersion(displaySong.id, otherId)
+      await linkSongVersion(displaySong.id, otherId, account?.display_name ?? null)
       refreshVersions(displaySong.id)
       setShowLinkSearch(false); setLinkQuery(''); setLinkResults([])
     } catch {} finally { setLinking(false) }
@@ -103,6 +108,17 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
     if (!displaySong) return
     try {
       await unlinkSongVersion(versionId)
+      refreshVersions(displaySong.id)
+    } catch {}
+  }
+
+  const handleUpdateMeta = async (
+    versionId: number,
+    meta: { version?: number | null; versionTitle?: string | null }
+  ): Promise<void> => {
+    if (!displaySong) return
+    try {
+      await setVersionMeta(versionId, meta)
       refreshVersions(displaySong.id)
     } catch {}
   }
@@ -227,24 +243,53 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
                 ) : versions.length === 0 ? (
                   <p className="text-text-muted text-xs py-1">No other versions linked.</p>
                 ) : (
-                  <div className="space-y-0.5">
-                    {versions.map(v => (
-                      <div key={v.id} className="group flex items-center gap-2">
-                        <button
-                          onClick={() => handleViewVersion(v.id)}
-                          className="flex-1 min-w-0 text-left hover:bg-surface-overlay rounded-lg px-1.5 py-1 -mx-1.5 transition-colors"
-                        >
-                          <span className="text-text-primary text-xs truncate block">{v.track_titles?.[0] || v.name}</span>
-                        </button>
-                        {onEdit && (
+                  <div className="space-y-1">
+                    {versions.map(({ song: v, meta }) => (
+                      <div key={v.id} className="group">
+                        <div className="flex items-center gap-2">
                           <button
-                            onClick={() => handleUnlink(v.id)}
-                            title="Unlink this version"
-                            className="text-text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-0.5"
+                            onClick={() => handleViewVersion(v.id)}
+                            className="flex-1 min-w-0 text-left hover:bg-surface-overlay rounded-lg px-1.5 py-1 -mx-1.5 transition-colors"
                           >
-                            <X size={12} />
+                            <span className="text-text-primary text-xs truncate block">
+                              {v.track_titles?.[0] || v.name}
+                              {meta.version != null && <span className="text-text-muted"> (v{meta.version}{meta.versionTitle ? ` — ${meta.versionTitle}` : ''})</span>}
+                              {meta.version == null && meta.versionTitle && <span className="text-text-muted"> ({meta.versionTitle})</span>}
+                            </span>
                           </button>
-                        )}
+                          {onEdit && (
+                            <button
+                              onClick={() => handleUnlink(v.id)}
+                              title="Unlink this version"
+                              className="text-text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-0.5"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                        {onEdit ? (
+                          <div className="flex items-center gap-1.5 px-1.5 pb-1">
+                            <input
+                              type="number"
+                              defaultValue={meta.version ?? ''}
+                              placeholder="Version #"
+                              onBlur={(e) => {
+                                const val = e.target.value.trim()
+                                handleUpdateMeta(v.id, { version: val ? Number(val) : null })
+                              }}
+                              className="w-16 bg-surface-overlay border border-[var(--border)] rounded px-1.5 py-0.5 text-[11px] text-text-primary focus:outline-none"
+                            />
+                            <input
+                              type="text"
+                              defaultValue={meta.versionTitle ?? ''}
+                              placeholder="Version title"
+                              onBlur={(e) => handleUpdateMeta(v.id, { versionTitle: e.target.value.trim() || null })}
+                              className="flex-1 min-w-0 bg-surface-overlay border border-[var(--border)] rounded px-1.5 py-0.5 text-[11px] text-text-primary focus:outline-none"
+                            />
+                          </div>
+                        ) : meta.addedBy ? (
+                          <p className="text-text-muted text-[10px] px-1.5 pb-1">Added by {meta.addedBy}</p>
+                        ) : null}
                       </div>
                     ))}
                   </div>
