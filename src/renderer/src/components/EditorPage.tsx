@@ -8,7 +8,10 @@ import { apiFetch, JWApiSong, JWApiEra, buildImageUrl, CATEGORY_LABELS } from '.
 import * as userApi from '../lib/userApi'
 import { invalidateLyricsCache } from './Player'
 import type { EditorApplication } from '../lib/userApi'
-import { versionsEnabled, getOwnVersionMeta, setSongVersion, setGroupVersionTitle } from '../lib/versionsApi'
+import {
+  versionsEnabled, getOwnVersionMeta, setSongVersion, setGroupVersionTitle, searchVersionTitles, joinVersionGroup,
+} from '../lib/versionsApi'
+import type { VersionTitleSuggestion } from '../lib/versionsApi'
 
 type SubmitState = 'idle' | 'submitting' | 'submitted' | 'error'
 type LyricsTab = 'lyrics' | 'synced'
@@ -241,6 +244,9 @@ export default function EditorPage(): JSX.Element {
   const [ownGroupId,   setOwnGroupId]   = useState<number | null>(null)
   const [versionSaveStatus, setVersionSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [linkError, setLinkError] = useState<string | null>(null)
+  const [titleSuggestions, setTitleSuggestions] = useState<VersionTitleSuggestion[]>([])
+  const [showTitleSuggestions, setShowTitleSuggestions] = useState(false)
+  const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const baseline = (s: JWApiSong | null): Record<string, unknown> => {
     if (!s) return {}
@@ -329,16 +335,47 @@ export default function EditorPage(): JSX.Element {
     })
   }, [song])
 
+  useEffect(() => {
+    if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current)
+    titleDebounceRef.current = setTimeout(() => {
+      searchVersionTitles(versionTitle).then(setTitleSuggestions)
+    }, 250)
+    return () => { if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current) }
+  }, [versionTitle])
+
   const saveVersionInfo = async (): Promise<void> => {
     if (!song) return
     setVersionSaveStatus('saving')
     setLinkError(null)
     try {
-      await setSongVersion(song.id, versionNum.trim() || null)
-      if (ownGroupId != null) await setGroupVersionTitle(ownGroupId, versionTitle.trim() || null)
+      const groupId = await setSongVersion(song.id, versionNum.trim() || null, ownGroupId, account?.display_name ?? null)
+      await setGroupVersionTitle(groupId, versionTitle.trim() || null)
+      setOwnGroupId(groupId)
       setVersionSaveStatus('saved')
     } catch (e) {
       setLinkError(e instanceof Error ? e.message : 'Failed to save version info')
+      setVersionSaveStatus('error')
+    }
+    setTimeout(() => setVersionSaveStatus('idle'), 2500)
+  }
+
+  // Picking an existing title from the autocomplete means "this song belongs
+  // with that group" — so it joins the group behind that title (merging like
+  // linkSongVersion does) rather than just copying the text, otherwise two
+  // songs could show the same title while sitting in different groups.
+  const handlePickTitleSuggestion = async (suggestion: VersionTitleSuggestion): Promise<void> => {
+    if (!song) return
+    setVersionTitle(suggestion.title)
+    setShowTitleSuggestions(false)
+    setVersionSaveStatus('saving')
+    setLinkError(null)
+    try {
+      const groupId = await joinVersionGroup(song.id, suggestion.groupId, account?.display_name ?? null)
+      await setGroupVersionTitle(groupId, suggestion.title)
+      setOwnGroupId(groupId)
+      setVersionSaveStatus('saved')
+    } catch (e) {
+      setLinkError(e instanceof Error ? e.message : 'Failed to join version group')
       setVersionSaveStatus('error')
     }
     setTimeout(() => setVersionSaveStatus('idle'), 2500)
@@ -668,13 +705,31 @@ export default function EditorPage(): JSX.Element {
                       placeholder="Version (e.g. v1, TV Mix)"
                       className="w-32 bg-surface-overlay border border-[var(--border)] rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
                     />
-                    <input
-                      type="text"
-                      value={versionTitle}
-                      onChange={(e) => setVersionTitle(e.target.value)}
-                      placeholder="Version title (shared by all linked songs)"
-                      className="flex-1 min-w-0 bg-surface-overlay border border-[var(--border)] rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
-                    />
+                    <div className="relative flex-1 min-w-0">
+                      <input
+                        type="text"
+                        value={versionTitle}
+                        onChange={(e) => setVersionTitle(e.target.value)}
+                        onFocus={() => setShowTitleSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowTitleSuggestions(false), 150)}
+                        placeholder="Version title (shared by all linked songs)"
+                        className="w-full bg-surface-overlay border border-[var(--border)] rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
+                      />
+                      {showTitleSuggestions && titleSuggestions.length > 0 && (
+                        <div className="absolute z-10 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-surface border border-[var(--border)] rounded-lg shadow-2xl py-1">
+                          {titleSuggestions.map(s => (
+                            <button
+                              key={s.groupId}
+                              onMouseDown={(e) => { e.preventDefault(); handlePickTitleSuggestion(s) }}
+                              title="Joins this song into that existing version group"
+                              className="w-full text-left px-2.5 py-1.5 text-xs text-text-secondary hover:bg-surface-overlay hover:text-text-primary transition-colors truncate"
+                            >
+                              {s.title}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <button
                       onClick={saveVersionInfo}
                       disabled={versionSaveStatus === 'saving'}

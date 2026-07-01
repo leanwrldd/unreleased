@@ -87,11 +87,11 @@ async function getRow(songId: number): Promise<SongVersionRow | null> {
   return rows[0] ?? null
 }
 
-async function upsertRow(songId: number, groupId: number, addedBy?: string | null): Promise<void> {
+async function upsertRow(songId: number, groupId: number, addedBy?: string | null, versionTitle?: string | null): Promise<void> {
   await supaFetch('/song_versions', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates' },
-    body: JSON.stringify({ song_id: songId, group_id: groupId, added_by: addedBy ?? null }),
+    body: JSON.stringify({ song_id: songId, group_id: groupId, added_by: addedBy ?? null, version_title: versionTitle ?? null }),
   })
 }
 
@@ -111,10 +111,32 @@ export async function getVersionGroup(songId: number): Promise<SongVersionMeta[]
   }
 }
 
+/** Every titled version group's rows, grouped by group id. Used by the
+ *  Tracker's compact view — deliberately independent of whichever songs
+ *  happen to be paginated into the Tracker at the time, since a group's
+ *  members can easily span pages the Tracker hasn't loaded yet (or won't,
+ *  under the current category/search filter). This is a small, one-shot
+ *  query (only songs that are actually linked into a titled group come
+ *  back), not tied to the Tracker's own song list at all. */
+export async function getAllVersionGroups(): Promise<SongVersionMeta[]> {
+  if (!versionsEnabled) return []
+  try {
+    const rows = await supaFetch<SongVersionRow[]>(
+      `/song_versions?version_title=not.is.null&select=${ROW_FIELDS}&order=group_id.asc`
+    )
+    return rows.map(toMeta)
+  } catch {
+    return []
+  }
+}
+
 /** Groups two songs as versions of each other. If one is already in a group,
- *  the other joins it; if both are in different groups already, the groups
- *  merge (all members repointed to the lower group id). `addedBy` is stamped
- *  on any row newly created by this call (existing rows are left as-is). */
+ *  the other joins it (inheriting its title); if both are in different
+ *  groups already, the groups merge (all members repointed to the lower
+ *  group id, and the surviving title — whichever side had one set — is
+ *  written to every row so the merged group doesn't end up with two songs
+ *  claiming different titles). `addedBy` is stamped on any row newly created
+ *  by this call (existing rows are left as-is). */
 export async function linkSongVersion(songId: number, otherSongId: number, addedBy?: string | null): Promise<void> {
   if (songId === otherSongId) return
   const [a, b] = await Promise.all([getRow(songId), getRow(otherSongId)])
@@ -126,10 +148,18 @@ export async function linkSongVersion(songId: number, otherSongId: number, added
       method: 'PATCH',
       body: JSON.stringify({ group_id: keep }),
     })
+    const survivingTitle = (a.group_id === keep ? a.version_title : b.version_title)
+      ?? (a.group_id === keep ? b.version_title : a.version_title)
+    if (survivingTitle) {
+      await supaFetch(`/song_versions?group_id=eq.${keep}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ version_title: survivingTitle }),
+      })
+    }
   } else if (a) {
-    await upsertRow(otherSongId, a.group_id, addedBy)
+    await upsertRow(otherSongId, a.group_id, addedBy, a.version_title)
   } else if (b) {
-    await upsertRow(songId, b.group_id, addedBy)
+    await upsertRow(songId, b.group_id, addedBy, b.version_title)
   } else {
     const groupId = Math.min(songId, otherSongId)
     await Promise.all([upsertRow(songId, groupId, addedBy), upsertRow(otherSongId, groupId, addedBy)])
@@ -153,13 +183,30 @@ export async function unlinkSongVersion(songId: number): Promise<void> {
   await supaFetch(`/song_versions?song_id=eq.${songId}`, { method: 'DELETE' })
 }
 
-/** Updates this song's own version label (e.g. "v1", "TV Mix") — distinct
- *  per song within a group, unlike the shared version title below. */
-export async function setSongVersion(songId: number, version: string | null): Promise<void> {
-  await supaFetch(`/song_versions?song_id=eq.${songId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ version }),
+/** Sets this song's own version label (e.g. "v1", "TV Mix") — distinct per
+ *  song within a group, unlike the shared version title below. If the song
+ *  isn't linked to anything yet, this creates a standalone one-song group
+ *  for it (group_id = its own song id) rather than silently no-op'ing — a
+ *  plain PATCH would match zero rows and appear to do nothing. `addedBy` is
+ *  only written when this call creates the row (existingGroupId is nullish)
+ *  — otherwise it's left as whoever originally added it. Returns the group
+ *  id the song ends up in, for setting the shared title afterward. */
+export async function setSongVersion(
+  songId: number,
+  version: string | null,
+  existingGroupId?: number | null,
+  addedBy?: string | null
+): Promise<number> {
+  const isNewRow = existingGroupId == null
+  const groupId = existingGroupId ?? songId
+  const body: Record<string, unknown> = { song_id: songId, group_id: groupId, version }
+  if (isNewRow) body.added_by = addedBy ?? null
+  await supaFetch('/song_versions', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates' },
+    body: JSON.stringify(body),
   })
+  return groupId
 }
 
 /** Sets the version title for every song in a group at once, so linked
@@ -169,4 +216,57 @@ export async function setGroupVersionTitle(groupId: number, versionTitle: string
     method: 'PATCH',
     body: JSON.stringify({ version_title: versionTitle }),
   })
+}
+
+/** An existing version title plus the group it belongs to — picking one of
+ *  these should join that group, not just copy the text (see
+ *  joinVersionGroup below). */
+export interface VersionTitleSuggestion {
+  title: string
+  groupId: number
+}
+
+/** Distinct existing version titles matching `query`, for autocompleting the
+ *  title field so editors reuse e.g. "TV Mix" instead of typing variants of
+ *  it across different groups. Empty query returns the most recent titles. */
+export async function searchVersionTitles(query: string, limit = 8): Promise<VersionTitleSuggestion[]> {
+  if (!versionsEnabled) return []
+  try {
+    const q = query.trim()
+    const filter = q ? `version_title=ilike.*${encodeURIComponent(q)}*&` : ''
+    const rows = await supaFetch<{ version_title: string | null; group_id: number }[]>(
+      `/song_versions?${filter}version_title=not.is.null&select=version_title,group_id&order=created_at.desc&limit=50`
+    )
+    const seen = new Set<string>()
+    const out: VersionTitleSuggestion[] = []
+    for (const r of rows) {
+      const title = r.version_title
+      if (!title || seen.has(title)) continue
+      seen.add(title)
+      out.push({ title, groupId: r.group_id })
+      if (out.length >= limit) break
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+/** Merges `songId` into an existing group (e.g. the one behind a title
+ *  autocomplete suggestion), the same way linkSongVersion merges two songs'
+ *  groups. Returns the group id the song ends up in. */
+export async function joinVersionGroup(songId: number, targetGroupId: number, addedBy?: string | null): Promise<number> {
+  const row = await getRow(songId)
+  if (!row) {
+    await upsertRow(songId, targetGroupId, addedBy)
+    return targetGroupId
+  }
+  if (row.group_id === targetGroupId) return targetGroupId
+  const keep = Math.min(row.group_id, targetGroupId)
+  const drop = Math.max(row.group_id, targetGroupId)
+  await supaFetch(`/song_versions?group_id=eq.${drop}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ group_id: keep }),
+  })
+  return keep
 }

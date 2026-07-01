@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Music2, Pencil } from 'lucide-react'
 import { JWApiSong, CATEGORY_LABELS, buildImageUrl, parseDuration, apiFetch } from '../lib/juicewrldApi'
-import { versionsEnabled, getVersionGroup, unlinkSongVersion, SongVersionMeta } from '../lib/versionsApi'
+import { versionsEnabled, getVersionGroup, SongVersionMeta } from '../lib/versionsApi'
 
 function formatDur(secs: number): string {
   if (!secs) return '—'
@@ -53,11 +53,10 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
   // "Other versions" — a separate database from juicewrldapi.com (see
   // lib/versionsApi.ts), since that API has no concept of grouping e.g.
   // "Song (v1)" / "(v2)" / "(TV Mix)" together as the same underlying song.
-  // Linking itself only happens from the editor (Edit song → Versions) —
-  // this view is read-only aside from unlinking a bad match.
+  // Linking/unlinking only happens from the editor (Edit song → Versions) —
+  // this view is read-only.
   const [versions, setVersions] = useState<{ song: JWApiSong; meta: SongVersionMeta }[]>([])
   const [loadingVersions, setLoadingVersions] = useState(false)
-  const [linkError, setLinkError] = useState<string | null>(null)
 
   const refreshVersions = (id: number): void => {
     if (!versionsEnabled) return
@@ -71,22 +70,10 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
   }
 
   useEffect(() => {
-    setLinkError(null)
     if (displaySong) refreshVersions(displaySong.id)
     else setVersions([])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displaySong?.id])
-
-  const handleUnlink = async (versionId: number): Promise<void> => {
-    if (!displaySong) return
-    setLinkError(null)
-    try {
-      await unlinkSongVersion(versionId)
-      refreshVersions(displaySong.id)
-    } catch (e) {
-      setLinkError(e instanceof Error ? e.message : 'Failed to unlink version')
-    }
-  }
 
   const handleViewVersion = async (id: number): Promise<void> => {
     try {
@@ -210,40 +197,19 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
                 ) : (
                   <div className="space-y-1">
                     {versions.map(({ song: v, meta }) => (
-                      <div key={v.id} className="group">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleViewVersion(v.id)}
-                            className="flex-1 min-w-0 text-left hover:bg-surface-overlay rounded-lg px-1.5 py-1 -mx-1.5 transition-colors"
-                          >
-                            <span className="text-text-primary text-xs truncate block">
-                              {v.track_titles?.[0] || v.name}
-                              {meta.version && <span className="text-text-muted"> ({meta.version}{meta.versionTitle ? ` — ${meta.versionTitle}` : ''})</span>}
-                              {!meta.version && meta.versionTitle && <span className="text-text-muted"> ({meta.versionTitle})</span>}
-                            </span>
-                          </button>
-                          {onEdit && (
-                            <button
-                              onClick={() => handleUnlink(v.id)}
-                              title="Unlink this version"
-                              className="text-text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-0.5"
-                            >
-                              <X size={12} />
-                            </button>
-                          )}
-                        </div>
-                        {/* Version # and title are set from the editor (Edit song →
-                            Versions), not here — keeps every linked song's title in
-                            sync instead of letting this view drift out of step. */}
-                      </div>
+                      <button
+                        key={v.id}
+                        onClick={() => handleViewVersion(v.id)}
+                        className="w-full text-left hover:bg-surface-overlay rounded-lg px-1.5 py-1 -mx-1.5 transition-colors"
+                      >
+                        <span className="text-text-primary text-xs truncate block">
+                          {v.track_titles?.[0] || v.name}
+                          {meta.version && <span className="text-text-muted"> ({meta.version}{meta.versionTitle ? ` — ${meta.versionTitle}` : ''})</span>}
+                          {!meta.version && meta.versionTitle && <span className="text-text-muted"> ({meta.versionTitle})</span>}
+                        </span>
+                      </button>
                     ))}
                   </div>
-                )}
-
-                {/* Linking itself only happens from the editor (Edit song →
-                    Versions) — this view only allows unlinking a bad match. */}
-                {linkError && (
-                  <p className="mt-2 text-red-400 text-xs">{linkError}</p>
                 )}
               </div>
             </>
