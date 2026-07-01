@@ -173,7 +173,7 @@ export default function App(): JSX.Element {
               : <ApiTrackerView />}
           </ErrorBoundary>
             {showNowPlaying && activeView !== 'wrld' && <ErrorBoundary><NowPlaying /></ErrorBoundary>}
-            {showQueue && <ErrorBoundary><QueuePanel /></ErrorBoundary>}
+            {showQueue && activeView !== 'wrld' && <ErrorBoundary><QueuePanel /></ErrorBoundary>}
           </div>
         </main>
       </div>

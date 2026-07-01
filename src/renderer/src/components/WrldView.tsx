@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useMemo, useState, memo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, ChevronDown, ChevronLeft, Play, Pause, SkipBack, SkipForward as SkipFwd, Shuffle, Repeat, Repeat1, Volume2, VolumeX, MoreHorizontal, ListPlus, Info, Heart, Maximize2, Minimize2 } from 'lucide-react'
+import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, ChevronDown, ChevronLeft, Play, Pause, SkipBack, SkipForward as SkipFwd, Shuffle, Repeat, Repeat1, Volume2, VolumeX, MoreHorizontal, ListPlus, Info, Heart, Maximize2, Minimize2, ListMusic, GripVertical, Trash2 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { useShallow } from 'zustand/react/shallow'
-import { parseLrc, getCurrentLineIndex, isLrcFormat } from '../lib/lyrics'
+import { parseLrc, getCurrentLineIndex, isLrcFormat, formatDuration } from '../lib/lyrics'
 import { seekAudio, getAudioDuration, getAudioCurrentTime } from './Player'
 import { buildImageUrl, apiFetch, songToTrack, JWAPI_BASE, playlistCoverUrl } from '../lib/juicewrldApi'
 import { getActiveRadioClient } from '../lib/radioSocketService'
@@ -11,6 +11,7 @@ import type { JWApiSong } from '../lib/juicewrldApi'
 import * as userApi from '../lib/userApi'
 import AddToPlaylistMenu from './AddToPlaylistMenu'
 import SongInfoModal from './SongInfoModal'
+import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 
 // ── WrldData types ────────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ export default function WrldView(): JSX.Element {
     isPlaying, setIsPlaying, volume, setVolume,
     shuffle, repeat, toggleShuffle, toggleRepeat,
     nextTrack, prevTrack,
+    showQueue, setShowQueue,
   } = useStore(useShallow(s => ({
     currentTrack: s.currentTrack,
     currentTrackFull: s.currentTrackFull,
@@ -54,23 +56,66 @@ export default function WrldView(): JSX.Element {
     toggleRepeat: s.toggleRepeat,
     nextTrack: s.nextTrack,
     prevTrack: s.prevTrack,
+    showQueue: s.showQueue,
+    setShowQueue: s.setShowQueue,
   })))
 
   const containerRef = useRef<HTMLDivElement>(null)
   const activeRef    = useRef<HTMLDivElement>(null)
   const [artError, setArtError] = useState(false)
   const [fmTab, setFmTab] = useState<'radio' | 'lyrics'>('radio')
-  // Fullscreen renders the page through a portal so it covers the sidebar and
-  // other chrome instead of being squeezed into the normal content column.
+  // Fullscreen renders the page through a portal (covers the sidebar/other
+  // chrome) AND requests real OS/browser-level fullscreen — the portal alone
+  // only fills the app window, not the actual screen.
   const [fullscreen, setFullscreen] = useState(false)
+  const fullscreenRef = useRef(false)
+  fullscreenRef.current = fullscreen
   const isElectronApp = navigator.userAgent.includes('Electron')
+  const elFullscreen = (window as any).electron
 
+  const enterFullscreen = (): void => {
+    if (isElectronApp) elFullscreen?.setFullscreen?.(true)
+    else document.documentElement.requestFullscreen?.().catch(() => {})
+    setFullscreen(true)
+  }
+  const exitFullscreen = (): void => {
+    if (isElectronApp) elFullscreen?.setFullscreen?.(false)
+    else if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+    setFullscreen(false)
+  }
+
+  // Keep React state in sync when fullscreen is entered/exited by something
+  // other than our own button — F11 (Electron, see main.js), OS window-manager
+  // gestures, or the browser's native Escape-exits-fullscreen behavior (web).
   useEffect(() => {
-    if (!fullscreen) return
-    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setFullscreen(false) }
+    if (isElectronApp) {
+      const off = elFullscreen?.onFullscreenChange?.((v: boolean) => setFullscreen(v))
+      return off
+    }
+    const onChange = (): void => setFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [isElectronApp])
+
+  // The web Fullscreen API exits on Escape by itself (caught by the listener
+  // above). Electron's setFullScreen has no built-in Escape binding though,
+  // so handle it ourselves there.
+  useEffect(() => {
+    if (!fullscreen || !isElectronApp) return
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') exitFullscreen() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [fullscreen])
+  }, [fullscreen, isElectronApp])
+
+  // If this page unmounts (navigating away) while still fullscreen, leave
+  // real OS/browser fullscreen too — otherwise the window would be stuck
+  // fullscreen with no obvious way back once the WRLD-specific toggle is gone.
+  useEffect(() => () => {
+    if (!fullscreenRef.current) return
+    if (isElectronApp) elFullscreen?.setFullscreen?.(false)
+    else if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+  }, [])
+
   const [suggestQuery, setSuggestQuery]     = useState('')
   const [suggestResults, setSuggestResults] = useState<JWApiSong[]>([])
   const [suggestLoading, setSuggestLoading] = useState(false)
@@ -541,12 +586,15 @@ export default function WrldView(): JSX.Element {
         <div className="absolute top-0 left-0 right-0 h-7 z-20 select-none mr-[132px]" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
       )}
 
-      {/* Fullscreen toggle */}
+      {/* Fullscreen toggle. The Electron window-control buttons (minimize/
+          maximize/close) are a fixed 132px-wide bar pinned to the top-right
+          corner at all times (see WindowControls in App.tsx) — clear it,
+          otherwise this sits underneath those buttons (z-[10000]). */}
       <button
-        onClick={() => setFullscreen(v => !v)}
-        className="absolute z-30 flex items-center justify-center w-8 h-8 rounded-full transition-all
-          top-3 right-12 md:top-4 md:right-4
-          bg-black/10 dark:bg-black/25 text-black/50 dark:text-white/50 hover:text-black/80 dark:hover:text-white/90 hover:bg-black/20 dark:hover:bg-black/50 backdrop-blur-sm"
+        onClick={() => (fullscreen ? exitFullscreen() : enterFullscreen())}
+        className={`absolute z-30 flex items-center justify-center w-8 h-8 rounded-full transition-all top-3 md:top-4
+          ${isElectronApp ? 'right-[140px]' : 'right-12 md:right-4'}
+          bg-black/10 dark:bg-black/25 text-black/50 dark:text-white/50 hover:text-black/80 dark:hover:text-white/90 hover:bg-black/20 dark:hover:bg-black/50 backdrop-blur-sm`}
         title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
       >
         {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
@@ -596,6 +644,16 @@ export default function WrldView(): JSX.Element {
                 {displayAlbum  && <p className="text-xs mt-0.5 truncate" style={{ color: txtTer }}>{displayAlbum}</p>}
                 {radioFmActive && !radioFmNowPlaying && <p className="text-xs mt-0.5" style={{ color: txtTer }}>Tuning in…</p>}
               </div>
+              {!radioFmActive && (
+                <button
+                  onClick={() => setShowQueue(!showQueue)}
+                  title="Playing Next"
+                  className="p-1.5 rounded-full transition-colors hover:bg-white/10"
+                  style={{ color: showQueue ? 'var(--accent)' : (textIsDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.55)') }}
+                >
+                  <ListMusic size={18} />
+                </button>
+              )}
               <SongMenu light={textIsDark} />
             </div>
 
@@ -754,6 +812,16 @@ export default function WrldView(): JSX.Element {
                     {displayArtist && <p className="text-sm mt-0.5 truncate" style={{ color: txtSec }}>{displayArtist}</p>}
                     {radioFmActive && !radioFmNowPlaying && <p className="text-sm mt-0.5" style={{ color: txtTer }}>Tuning in…</p>}
                   </div>
+                  {!radioFmActive && (
+                    <button
+                      onClick={() => setShowQueue(!showQueue)}
+                      title="Playing Next"
+                      className="p-1.5 rounded-full transition-colors hover:bg-white/10"
+                      style={{ color: showQueue ? 'var(--accent)' : (textIsDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.55)') }}
+                    >
+                      <ListMusic size={18} />
+                    </button>
+                  )}
                   <SongMenu light={textIsDark} />
                 </div>
               </div>
@@ -991,6 +1059,12 @@ export default function WrldView(): JSX.Element {
         {/* Notch handle — pill tab */}
         <div className="w-[5px] group-hover:w-[3px] h-16 group-hover:h-24 rounded-l-full bg-white/20 group-hover:bg-white/50 transition-all duration-200 ease-out shrink-0" />
       </div>
+
+      {/* Queue — hidden during 999FM, which is a live stream with nothing to
+          queue/reorder. A real flex sibling (not absolutely positioned) on
+          desktop, so it takes its own column and the layout beside it shrinks
+          to fit, matching Apple Music's "Playing Next" panel. */}
+      {showQueue && !radioFmActive && <WrldQueuePanel onClose={() => setShowQueue(false)} />}
     </div>
   )
 
@@ -1123,6 +1197,151 @@ const SongMenu = memo(function SongMenu({ light }: { light: boolean }): JSX.Elem
     </div>
   )
 })
+
+// Apple Music-style "Up Next" queue panel for the WRLD tab — a dark glass
+// panel matching the rest of the page instead of the app-wide QueuePanel's
+// light theme (which App.tsx suppresses while this page is active, mirroring
+// how it already suppresses the standalone NowPlaying panel here).
+const WrldQueuePanel = memo(function WrldQueuePanel({ onClose }: { onClose: () => void }): JSX.Element {
+  const { queue, queueIndex, currentTrack, isPlaying, shuffle, playTrack, removeFromQueue, clearQueue, reorderQueue } = useStore(useShallow(s => ({
+    queue: s.queue,
+    queueIndex: s.queueIndex,
+    currentTrack: s.currentTrack,
+    isPlaying: s.isPlaying,
+    shuffle: s.shuffle,
+    playTrack: s.playTrack,
+    removeFromQueue: s.removeFromQueue,
+    clearQueue: s.clearQueue,
+    reorderQueue: s.reorderQueue,
+  })))
+
+  const upcoming = queue.slice(queueIndex + 1)
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+
+  const handleDrop = (idx: number): void => {
+    if (dragIdx !== null && dragIdx !== idx) reorderQueue(dragIdx, idx)
+    setDragIdx(null); setDragOverIdx(null)
+  }
+
+  return (
+    <div
+      className="absolute md:static inset-0 md:inset-auto z-40 flex flex-col md:w-[320px] md:shrink-0 h-full bg-black/85 backdrop-blur-2xl md:border-l border-white/10"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between px-4 pt-5 pb-3 shrink-0 border-b border-white/10">
+        <div className="flex items-center gap-2">
+          <ListMusic size={14} className="text-white/50" />
+          <h2 className="text-white/90 font-semibold text-xs uppercase tracking-widest">Playing Next</h2>
+        </div>
+        <div className="flex items-center gap-3">
+          {upcoming.length > 0 && (
+            <button onClick={clearQueue} className="text-white/50 hover:text-red-400 transition-colors text-xs flex items-center gap-1">
+              <Trash2 size={12} /> Clear
+            </button>
+          )}
+          <button onClick={onClose} className="text-white/50 hover:text-white/90 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+        {currentTrack ? (
+          <div className="px-3 py-3">
+            <p className="text-white/40 text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold">Now Playing</p>
+            <WrldQueueRow track={currentTrack} isActive isPlaying={isPlaying} />
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-40 gap-2 text-center px-8">
+            <ListMusic className="text-white/20 w-8 h-8" />
+            <p className="text-white/50 text-sm">Queue is empty</p>
+          </div>
+        )}
+
+        {currentTrack && <div className="mx-3 border-t border-white/10" />}
+
+        {upcoming.length > 0 ? (
+          <div className="px-3 pt-3 pb-6">
+            <p className="text-white/40 text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold">
+              {shuffle ? 'Shuffle' : 'Up Next'} · {upcoming.length}
+            </p>
+            {upcoming.map((track, i) => (
+              <div
+                key={`${track.id}-${queueIndex + 1 + i}`}
+                draggable
+                onDragStart={() => setDragIdx(i)}
+                onDragOver={(e) => { e.preventDefault(); setDragOverIdx(i) }}
+                onDrop={() => handleDrop(i)}
+                onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
+                className={`transition-transform ${dragOverIdx === i && dragIdx !== i ? 'translate-y-0.5 opacity-70' : ''} ${dragIdx === i ? 'opacity-30' : ''}`}
+              >
+                <WrldQueueRow
+                  track={track}
+                  isActive={false}
+                  isPlaying={false}
+                  showDrag
+                  onPlay={() => playTrack(track, queue.slice(queueIndex + 1 + i))}
+                  onRemove={() => removeFromQueue(queueIndex + 1 + i)}
+                />
+              </div>
+            ))}
+          </div>
+        ) : currentTrack ? (
+          <p className="text-white/40 text-xs text-center py-4">Nothing up next</p>
+        ) : null}
+      </div>
+    </div>
+  )
+})
+
+function WrldQueueRow({ track, isActive, isPlaying, showDrag, onPlay, onRemove }: {
+  track: Track
+  isActive: boolean
+  isPlaying: boolean
+  showDrag?: boolean
+  onPlay?: () => void
+  onRemove?: () => void
+}): JSX.Element {
+  return (
+    <div
+      className={`flex items-center gap-2 px-1 py-1.5 rounded-lg group transition-colors ${isActive ? 'bg-white/10' : 'hover:bg-white/[0.06]'} ${onPlay && !isActive ? 'cursor-pointer' : ''}`}
+      onDoubleClick={onPlay}
+    >
+      {showDrag ? (
+        <div className="text-white/40 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing shrink-0 transition-opacity">
+          <GripVertical size={13} />
+        </div>
+      ) : (
+        <div className="w-3.5 shrink-0" />
+      )}
+      <div className="w-9 h-9 rounded shrink-0 overflow-hidden bg-white/[0.06]">
+        <AlbumArtThumbnail track={track} size={36} className="w-full h-full" shimmer={false} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-xs font-medium truncate leading-tight ${isActive ? 'text-accent' : 'text-white/85'}`}>{track.title}</p>
+        <p className="text-[10px] text-white/40 truncate mt-0.5">{track.artist}</p>
+      </div>
+      <div className="flex items-center gap-1 shrink-0">
+        {!isPlaying && (
+          <span className="text-white/40 text-[10px] tabular-nums">{track.duration ? formatDuration(track.duration) : ''}</span>
+        )}
+        {isPlaying && (
+          <span className="flex gap-0.5 items-end h-3">
+            {[0.4, 0.7, 1, 0.6].map((h, i) => (
+              <span key={i} className="w-0.5 bg-accent rounded-full animate-pulse" style={{ height: `${h * 100}%`, animationDelay: `${i * 0.15}s` }} />
+            ))}
+          </span>
+        )}
+        {onRemove && (
+          <button onClick={(e) => { e.stopPropagation(); onRemove() }} className="opacity-0 group-hover:opacity-100 text-white/40 hover:text-red-400 transition-all ml-1 p-0.5">
+            <X size={11} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 // Read-only playback bar for 999FM — it's a live stream, so no scrubbing,
 // but elapsed/duration are still known (from the radio WS) and ticked
@@ -1357,13 +1576,20 @@ const LyricsPanel = memo(function LyricsPanel({
                 className="cursor-pointer select-none origin-left"
                 style={{
                   fontSize:   baseFontSize,
-                  fontWeight: isActive ? 800 : dist === 1 ? 600 : 400,
+                  // Bold weight is the active line's CSS class only — not
+                  // animated. Most fonts (including this app's system-font
+                  // stack) aren't variable fonts, so `font-weight` can't
+                  // actually interpolate between steps like 400→800; the
+                  // browser just snaps partway through the transition,
+                  // reading as the text suddenly going bold once the (truly
+                  // smooth) scale/opacity/color animation appears to settle.
+                  fontWeight: isActive ? 800 : 500,
                   lineHeight: 1.25,
                   color:      isActive ? txtPri : txtSec,
                   opacity:    isActive ? 1 : dist === 1 ? 0.55 : dist === 2 ? 0.35 : 0.2,
                   filter:     (!isActive && !isPast && dist >= 2) ? 'blur(0.6px)' : 'none',
                   transform:  `scale(${scale})`,
-                  transition: 'opacity 0.4s cubic-bezier(0.4,0,0.2,1), color 0.4s cubic-bezier(0.4,0,0.2,1), transform 0.4s cubic-bezier(0.4,0,0.2,1), font-weight 0.4s cubic-bezier(0.4,0,0.2,1), filter 0.4s cubic-bezier(0.4,0,0.2,1)',
+                  transition: 'opacity 0.4s cubic-bezier(0.4,0,0.2,1), color 0.4s cubic-bezier(0.4,0,0.2,1), transform 0.4s cubic-bezier(0.4,0,0.2,1), filter 0.4s cubic-bezier(0.4,0,0.2,1)',
                   textShadow: isActive ? '0 0 30px rgba(255,255,255,0.12)' : 'none',
                 }}
               >
