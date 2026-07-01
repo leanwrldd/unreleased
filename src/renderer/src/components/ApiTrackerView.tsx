@@ -3,13 +3,14 @@ import {
   Search, Play, Loader2, Music2, X, Check,
   LayoutList, LayoutGrid, Info, Download, ListPlus, PanelLeft,
   ChevronUp, ChevronDown, MoreHorizontal, Folder, Pencil, Plus, ListMusic, HardDrive, PackageOpen,
+  CheckSquare2, Square,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { useShallow } from 'zustand/react/shallow'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 import SongInfoModal from './SongInfoModal'
 import {
-  apiFetch, songToTrack, parseDuration, CATEGORY_LABELS, buildStreamUrl, findSessionZips,
+  apiFetch, songToTrack, parseDuration, CATEGORY_LABELS, buildStreamUrl, findSessionZips, JWAPI_BASE,
   JWApiSong, JWApiPaginatedResponse, JWApiStats, JWApiEra, JWApiFileEntry,
 } from '../lib/juicewrldApi'
 import { fisherYates } from '../store/queueSlice'
@@ -504,6 +505,7 @@ function SongActions({
 // ─── Song row (list mode) ─────────────────────────────────────────────────────
 function SongRow({
   song, onPlay, onCategoryClick, onEraClick, onInfo, onContextMenu,
+  selectMode, selected, onToggleSelect,
 }: {
   song: JWApiSong
   onPlay: (song: JWApiSong) => void
@@ -511,6 +513,9 @@ function SongRow({
   onEraClick: (era: string) => void
   onInfo: (song: JWApiSong) => void
   onContextMenu: (song: JWApiSong, e: React.MouseEvent) => void
+  selectMode: boolean
+  selected: boolean
+  onToggleSelect: (song: JWApiSong) => void
 }): JSX.Element {
   const track = songToTrack(song)
   const title = song.name
@@ -519,17 +524,26 @@ function SongRow({
 
   return (
     <div
-      className="group flex items-center gap-3 px-3 py-2.5 md:py-2 hover:bg-surface-overlay active:bg-surface-overlay rounded-lg transition-colors cursor-default"
-      onDoubleClick={() => onInfo(song)}
-      onContextMenu={(e) => { e.preventDefault(); onContextMenu(song, e) }}
+      className={`group flex items-center gap-3 px-3 py-2.5 md:py-2 hover:bg-surface-overlay active:bg-surface-overlay rounded-lg transition-colors cursor-default ${selected ? 'bg-accent/10' : ''}`}
+      onClick={() => { if (selectMode) onToggleSelect(song) }}
+      onDoubleClick={() => { if (!selectMode) onInfo(song) }}
+      onContextMenu={(e) => { e.preventDefault(); if (!selectMode) onContextMenu(song, e) }}
     >
+      {selectMode && (
+        <div className="shrink-0">
+          {selected
+            ? <CheckSquare2 size={17} className="text-accent" />
+            : <Square size={17} className="text-text-muted opacity-50" />}
+        </div>
+      )}
+
       {/* Cover art */}
       <div className="relative shrink-0 w-10 h-10 md:w-9 md:h-9 rounded overflow-hidden bg-surface-overlay">
         <AlbumArtThumbnail track={track} size={36} shimmer={false} />
-        {canPlay && (
+        {canPlay && !selectMode && (
           <button
             className="absolute inset-0 items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
-            onClick={() => onPlay(song)}
+            onClick={(e) => { e.stopPropagation(); onPlay(song) }}
             title="Play"
           >
             <Play size={14} fill="white" className="text-white ml-0.5" />
@@ -552,50 +566,64 @@ function SongRow({
       {/* Desktop-only columns */}
       <span className="hidden md:block text-text-muted text-xs truncate w-32 shrink-0">{song.credited_artists || 'Juice WRLD'}</span>
       {song.era?.name ? (
-        <button
-          onClick={() => onEraClick(song.era!.name)}
-          className="hidden md:block text-text-muted text-xs truncate w-36 shrink-0 text-left hover:text-accent transition-colors"
-          title={`Filter by era: ${song.era.name}`}
-        >
-          {song.era.name}
-        </button>
+        selectMode ? (
+          <span className="hidden md:block text-text-muted text-xs truncate w-36 shrink-0">{song.era.name}</span>
+        ) : (
+          <button
+            onClick={() => onEraClick(song.era!.name)}
+            className="hidden md:block text-text-muted text-xs truncate w-36 shrink-0 text-left hover:text-accent transition-colors"
+            title={`Filter by era: ${song.era.name}`}
+          >
+            {song.era.name}
+          </button>
+        )
       ) : (
         <span className="hidden md:block text-text-muted text-xs truncate w-36 shrink-0">—</span>
       )}
-      <button
-        onClick={() => onCategoryClick(song.category as Category)}
-        className={`hidden md:block text-xs px-1.5 py-0.5 rounded border shrink-0 w-24 text-center transition-colors hover:opacity-80 ${CATEGORY_COLORS[song.category] ?? 'text-text-muted bg-surface border-[var(--border)]'}`}
-        title="Filter by category"
-      >
-        {CATEGORY_LABELS[song.category] ?? song.category}
-      </button>
+      {selectMode ? (
+        <span className={`hidden md:block text-xs px-1.5 py-0.5 rounded border shrink-0 w-24 text-center ${CATEGORY_COLORS[song.category] ?? 'text-text-muted bg-surface border-[var(--border)]'}`}>
+          {CATEGORY_LABELS[song.category] ?? song.category}
+        </span>
+      ) : (
+        <button
+          onClick={() => onCategoryClick(song.category as Category)}
+          className={`hidden md:block text-xs px-1.5 py-0.5 rounded border shrink-0 w-24 text-center transition-colors hover:opacity-80 ${CATEGORY_COLORS[song.category] ?? 'text-text-muted bg-surface border-[var(--border)]'}`}
+          title="Filter by category"
+        >
+          {CATEGORY_LABELS[song.category] ?? song.category}
+        </button>
+      )}
       <span className="hidden md:block text-text-muted text-xs w-12 text-right shrink-0 tabular-nums">{formatDur(parseDuration(song.length))}</span>
 
       {/* Desktop action buttons */}
-      <div className="hidden md:flex items-center gap-0.5 shrink-0">
-        <SongActions onInfo={() => onInfo(song)} onContextMenu={(e) => onContextMenu(song, e)} />
-      </div>
+      {!selectMode && (
+        <div className="hidden md:flex items-center gap-0.5 shrink-0">
+          <SongActions onInfo={() => onInfo(song)} onContextMenu={(e) => onContextMenu(song, e)} />
+        </div>
+      )}
 
       {/* Mobile: more + play */}
-      <div className="md:hidden flex items-center shrink-0">
-        <button
-          className="p-2 text-text-muted active:text-accent transition-colors"
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); onContextMenu(song, e) }}
-          title="More options"
-        >
-          <MoreHorizontal size={16} />
-        </button>
-        {canPlay && (
+      {!selectMode && (
+        <div className="md:hidden flex items-center shrink-0">
           <button
             className="p-2 text-text-muted active:text-accent transition-colors"
-            onClick={() => onPlay(song)}
-            title="Play"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onContextMenu(song, e) }}
+            title="More options"
           >
-            <Play size={17} />
+            <MoreHorizontal size={16} />
           </button>
-        )}
-      </div>
+          {canPlay && (
+            <button
+              className="p-2 text-text-muted active:text-accent transition-colors"
+              onClick={() => onPlay(song)}
+              title="Play"
+            >
+              <Play size={17} />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -603,6 +631,7 @@ function SongRow({
 // ─── Song card (grid mode) ────────────────────────────────────────────────────
 function SongCard({
   song, onPlay, onCategoryClick, onEraClick, onInfo, onContextMenu,
+  selectMode, selected, onToggleSelect,
 }: {
   song: JWApiSong
   onPlay: (song: JWApiSong) => void
@@ -610,6 +639,9 @@ function SongCard({
   onEraClick: (era: string) => void
   onInfo: (song: JWApiSong) => void
   onContextMenu: (song: JWApiSong, e: React.MouseEvent) => void
+  selectMode: boolean
+  selected: boolean
+  onToggleSelect: (song: JWApiSong) => void
 }): JSX.Element {
   const track = songToTrack(song)
   const title = song.name
@@ -617,15 +649,23 @@ function SongCard({
 
   return (
     <div
-      className="group flex flex-col rounded-xl overflow-hidden bg-surface-overlay hover:bg-surface-raised transition-colors cursor-default"
-      onContextMenu={(e) => { e.preventDefault(); onContextMenu(song, e) }}
+      className={`group flex flex-col rounded-xl overflow-hidden bg-surface-overlay hover:bg-surface-raised transition-colors cursor-default ${selected ? 'ring-2 ring-accent' : ''}`}
+      onClick={() => { if (selectMode) onToggleSelect(song) }}
+      onContextMenu={(e) => { e.preventDefault(); if (!selectMode) onContextMenu(song, e) }}
     >
       <div className="relative w-full aspect-square bg-surface-raised">
         <AlbumArtThumbnail track={track} size={160} shimmer={false} />
-        {canPlay && (
+        {selectMode && (
+          <div className="absolute top-1.5 left-1.5 z-10">
+            {selected
+              ? <CheckSquare2 size={18} className="text-accent drop-shadow" />
+              : <Square size={18} className="text-white/70 drop-shadow" />}
+          </div>
+        )}
+        {canPlay && !selectMode && (
           <button
             className="absolute inset-0 items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex"
-            onClick={() => onPlay(song)}
+            onClick={(e) => { e.stopPropagation(); onPlay(song) }}
             title="Play"
           >
             <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center shadow-lg">
@@ -633,21 +673,23 @@ function SongCard({
             </div>
           </button>
         )}
-        {canPlay && (
+        {canPlay && !selectMode && (
           <button
             className="md:hidden absolute bottom-1.5 right-1.5 w-8 h-8 rounded-full bg-accent flex items-center justify-center shadow-lg active:scale-95 transition-transform"
-            onClick={() => onPlay(song)}
+            onClick={(e) => { e.stopPropagation(); onPlay(song) }}
           >
             <Play size={14} fill="black" className="text-black ml-0.5" />
           </button>
         )}
-        <button
-          className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 md:flex hidden transition-opacity"
-          onClick={(e) => { e.stopPropagation(); onContextMenu(song, e) }}
-          title="More options"
-        >
-          <MoreHorizontal size={13} className="text-white" />
-        </button>
+        {!selectMode && (
+          <button
+            className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 md:flex hidden transition-opacity"
+            onClick={(e) => { e.stopPropagation(); onContextMenu(song, e) }}
+            title="More options"
+          >
+            <MoreHorizontal size={13} className="text-white" />
+          </button>
+        )}
       </div>
 
       <div className="p-2.5 flex flex-col gap-1 min-w-0">
@@ -656,7 +698,7 @@ function SongCard({
         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
           {song.era?.name && (
             <button
-              onClick={(e) => { e.stopPropagation(); onEraClick(song.era!.name) }}
+              onClick={(e) => { e.stopPropagation(); if (!selectMode) onEraClick(song.era!.name) }}
               className="text-[9px] uppercase tracking-wide text-text-muted bg-surface px-1.5 py-0.5 rounded border border-[var(--border)] truncate max-w-full hover:text-accent hover:border-accent/40 transition-colors"
               title={`Filter by era: ${song.era.name}`}
             >
@@ -664,11 +706,12 @@ function SongCard({
             </button>
           )}
           <button
-            onClick={(e) => { e.stopPropagation(); onCategoryClick(song.category as Category) }}
+            onClick={(e) => { e.stopPropagation(); if (!selectMode) onCategoryClick(song.category as Category) }}
             className={`text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded border shrink-0 transition-colors hover:opacity-80 ${CATEGORY_COLORS[song.category] ?? 'text-accent/80 bg-accent/10 border-accent/20'}`}
           >
             {CATEGORY_LABELS[song.category] ?? song.category}
           </button>
+          {!selectMode && (
           <div className="ml-auto flex items-center gap-0.5">
             <button
               onClick={(e) => { e.stopPropagation(); onInfo(song) }}
@@ -685,6 +728,7 @@ function SongCard({
               <MoreHorizontal size={11} />
             </button>
           </div>
+          )}
         </div>
       </div>
     </div>
@@ -698,6 +742,7 @@ export default function ApiTrackerView(): JSX.Element {
     apiTrackerCategory, setApiTrackerCategory,
     apiTrackerEra, setApiTrackerEra,
     setActiveView, setApiFilesPath, setPendingEditorSongId,
+    playlists, refreshPlaylists, setShowUserAuth,
   } = useStore(useShallow(s => ({
     playTrack: s.playTrack, startRadio: s.startRadio, addToQueue: s.addToQueue,
     account: s.account, shuffle: s.shuffle,
@@ -705,12 +750,36 @@ export default function ApiTrackerView(): JSX.Element {
     apiTrackerEra: s.apiTrackerEra, setApiTrackerEra: s.setApiTrackerEra,
     setActiveView: s.setActiveView, setApiFilesPath: s.setApiFilesPath,
     setPendingEditorSongId: s.setPendingEditorSongId,
+    playlists: s.playlists, refreshPlaylists: s.refreshPlaylists, setShowUserAuth: s.setShowUserAuth,
   })))
 
   const canEdit = !!(account?.is_editor || account?.is_administrator)
 
   const [selectedSong, setSelectedSong] = useState<JWApiSong | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+
+  // Multi-select — mirrors the same pattern used in ApiFilesView's bulk select.
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState<Map<number, JWApiSong>>(new Map())
+  const [bulkZipStatus, setBulkZipStatus] = useState<'idle' | 'zipping' | 'done' | 'error'>('idle')
+  const [showBulkPlaylists, setShowBulkPlaylists] = useState(false)
+
+  const toggleSelect = (song: JWApiSong): void => {
+    setSelected(prev => {
+      const next = new Map(prev)
+      if (next.has(song.id)) next.delete(song.id)
+      else next.set(song.id, song)
+      return next
+    })
+  }
+
+  const exitSelectMode = (): void => {
+    setSelectMode(false)
+    setSelected(new Map())
+    setBulkZipStatus('idle')
+    setShowBulkPlaylists(false)
+  }
+
   const [stats, setStats] = useState<JWApiStats | null>(null)
   const [eras, setEras] = useState<JWApiEra[]>([])
   const [songs, setSongs] = useState<JWApiSong[]>([])
@@ -937,6 +1006,57 @@ export default function ApiTrackerView(): JSX.Element {
     setContextMenu({ song, x: e.clientX, y: e.clientY, showPlaylists: false })
   }, [])
 
+  // ESC exits select mode
+  useEffect(() => {
+    if (!selectMode) return
+    const onKeyDown = (e: KeyboardEvent): void => { if (e.key === 'Escape') exitSelectMode() }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectMode])
+
+  const selectedSongs = useMemo(() => [...selected.values()], [selected])
+
+  const bulkAddToQueue = (): void => {
+    selectedSongs.filter(s => s.path).forEach(s => addToQueue(songToTrack(s)))
+    exitSelectMode()
+  }
+
+  const bulkAddToPlaylist = async (playlistId: number): Promise<void> => {
+    const eligible = selectedSongs.filter(s => !['recording_session', 'unsurfaced'].includes(s.category))
+    await Promise.all(eligible.map(s => userApi.addToPlaylist(playlistId, s.id).catch(() => {})))
+    await refreshPlaylists()
+    exitSelectMode()
+  }
+
+  const bulkDownloadZip = async (): Promise<void> => {
+    const paths = selectedSongs.map(s => s.path).filter(Boolean) as string[]
+    if (paths.length === 0) return
+    setBulkZipStatus('zipping')
+    try {
+      const res = await fetch(`${JWAPI_BASE}/files/zip-selection/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paths }),
+      })
+      if (!res.ok) throw new Error()
+      const contentType = res.headers.get('content-type') || ''
+      if (contentType.includes('zip') || contentType.includes('octet-stream')) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a'); a.href = url; a.download = 'songs.zip'; a.click()
+        URL.revokeObjectURL(url)
+      } else {
+        const data = await res.json()
+        if (data.download_url) { const a = document.createElement('a'); a.href = data.download_url; a.download = 'songs.zip'; a.click() }
+      }
+      setBulkZipStatus('done')
+    } catch {
+      setBulkZipStatus('error')
+    }
+    setTimeout(() => setBulkZipStatus('idle'), 3000)
+  }
+
   const handleShowInFiles = useCallback((song: JWApiSong): void => {
     if (!song.path) return
     const parts = song.path.split('/')
@@ -996,6 +1116,19 @@ export default function ApiTrackerView(): JSX.Element {
               <option value="unsurfaced">Unsurfaced</option>
               <option value="recording_session">Sessions</option>
             </select>
+
+            <button
+              onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+              className={`flex items-center gap-1.5 px-2.5 py-2.5 md:py-2 rounded-lg text-xs transition-colors shrink-0 ${
+                selectMode
+                  ? 'bg-accent/15 text-accent border border-accent/30'
+                  : 'bg-surface-overlay text-text-muted hover:text-text-secondary border border-transparent'
+              }`}
+              title={selectMode ? 'Exit selection' : 'Select multiple songs'}
+            >
+              <CheckSquare2 size={13} />
+              <span className="hidden sm:inline">{selectMode ? 'Cancel' : 'Select'}</span>
+            </button>
 
             <div className="flex items-center bg-surface-overlay rounded-lg p-0.5 shrink-0 ml-auto">
               <button
@@ -1118,6 +1251,9 @@ export default function ApiTrackerView(): JSX.Element {
                     onEraClick={handleEraClick}
                     onInfo={handleInfo}
                     onContextMenu={handleContextMenu}
+                    selectMode={selectMode}
+                    selected={selected.has(song.id)}
+                    onToggleSelect={toggleSelect}
                   />
                 ))}
               </div>
@@ -1132,6 +1268,9 @@ export default function ApiTrackerView(): JSX.Element {
                     onEraClick={handleEraClick}
                     onInfo={handleInfo}
                     onContextMenu={handleContextMenu}
+                    selectMode={selectMode}
+                    selected={selected.has(song.id)}
+                    onToggleSelect={toggleSelect}
                   />
                 ))}
               </div>
@@ -1150,6 +1289,102 @@ export default function ApiTrackerView(): JSX.Element {
           </div>
         </div>
       </div>
+
+      {/* Bulk selection action bar */}
+      {selectMode && (
+        <div className="shrink-0 border-t border-[var(--border)] bg-surface px-4 py-2.5 flex items-center gap-2 relative">
+          <span className="text-sm text-text-primary font-medium flex-1">
+            {selected.size} {selected.size === 1 ? 'song' : 'songs'} selected
+          </span>
+          <button
+            onClick={() => setSelected(new Map(sortedSongs.map(s => [s.id, s])))}
+            className="text-xs text-text-muted hover:text-text-primary px-2 py-1 rounded transition-colors"
+          >
+            Select all
+          </button>
+          <button
+            onClick={() => setSelected(new Map())}
+            className="text-xs text-text-muted hover:text-text-primary px-2 py-1 rounded transition-colors"
+          >
+            Clear
+          </button>
+          <button
+            onClick={bulkAddToQueue}
+            disabled={selected.size === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-overlay hover:bg-surface-raised text-text-primary rounded-lg text-xs font-medium disabled:opacity-50 transition-colors"
+          >
+            <ListPlus size={13} /> Add to queue
+          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowBulkPlaylists(v => !v)}
+              disabled={selected.size === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-overlay hover:bg-surface-raised text-text-primary rounded-lg text-xs font-medium disabled:opacity-50 transition-colors"
+            >
+              <Plus size={13} /> Add to playlist
+            </button>
+            {showBulkPlaylists && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowBulkPlaylists(false)} />
+                <div className="absolute right-0 bottom-full mb-1 z-50 w-56 bg-surface border border-[var(--border)] rounded-xl shadow-2xl overflow-hidden">
+                  <div className="px-3 py-2 border-b border-[var(--border)] text-[11px] uppercase tracking-wider text-text-muted font-semibold">
+                    Add to playlist
+                  </div>
+                  {!account ? (
+                    <div className="p-3">
+                      <p className="text-xs text-text-muted mb-2">Log in to save to playlists.</p>
+                      <button
+                        onClick={() => { setShowUserAuth(true); setShowBulkPlaylists(false) }}
+                        className="w-full py-1.5 rounded-lg bg-accent/15 text-accent text-xs font-semibold"
+                      >
+                        Log in
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="max-h-56 overflow-y-auto py-1">
+                      {playlists.length === 0 && (
+                        <p className="px-3 py-2 text-xs text-text-muted">No playlists yet.</p>
+                      )}
+                      {playlists.map(p => (
+                        <button
+                          key={p.id}
+                          onClick={() => { bulkAddToPlaylist(p.id); setShowBulkPlaylists(false) }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                        >
+                          <ListMusic size={14} className="shrink-0 text-text-muted" />
+                          <span className="flex-1 truncate">{p.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+          <button
+            onClick={bulkDownloadZip}
+            disabled={selected.size === 0 || bulkZipStatus === 'zipping'}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-white rounded-lg text-xs font-medium disabled:opacity-50 transition-opacity hover:opacity-90"
+          >
+            {bulkZipStatus === 'zipping' ? (
+              <><Loader2 size={13} className="animate-spin" /> Zipping…</>
+            ) : bulkZipStatus === 'done' ? (
+              <><Check size={13} /> Done</>
+            ) : bulkZipStatus === 'error' ? (
+              <><X size={13} /> Error</>
+            ) : (
+              <><PackageOpen size={13} /> Download ZIP</>
+            )}
+          </button>
+          <button
+            onClick={exitSelectMode}
+            className="p-1.5 rounded-lg hover:bg-surface-overlay transition-colors"
+            title="Exit selection"
+          >
+            <X size={15} className="text-text-muted" />
+          </button>
+        </div>
+      )}
 
       {selectedSong && (
         <SongInfoModal
