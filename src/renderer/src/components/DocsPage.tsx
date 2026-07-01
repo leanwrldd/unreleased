@@ -189,10 +189,15 @@ function OverviewTab() {
   "snippets": [],
   "date_leaked": "Leak Date",
   "leak_type": "Leak Type",
-  "image_url": "/assets/era-image.webp"
+  "image_url": "/assets/era-image.webp",
+  "version_title": "Version label (only with ?versions=true on /songs/)",
+  "versions": []
 }`}</Pre>
         <p className="text-xs text-text-muted">
           <Code>image_url</Code> is relative — prepend <Code>https://juicewrldapi.com</Code> before use.
+        </p>
+        <p className="text-xs text-text-muted">
+          <Code>version_title</Code> / <Code>versions</Code> are omitted unless the request includes <Code>?versions=true</Code> — see the <Code>/songs/</Code> params below.
         </p>
       </Section>
     </div>
@@ -215,6 +220,7 @@ function SongsTab() {
             [<Code>searchall</Code>, 'string', 'Search names, artists, producers, track titles'],
             [<Code>lyrics</Code>, 'string', 'Full-text search within lyrics content'],
             [<Code>file_names_array</Code>, 'string', '"true" to return file_names as array instead of string'],
+            [<Code>versions</Code>, 'string', <>"true" to add <Code>version_title</Code> and a <Code>versions</Code> array to each song. Collection endpoint only — <Code>/songs/{'{id}'}/</Code> ignores it.</>],
           ]}
         />
         <p className="text-xs text-text-muted font-semibold mt-2">Response shape:</p>

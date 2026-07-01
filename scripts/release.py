@@ -4,13 +4,16 @@ Unreleased Music Player — Interactive Release Script
 
 Just run it — no arguments needed.
 
-Steps:
+All prompts are asked up front, then everything else runs unattended:
   1. Pick a version (bump patch / minor / major, or keep / custom)
-  2. Commit all changes to the desktop branch (app)
-  3. Build the renderer + Electron installer
-  4. Push the desktop branch to GitHub
-  5. Sync the web branch (copies src/ + package.json from app, skips electron/)
-  6. Create the GitHub release and upload all assets
+  2. Enter a commit message (only if the tree is dirty)
+  3. Enter release notes (blank = auto-generate from commits)
+  ── nothing left to answer past this point ──
+  4. Commit all changes to the desktop branch (app)
+  5. Build the renderer + Electron installer
+  6. Push the desktop branch to GitHub
+  7. Sync the web branch (copies src/ + package.json from app, skips electron/)
+  8. Create the GitHub release and upload all assets
 """
 
 import os, sys, re, json, subprocess, time, urllib.request, urllib.error, urllib.parse
@@ -200,11 +203,11 @@ def upload_asset(release_id, filepath, token):
     finally:
         wrap.close()
 
-# ── Steps ─────────────────────────────────────────────────────────────────────
+# ── Prompts (collected up front, before any build/deploy/commit) ──────────────
 
-TOTAL = 6
+TOTAL = 8
 
-def step_version():
+def prompt_version():
     section(1, TOTAL, "Version")
     cur = load_version()
     info(f"Current version: {_c(cur, WHT, BOLD)}")
@@ -233,23 +236,42 @@ def step_version():
         ok(f"Keeping {_c(cur, WHT, BOLD)}")
         return cur
 
-    set_version(new_ver)
     ok(f"Version: {cur}  →  {_c(new_ver, WHT, BOLD)}")
     return new_ver
 
 
-def step_commit(version):
-    section(2, TOTAL, f"Commit → {APP_BRANCH}")
-
-    if git_branch() != APP_BRANCH:
-        info(f"Switching to {APP_BRANCH}")
-        run(f"git checkout {APP_BRANCH}")
+def prompt_commit_message(version):
+    section(2, TOTAL, f"Commit message")
 
     if is_dirty():
         info("Uncommitted changes:")
         for line in capture("git status --short").splitlines():
             detail(line)
-        msg = ask("Commit message", default=f"v{version}")
+        return ask("Commit message", default=f"v{version}")
+    else:
+        ok("Nothing to commit — tree is clean")
+        return None
+
+
+def prompt_release_notes():
+    section(3, TOTAL, "Release notes")
+    return ask("Release notes  (blank = auto-generate from commits)", default="")
+
+
+# ── Steps (run only after every prompt above has been answered) ──────────────
+
+def step_apply_version(new_ver):
+    set_version(new_ver)
+
+
+def step_commit(version, msg):
+    section(4, TOTAL, f"Commit → {APP_BRANCH}")
+
+    if git_branch() != APP_BRANCH:
+        info(f"Switching to {APP_BRANCH}")
+        run(f"git checkout {APP_BRANCH}")
+
+    if msg is not None:
         run("git add -A")
         run(f'git commit -m "{msg}"')
         ok(f"Committed: {msg}")
@@ -258,7 +280,7 @@ def step_commit(version):
 
 
 def step_build():
-    section(3, TOTAL, "Build Electron app")
+    section(5, TOTAL, "Build Electron app")
     warn("This takes ~2 minutes — output streams below")
     print()
 
@@ -286,13 +308,13 @@ def step_build():
 
 
 def step_push_app():
-    section(4, TOTAL, f"Push → origin/{APP_BRANCH}")
+    section(6, TOTAL, f"Push → origin/{APP_BRANCH}")
     run(f"git push origin {APP_BRANCH}")
     ok(f"Pushed to origin/{APP_BRANCH}")
 
 
 def step_sync_web(version):
-    section(5, TOTAL, f"Sync → {WEB_BRANCH}  (electron/ excluded)")
+    section(7, TOTAL, f"Sync → {WEB_BRANCH}  (electron/ excluded)")
 
     original = git_branch()
     try:
@@ -332,8 +354,8 @@ def step_sync_web(version):
             run(f"git checkout {original}")
 
 
-def step_release(version, token):
-    section(6, TOTAL, "GitHub release")
+def step_release(version, token, notes):
+    section(8, TOTAL, "GitHub release")
     tag         = f"v{version}"
     release_dir = ROOT / "release"
 
@@ -353,7 +375,6 @@ def step_release(version, token):
     if not to_upload:
         die(f"No release assets found in {release_dir}/\nDid the build succeed?")
 
-    notes = ask("Release notes  (blank = auto-generate from commits)", default="")
     if not notes:
         # Auto-generate from commits since last tag
         notes = capture(
@@ -406,13 +427,20 @@ def step_release(version, token):
 def main():
     banner()
     try:
-        token   = get_token()
-        version = step_version()
-        step_commit(version)
+        token = get_token()
+
+        # ── Every user prompt happens first — once these are answered, the
+        #    rest of the release runs unattended (build, push, sync, commit).
+        version = prompt_version()
+        step_apply_version(version)
+        commit_msg = prompt_commit_message(version)
+        release_notes = prompt_release_notes()
+
+        step_commit(version, commit_msg)
         step_build()
         step_push_app()
         step_sync_web(version)
-        step_release(version, token)
+        step_release(version, token, release_notes)
 
         print()
         print(_c("  " + "═" * 46, GRN, BOLD))
