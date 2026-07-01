@@ -51,10 +51,20 @@ HELP = f"""
 
 {BOLD}Shortcuts{RST} (type the name, some take an argument)
   {", ".join(SHORTCUTS)}
-  e.g. {CYN}song 94316{RST}   ->  GET /songs/94316/
-       {CYN}search juice{RST} ->  GET /songs/ search=juice
-  Extra key=value args after a shortcut are added as params too:
-       {CYN}song 94316 versions=true{RST}  ->  GET /songs/94316/?versions=true
+  e.g. {CYN}songs{RST}                        ->  GET /songs/?page_size=10
+       {CYN}songs category=released{RST}      ->  GET /songs/?page_size=10&category=released
+       {CYN}song 94316{RST}                   ->  GET /songs/94316/
+       {CYN}song 94316 versions=true{RST}     ->  GET /songs/94316/?versions=true
+       {CYN}search juice{RST}                 ->  GET /songs/?search=juice
+       {CYN}search juice category=released{RST} ->  GET /songs/?search=juice&category=released
+       {CYN}eras{RST}                         ->  GET /eras/
+       {CYN}stats{RST}                        ->  GET /stats/
+       {CYN}browse{RST}                       ->  GET /files/browse/
+       {CYN}browse search=juice{RST}          ->  GET /files/browse/?search=juice
+       {CYN}me{RST}                           ->  GET /accounts/me/  (needs a token)
+       {CYN}favorites{RST}                    ->  GET /library/favorites/  (needs a token)
+       {CYN}playlists{RST}                    ->  GET /library/playlists/  (needs a token)
+  Any shortcut can take extra key=value args, which get added as query params.
 
 {BOLD}Session{RST}
   {CYN}token{RST} <value>       set the auth token (sent as "Authorization: Token <value>")
