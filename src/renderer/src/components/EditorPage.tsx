@@ -8,7 +8,7 @@ import { apiFetch, JWApiSong, JWApiEra, buildImageUrl, CATEGORY_LABELS } from '.
 import * as userApi from '../lib/userApi'
 import { invalidateLyricsCache } from './Player'
 import type { EditorApplication } from '../lib/userApi'
-import { versionsEnabled, getVersionGroup, getOwnVersionMeta, linkSongVersion, unlinkSongVersion, setVersionMeta } from '../lib/versionsApi'
+import { versionsEnabled, getVersionGroup, getOwnVersionMeta, linkSongVersion, unlinkSongVersion, setSongVersion, setGroupVersionTitle } from '../lib/versionsApi'
 
 type SubmitState = 'idle' | 'submitting' | 'submitted' | 'error'
 type LyricsTab = 'lyrics' | 'synced'
@@ -239,11 +239,14 @@ export default function EditorPage(): JSX.Element {
   const [linking, setLinking] = useState(false)
   const [linkError, setLinkError] = useState<string | null>(null)
   const linkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // This song's own version number/title within its group (separate from the
-  // proposal patch below — these write straight to Supabase on blur, same as
-  // the equivalent fields in SongInfoModal).
+  // This song's own version label plus the group's shared version title
+  // (separate from the proposal patch below — these write straight to
+  // Supabase on blur). Version is per-song ("v1", "TV Mix"); version title
+  // is written to every song in the group at once so they always match —
+  // read-only everywhere else (SongInfoModal no longer allows editing it).
   const [versionNum,   setVersionNum]   = useState('')
   const [versionTitle, setVersionTitle] = useState('')
+  const [ownGroupId,   setOwnGroupId]   = useState<number | null>(null)
 
   const baseline = (s: JWApiSong | null): Record<string, unknown> => {
     if (!s) return {}
@@ -339,16 +342,26 @@ export default function EditorPage(): JSX.Element {
   }, [song, refreshVersions])
 
   useEffect(() => {
-    if (!versionsEnabled || !song) { setVersionNum(''); setVersionTitle(''); return }
+    if (!versionsEnabled || !song) { setVersionNum(''); setVersionTitle(''); setOwnGroupId(null); return }
     getOwnVersionMeta(song.id).then(meta => {
-      setVersionNum(meta?.version != null ? String(meta.version) : '')
+      setVersionNum(meta?.version ?? '')
       setVersionTitle(meta?.versionTitle ?? '')
+      setOwnGroupId(meta?.groupId ?? null)
     })
   }, [song])
 
-  const saveVersionMeta = (meta: { version?: number | null; versionTitle?: string | null }): void => {
+  const saveVersion = (version: string): void => {
     if (!song) return
-    setVersionMeta(song.id, meta).catch(() => {})
+    setLinkError(null)
+    setSongVersion(song.id, version.trim() || null)
+      .catch(e => setLinkError(e instanceof Error ? e.message : 'Failed to save version'))
+  }
+
+  const saveVersionTitle = (title: string): void => {
+    if (ownGroupId == null) return
+    setLinkError(null)
+    setGroupVersionTitle(ownGroupId, title.trim() || null)
+      .catch(e => setLinkError(e instanceof Error ? e.message : 'Failed to save version title'))
   }
 
   useEffect(() => {
@@ -706,19 +719,19 @@ export default function EditorPage(): JSX.Element {
                   {versions.length > 0 && (
                     <div className="flex items-center gap-1.5 mt-1.5">
                       <input
-                        type="number"
+                        type="text"
                         value={versionNum}
                         onChange={(e) => setVersionNum(e.target.value)}
-                        onBlur={() => saveVersionMeta({ version: versionNum.trim() ? Number(versionNum) : null })}
-                        placeholder="Version #"
-                        className="w-20 bg-surface-overlay border border-[var(--border)] rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
+                        onBlur={() => saveVersion(versionNum)}
+                        placeholder="Version (e.g. v1, TV Mix)"
+                        className="w-32 bg-surface-overlay border border-[var(--border)] rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
                       />
                       <input
                         type="text"
                         value={versionTitle}
                         onChange={(e) => setVersionTitle(e.target.value)}
-                        onBlur={() => saveVersionMeta({ versionTitle: versionTitle.trim() || null })}
-                        placeholder="Version title"
+                        onBlur={() => saveVersionTitle(versionTitle)}
+                        placeholder="Version title (shared by all linked songs)"
                         className="flex-1 min-w-0 bg-surface-overlay border border-[var(--border)] rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
                       />
                     </div>

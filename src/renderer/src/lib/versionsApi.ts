@@ -9,11 +9,16 @@
 //   create table if not exists song_versions (
 //     song_id       bigint primary key,
 //     group_id      bigint not null,
-//     version       int,
+//     version       text,
 //     version_title text,
 //     added_by      text,
 //     created_at    timestamptz not null default now()
 //   );
+//
+//   -- version_title is written to every row in a group together (see
+//   -- setGroupVersionTitle below), so all linked songs always show the same
+//   -- title — it's stored per-row rather than in a separate groups table
+//   -- purely to avoid an extra migration, not because it's meant to vary.
 //   create index if not exists song_versions_group_id_idx on song_versions (group_id);
 //
 //   alter table song_versions enable row level security;
@@ -41,7 +46,7 @@ export const versionsEnabled = !!(SUPABASE_URL && SUPABASE_ANON_KEY)
 interface SongVersionRow {
   song_id: number
   group_id: number
-  version: number | null
+  version: string | null
   version_title: string | null
   added_by: string | null
 }
@@ -49,7 +54,8 @@ interface SongVersionRow {
 /** Version metadata for one song within a linked group. */
 export interface SongVersionMeta {
   songId: number
-  version: number | null
+  groupId: number
+  version: string | null
   versionTitle: string | null
   addedBy: string | null
 }
@@ -73,7 +79,7 @@ async function supaFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
 const ROW_FIELDS = 'song_id,group_id,version,version_title,added_by'
 
 function toMeta(row: SongVersionRow): SongVersionMeta {
-  return { songId: row.song_id, version: row.version, versionTitle: row.version_title, addedBy: row.added_by }
+  return { songId: row.song_id, groupId: row.group_id, version: row.version, versionTitle: row.version_title, addedBy: row.added_by }
 }
 
 async function getRow(songId: number): Promise<SongVersionRow | null> {
@@ -147,16 +153,20 @@ export async function unlinkSongVersion(songId: number): Promise<void> {
   await supaFetch(`/song_versions?song_id=eq.${songId}`, { method: 'DELETE' })
 }
 
-/** Updates the version number/title shown for a song within its group. */
-export async function setVersionMeta(
-  songId: number,
-  meta: { version?: number | null; versionTitle?: string | null }
-): Promise<void> {
-  const body: Record<string, unknown> = {}
-  if ('version' in meta) body.version = meta.version
-  if ('versionTitle' in meta) body.version_title = meta.versionTitle
+/** Updates this song's own version label (e.g. "v1", "TV Mix") — distinct
+ *  per song within a group, unlike the shared version title below. */
+export async function setSongVersion(songId: number, version: string | null): Promise<void> {
   await supaFetch(`/song_versions?song_id=eq.${songId}`, {
     method: 'PATCH',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ version }),
+  })
+}
+
+/** Sets the version title for every song in a group at once, so linked
+ *  songs always agree on the title (e.g. "She's The One"). */
+export async function setGroupVersionTitle(groupId: number, versionTitle: string | null): Promise<void> {
+  await supaFetch(`/song_versions?group_id=eq.${groupId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ version_title: versionTitle }),
   })
 }
