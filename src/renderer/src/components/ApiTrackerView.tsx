@@ -3,7 +3,7 @@ import {
   Search, Play, Loader2, Music2, X, Check,
   LayoutList, LayoutGrid, Info, Download, ListPlus, PanelLeft,
   ChevronUp, ChevronDown, MoreHorizontal, Folder, Pencil, Plus, ListMusic, HardDrive, PackageOpen,
-  CheckSquare2, Square,
+  CheckSquare2, Square, Link2,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { useShallow } from 'zustand/react/shallow'
@@ -16,6 +16,7 @@ import {
 import { fisherYates } from '../store/queueSlice'
 import { Track } from '../types'
 import * as userApi from '../lib/userApi'
+import { versionsEnabled, linkSongVersion } from '../lib/versionsApi'
 
 type Category = 'released' | 'unreleased' | 'unsurfaced' | 'recording_session' | ''
 type ViewMode = 'list' | 'grid'
@@ -172,6 +173,12 @@ interface ContextMenuState {
   showPlaylists: boolean
 }
 
+interface BulkContextMenuState {
+  x: number
+  y: number
+  showPlaylists: boolean
+}
+
 // Hoisted to module scope — defining this inside SongContextMenu's render body
 // would give it a new function identity every render, causing React to
 // unmount/remount every menu item button (and flicker any :hover state) on
@@ -197,6 +204,7 @@ function SongContextMenu({
   onEdit,
   canEdit,
   onTogglePlaylists,
+  onSelect,
 }: {
   state: ContextMenuState
   onClose: () => void
@@ -206,6 +214,7 @@ function SongContextMenu({
   onEdit: () => void
   canEdit: boolean
   onTogglePlaylists: () => void
+  onSelect: () => void
 }): JSX.Element {
   const { playlists, account, refreshPlaylists, setShowUserAuth } = useStore(
     useShallow(s => ({ playlists: s.playlists, account: s.account, refreshPlaylists: s.refreshPlaylists, setShowUserAuth: s.setShowUserAuth }))
@@ -418,6 +427,7 @@ function SongContextMenu({
         /* Main menu */
         <>
           <MenuItem icon={<Info size={14} />} label="Song info" onClick={() => { onInfo(); onClose() }} />
+          <MenuItem icon={<CheckSquare2 size={14} />} label="Select" onClick={() => { onSelect(); onClose() }} />
           {state.song.path && (
             <MenuItem icon={<ListPlus size={14} />} label="Add to queue" onClick={() => { onQueue(); onClose() }} />
           )}
@@ -466,6 +476,114 @@ function SongContextMenu({
               )}
             </>
           )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function BulkContextMenu({
+  state,
+  onClose,
+  count,
+  onAddToQueue,
+  onDownloadZip,
+  onTogglePlaylists,
+  playlists,
+  account,
+  onAddToPlaylist,
+  onLogin,
+  canLinkVersions,
+  onLinkVersions,
+}: {
+  state: BulkContextMenuState
+  onClose: () => void
+  count: number
+  onAddToQueue: () => void
+  onDownloadZip: () => void
+  onTogglePlaylists: () => void
+  playlists: userApi.PlaylistSummary[]
+  account: userApi.AccountUser | null
+  onAddToPlaylist: (id: number) => void
+  onLogin: () => void
+  canLinkVersions: boolean
+  onLinkVersions: () => void
+}): JSX.Element {
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handle = (e: MouseEvent): void => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose()
+    }
+    const handleKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('mousedown', handle)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handle)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [onClose])
+
+  const menuWidth = 208
+  const menuHeight = state.showPlaylists ? 320 : 160
+  const top = Math.max(8, Math.min(state.y, window.innerHeight - menuHeight - 8))
+  const left = Math.max(8, Math.min(state.x, window.innerWidth - menuWidth - 8))
+
+  return (
+    <div
+      ref={menuRef}
+      style={{ position: 'fixed', zIndex: 9999, top, left }}
+      className="w-52 bg-surface border border-[var(--border)] rounded-xl shadow-2xl overflow-hidden py-1"
+    >
+      <div className="px-3 py-2 border-b border-[var(--border)] mb-1">
+        <p className="text-text-primary text-xs font-semibold truncate">{count} {count === 1 ? 'song' : 'songs'} selected</p>
+      </div>
+
+      {state.showPlaylists ? (
+        <>
+          <button
+            onClick={(e) => { e.stopPropagation(); onTogglePlaylists() }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-muted hover:text-text-primary transition-colors"
+          >
+            <ChevronDown size={12} className="rotate-90" /> Back
+          </button>
+          {!account ? (
+            <div className="px-3 pb-2">
+              <p className="text-xs text-text-muted mb-2">Log in to save to playlists.</p>
+              <button
+                onClick={(e) => { e.stopPropagation(); onLogin() }}
+                className="w-full py-1.5 rounded-lg bg-accent/15 text-accent text-xs font-semibold"
+              >
+                Log in
+              </button>
+            </div>
+          ) : (
+            <div className="max-h-44 overflow-y-auto">
+              {playlists.length === 0 && (
+                <p className="px-3 py-2 text-xs text-text-muted">No playlists yet.</p>
+              )}
+              {playlists.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={(e) => { e.stopPropagation(); onAddToPlaylist(p.id) }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                >
+                  <ListMusic size={13} className="shrink-0 text-text-muted" />
+                  <span className="flex-1 truncate text-xs">{p.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <MenuItem icon={<ListPlus size={14} />} label="Add to queue" onClick={onAddToQueue} />
+          <MenuItem icon={<Plus size={14} />} label="Add to playlist" onClick={onTogglePlaylists} />
+          {canLinkVersions && (
+            <MenuItem icon={<Link2 size={14} />} label="Link versions" onClick={onLinkVersions} />
+          )}
+          <div className="my-1 border-t border-[var(--border)]" />
+          <MenuItem icon={<PackageOpen size={14} />} label="Download ZIP" onClick={onDownloadZip} />
         </>
       )}
     </div>
@@ -527,7 +645,7 @@ function SongRow({
       className={`group flex items-center gap-3 px-3 py-2.5 md:py-2 hover:bg-surface-overlay active:bg-surface-overlay rounded-lg transition-colors cursor-default ${selected ? 'bg-accent/10' : ''}`}
       onClick={() => { if (selectMode) onToggleSelect(song) }}
       onDoubleClick={() => { if (!selectMode) onInfo(song) }}
-      onContextMenu={(e) => { e.preventDefault(); if (!selectMode) onContextMenu(song, e) }}
+      onContextMenu={(e) => { e.preventDefault(); onContextMenu(song, e) }}
     >
       {selectMode && (
         <div className="shrink-0">
@@ -651,7 +769,7 @@ function SongCard({
     <div
       className={`group flex flex-col rounded-xl overflow-hidden bg-surface-overlay hover:bg-surface-raised transition-colors cursor-default ${selected ? 'ring-2 ring-accent' : ''}`}
       onClick={() => { if (selectMode) onToggleSelect(song) }}
-      onContextMenu={(e) => { e.preventDefault(); if (!selectMode) onContextMenu(song, e) }}
+      onContextMenu={(e) => { e.preventDefault(); onContextMenu(song, e) }}
     >
       <div className="relative w-full aspect-square bg-surface-raised">
         <AlbumArtThumbnail track={track} size={160} shimmer={false} />
@@ -757,12 +875,14 @@ export default function ApiTrackerView(): JSX.Element {
 
   const [selectedSong, setSelectedSong] = useState<JWApiSong | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [bulkContextMenu, setBulkContextMenu] = useState<BulkContextMenuState | null>(null)
 
   // Multi-select — mirrors the same pattern used in ApiFilesView's bulk select.
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Map<number, JWApiSong>>(new Map())
   const [bulkZipStatus, setBulkZipStatus] = useState<'idle' | 'zipping' | 'done' | 'error'>('idle')
   const [showBulkPlaylists, setShowBulkPlaylists] = useState(false)
+  const [bulkLinkStatus, setBulkLinkStatus] = useState<'idle' | 'linking' | 'done' | 'error'>('idle')
 
   const toggleSelect = (song: JWApiSong): void => {
     setSelected(prev => {
@@ -1003,8 +1123,13 @@ export default function ApiTrackerView(): JSX.Element {
   const handleQueue = useCallback((track: Track) => { addToQueue(track) }, [addToQueue])
 
   const handleContextMenu = useCallback((song: JWApiSong, e: React.MouseEvent): void => {
+    if (selectMode) {
+      setSelected(prev => prev.has(song.id) ? prev : new Map(prev).set(song.id, song))
+      setBulkContextMenu({ x: e.clientX, y: e.clientY, showPlaylists: false })
+      return
+    }
     setContextMenu({ song, x: e.clientX, y: e.clientY, showPlaylists: false })
-  }, [])
+  }, [selectMode])
 
   // ESC exits select mode
   useEffect(() => {
@@ -1055,6 +1180,23 @@ export default function ApiTrackerView(): JSX.Element {
       setBulkZipStatus('error')
     }
     setTimeout(() => setBulkZipStatus('idle'), 3000)
+  }
+
+  // Links every selected song together as versions of one another — pairing
+  // each against the first selected song merges all of their groups (see
+  // linkSongVersion's group-merge logic in versionsApi.ts).
+  const bulkLinkVersions = async (): Promise<void> => {
+    const ids = selectedSongs.map(s => s.id)
+    if (ids.length < 2) return
+    setBulkLinkStatus('linking')
+    try {
+      const [first, ...rest] = ids
+      for (const id of rest) await linkSongVersion(first, id, account?.display_name ?? null)
+      setBulkLinkStatus('done')
+    } catch {
+      setBulkLinkStatus('error')
+    }
+    setTimeout(() => setBulkLinkStatus('idle'), 3000)
   }
 
   const handleShowInFiles = useCallback((song: JWApiSong): void => {
@@ -1361,6 +1503,24 @@ export default function ApiTrackerView(): JSX.Element {
               </>
             )}
           </div>
+          {versionsEnabled && canEdit && (
+            <button
+              onClick={bulkLinkVersions}
+              disabled={selected.size < 2 || bulkLinkStatus === 'linking'}
+              title={selected.size < 2 ? 'Select 2 or more songs to link' : 'Link selected songs as versions of each other'}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-overlay hover:bg-surface-raised text-text-primary rounded-lg text-xs font-medium disabled:opacity-50 transition-colors"
+            >
+              {bulkLinkStatus === 'linking' ? (
+                <><Loader2 size={13} className="animate-spin" /> Linking…</>
+              ) : bulkLinkStatus === 'done' ? (
+                <><Check size={13} /> Linked</>
+              ) : bulkLinkStatus === 'error' ? (
+                <><X size={13} /> Error</>
+              ) : (
+                <><Link2 size={13} /> Link versions</>
+              )}
+            </button>
+          )}
           <button
             onClick={bulkDownloadZip}
             disabled={selected.size === 0 || bulkZipStatus === 'zipping'}
@@ -1408,6 +1568,24 @@ export default function ApiTrackerView(): JSX.Element {
           onEdit={() => { setPendingEditorSongId(contextMenu.song.id); setActiveView('editor') }}
           canEdit={canEdit}
           onTogglePlaylists={() => setContextMenu((prev) => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null)}
+          onSelect={() => { setSelectMode(true); toggleSelect(contextMenu.song) }}
+        />
+      )}
+
+      {bulkContextMenu && (
+        <BulkContextMenu
+          state={bulkContextMenu}
+          onClose={() => setBulkContextMenu(null)}
+          count={selected.size}
+          onAddToQueue={() => { bulkAddToQueue(); setBulkContextMenu(null) }}
+          onDownloadZip={() => { bulkDownloadZip(); setBulkContextMenu(null) }}
+          onTogglePlaylists={() => setBulkContextMenu((prev) => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null)}
+          playlists={playlists}
+          account={account}
+          onAddToPlaylist={(id) => { bulkAddToPlaylist(id); setBulkContextMenu(null) }}
+          onLogin={() => { setShowUserAuth(true); setBulkContextMenu(null) }}
+          canLinkVersions={versionsEnabled && canEdit && selected.size >= 2}
+          onLinkVersions={() => { bulkLinkVersions(); setBulkContextMenu(null) }}
         />
       )}
     </div>

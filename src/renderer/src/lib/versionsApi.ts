@@ -7,9 +7,12 @@
 // talks to:
 //
 //   create table if not exists song_versions (
-//     song_id    bigint primary key,
-//     group_id   bigint not null,
-//     created_at timestamptz not null default now()
+//     song_id       bigint primary key,
+//     group_id      bigint not null,
+//     version       int,
+//     version_title text,
+//     added_by      text,
+//     created_at    timestamptz not null default now()
 //   );
 //   create index if not exists song_versions_group_id_idx on song_versions (group_id);
 //
@@ -38,6 +41,17 @@ export const versionsEnabled = !!(SUPABASE_URL && SUPABASE_ANON_KEY)
 interface SongVersionRow {
   song_id: number
   group_id: number
+  version: number | null
+  version_title: string | null
+  added_by: string | null
+}
+
+/** Version metadata for one song within a linked group. */
+export interface SongVersionMeta {
+  songId: number
+  version: number | null
+  versionTitle: string | null
+  addedBy: string | null
 }
 
 async function supaFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -56,30 +70,36 @@ async function supaFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (text ? JSON.parse(text) : null) as T
 }
 
+const ROW_FIELDS = 'song_id,group_id,version,version_title,added_by'
+
+function toMeta(row: SongVersionRow): SongVersionMeta {
+  return { songId: row.song_id, version: row.version, versionTitle: row.version_title, addedBy: row.added_by }
+}
+
 async function getRow(songId: number): Promise<SongVersionRow | null> {
-  const rows = await supaFetch<SongVersionRow[]>(`/song_versions?song_id=eq.${songId}&select=song_id,group_id`)
+  const rows = await supaFetch<SongVersionRow[]>(`/song_versions?song_id=eq.${songId}&select=${ROW_FIELDS}`)
   return rows[0] ?? null
 }
 
-async function upsertRow(songId: number, groupId: number): Promise<void> {
+async function upsertRow(songId: number, groupId: number, addedBy?: string | null): Promise<void> {
   await supaFetch('/song_versions', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates' },
-    body: JSON.stringify({ song_id: songId, group_id: groupId }),
+    body: JSON.stringify({ song_id: songId, group_id: groupId, added_by: addedBy ?? null }),
   })
 }
 
-/** All other song ids grouped with this one (excluding itself). Empty if
- *  ungrouped or Supabase isn't configured. */
-export async function getVersionGroup(songId: number): Promise<number[]> {
+/** All other songs grouped with this one (excluding itself), with their
+ *  version metadata. Empty if ungrouped or Supabase isn't configured. */
+export async function getVersionGroup(songId: number): Promise<SongVersionMeta[]> {
   if (!versionsEnabled) return []
   try {
     const row = await getRow(songId)
     if (!row) return []
     const rows = await supaFetch<SongVersionRow[]>(
-      `/song_versions?group_id=eq.${row.group_id}&song_id=neq.${songId}&select=song_id`
+      `/song_versions?group_id=eq.${row.group_id}&song_id=neq.${songId}&select=${ROW_FIELDS}`
     )
-    return rows.map(r => r.song_id)
+    return rows.map(toMeta)
   } catch {
     return []
   }
@@ -87,8 +107,9 @@ export async function getVersionGroup(songId: number): Promise<number[]> {
 
 /** Groups two songs as versions of each other. If one is already in a group,
  *  the other joins it; if both are in different groups already, the groups
- *  merge (all members repointed to the lower group id). */
-export async function linkSongVersion(songId: number, otherSongId: number): Promise<void> {
+ *  merge (all members repointed to the lower group id). `addedBy` is stamped
+ *  on any row newly created by this call (existing rows are left as-is). */
+export async function linkSongVersion(songId: number, otherSongId: number, addedBy?: string | null): Promise<void> {
   if (songId === otherSongId) return
   const [a, b] = await Promise.all([getRow(songId), getRow(otherSongId)])
   if (a && b) {
@@ -100,16 +121,42 @@ export async function linkSongVersion(songId: number, otherSongId: number): Prom
       body: JSON.stringify({ group_id: keep }),
     })
   } else if (a) {
-    await upsertRow(otherSongId, a.group_id)
+    await upsertRow(otherSongId, a.group_id, addedBy)
   } else if (b) {
-    await upsertRow(songId, b.group_id)
+    await upsertRow(songId, b.group_id, addedBy)
   } else {
     const groupId = Math.min(songId, otherSongId)
-    await Promise.all([upsertRow(songId, groupId), upsertRow(otherSongId, groupId)])
+    await Promise.all([upsertRow(songId, groupId, addedBy), upsertRow(otherSongId, groupId, addedBy)])
+  }
+}
+
+/** This song's own version number/title/author, if it's linked into a group.
+ *  Null if ungrouped or Supabase isn't configured. */
+export async function getOwnVersionMeta(songId: number): Promise<SongVersionMeta | null> {
+  if (!versionsEnabled) return null
+  try {
+    const row = await getRow(songId)
+    return row ? toMeta(row) : null
+  } catch {
+    return null
   }
 }
 
 /** Removes a song from its version group (leaves siblings grouped together). */
 export async function unlinkSongVersion(songId: number): Promise<void> {
   await supaFetch(`/song_versions?song_id=eq.${songId}`, { method: 'DELETE' })
+}
+
+/** Updates the version number/title shown for a song within its group. */
+export async function setVersionMeta(
+  songId: number,
+  meta: { version?: number | null; versionTitle?: string | null }
+): Promise<void> {
+  const body: Record<string, unknown> = {}
+  if ('version' in meta) body.version = meta.version
+  if ('versionTitle' in meta) body.version_title = meta.versionTitle
+  await supaFetch(`/song_versions?song_id=eq.${songId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
 }

@@ -1275,7 +1275,6 @@ const WrldQueuePanel = memo(function WrldQueuePanel({ onClose, variant }: {
         style={{ backdropFilter: 'blur(40px) saturate(1.8) brightness(1.4)', WebkitBackdropFilter: 'blur(40px) saturate(1.8) brightness(1.4)' }}
       />
       <div className="absolute inset-0 bg-white/[0.06]" />
-      <div className="absolute inset-0 ring-1 ring-inset ring-white/15" />
 
       <div className="relative z-10 flex items-center justify-between px-4 pt-4 pb-3 shrink-0 border-b border-white/10">
         <div className="flex items-center gap-2">
@@ -1294,7 +1293,13 @@ const WrldQueuePanel = memo(function WrldQueuePanel({ onClose, variant }: {
         </div>
       </div>
 
-      <div className="relative z-10 flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+      <div className="relative z-10 flex-1 overflow-y-auto wrld-queue-scroll" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.2) transparent' }}>
+        <style>{`
+          .wrld-queue-scroll::-webkit-scrollbar { width: 6px; }
+          .wrld-queue-scroll::-webkit-scrollbar-track { background: transparent; }
+          .wrld-queue-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+          .wrld-queue-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
+        `}</style>
         {currentTrack ? (
           <div className="px-3 py-3">
             <p className="text-white/50 text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold">Now Playing</p>
