@@ -45,7 +45,7 @@ HELP = f"""
 {BOLD}Requests{RST}
   {CYN}get{RST} <path> [key=value ...]          e.g. get /songs/ page_size=5 category=released
   {CYN}post|put|patch|delete{RST} <path> [k=v ...]   key=value becomes a JSON body
-  Add as many optional params as you want:  get /songs/94316/ versions=true include_snippets=true
+  Add as many optional params as you want:  get /songs/ versions=true include_snippets=true
   Quote values with spaces:  get /songs/ search="see you again"
   Use --body for raw JSON:   post /accounts/login/ --body {{"discord_id": "123"}}
 
@@ -53,8 +53,9 @@ HELP = f"""
   {", ".join(SHORTCUTS)}
   e.g. {CYN}songs{RST}                        ->  GET /songs/?page_size=10
        {CYN}songs category=released{RST}      ->  GET /songs/?page_size=10&category=released
+       {CYN}songs versions=true{RST}          ->  GET /songs/?page_size=10&versions=true
+                                                (adds version_title + versions[] to each song; collection only, the song/{{id}} route ignores it)
        {CYN}song 94316{RST}                   ->  GET /songs/94316/
-       {CYN}song 94316 versions=true{RST}     ->  GET /songs/94316/?versions=true
        {CYN}search juice{RST}                 ->  GET /songs/?search=juice
        {CYN}search juice category=released{RST} ->  GET /songs/?search=juice&category=released
        {CYN}eras{RST}                         ->  GET /eras/

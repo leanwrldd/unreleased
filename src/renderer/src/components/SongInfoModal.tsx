@@ -1,6 +1,7 @@
-﻿import { useRef } from 'react'
-import { X, Music2, Pencil } from 'lucide-react'
-import { JWApiSong, CATEGORY_LABELS, buildImageUrl, parseDuration } from '../lib/juicewrldApi'
+import { useEffect, useRef, useState } from 'react'
+import { X, Music2, Pencil, Link2 } from 'lucide-react'
+import { JWApiSong, CATEGORY_LABELS, buildImageUrl, parseDuration, apiFetch } from '../lib/juicewrldApi'
+import { versionsEnabled, getVersionGroup, linkSongVersion, unlinkSongVersion } from '../lib/versionsApi'
 
 function formatDur(secs: number): string {
   if (!secs) return '—'
@@ -43,24 +44,94 @@ interface Props {
 export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Element | null {
   const overlayRef = useRef<HTMLDivElement>(null)
 
-  if (!song) return null
+  // Clicking a linked version swaps the displayed song in place, without the
+  // caller needing to manage that — falls back to the `song` prop otherwise.
+  const [overrideSong, setOverrideSong] = useState<JWApiSong | null>(null)
+  useEffect(() => { setOverrideSong(null) }, [song?.id])
+  const displaySong = overrideSong ?? song
 
-  const coverUrl = buildImageUrl(song.image_url)
-  const primaryTitle = song.track_titles?.[0] || song.name
-  const altTitles = song.track_titles?.slice(1).filter(Boolean) ?? []
-  const duration = formatDur(parseDuration(song.length))
-  const catColor = CATEGORY_COLORS[song.category] ?? 'bg-surface-overlay text-text-muted border-[var(--border)]'
-  const catLabel = CATEGORY_LABELS[song.category] ?? song.category
+  // "Other versions" — a separate database from juicewrldapi.com (see
+  // lib/versionsApi.ts), since that API has no concept of grouping e.g.
+  // "Song (v1)" / "(v2)" / "(TV Mix)" together as the same underlying song.
+  const [versions, setVersions] = useState<JWApiSong[]>([])
+  const [loadingVersions, setLoadingVersions] = useState(false)
+  const [showLinkSearch, setShowLinkSearch] = useState(false)
+  const [linkQuery, setLinkQuery] = useState('')
+  const [linkResults, setLinkResults] = useState<JWApiSong[]>([])
+  const [linking, setLinking] = useState(false)
+  const linkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const hasRecording = song.recording_locations || song.record_dates
-  const hasImportantDates = song.preview_date || song.release_date || song.dates
-  const hasInstrumentals = song.instrumentals || song.instrumental_names
-  const hasSession = song.session_titles || song.session_tracking
+  const refreshVersions = (id: number): void => {
+    if (!versionsEnabled) return
+    setLoadingVersions(true)
+    getVersionGroup(id)
+      .then(ids => Promise.all(ids.map(vid => apiFetch<JWApiSong>(`/songs/${vid}/`).catch(() => null))))
+      .then(songs => setVersions(songs.filter((s): s is JWApiSong => !!s)))
+      .finally(() => setLoadingVersions(false))
+  }
+
+  useEffect(() => {
+    setShowLinkSearch(false); setLinkQuery(''); setLinkResults([])
+    if (displaySong) refreshVersions(displaySong.id)
+    else setVersions([])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displaySong?.id])
+
+  useEffect(() => {
+    if (linkDebounceRef.current) clearTimeout(linkDebounceRef.current)
+    if (!linkQuery.trim()) { setLinkResults([]); return }
+    linkDebounceRef.current = setTimeout(() => {
+      apiFetch<{ results: JWApiSong[] }>('/songs/', { search: linkQuery.trim(), page_size: 8 })
+        .then(data => setLinkResults((data.results ?? []).filter(r => r.id !== displaySong?.id)))
+        .catch(() => setLinkResults([]))
+    }, 350)
+    return () => { if (linkDebounceRef.current) clearTimeout(linkDebounceRef.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkQuery])
+
+  const handleLink = async (otherId: number): Promise<void> => {
+    if (!displaySong || linking) return
+    setLinking(true)
+    try {
+      await linkSongVersion(displaySong.id, otherId)
+      refreshVersions(displaySong.id)
+      setShowLinkSearch(false); setLinkQuery(''); setLinkResults([])
+    } catch {} finally { setLinking(false) }
+  }
+
+  const handleUnlink = async (versionId: number): Promise<void> => {
+    if (!displaySong) return
+    try {
+      await unlinkSongVersion(versionId)
+      refreshVersions(displaySong.id)
+    } catch {}
+  }
+
+  const handleViewVersion = async (id: number): Promise<void> => {
+    try {
+      const s = await apiFetch<JWApiSong>(`/songs/${id}/`)
+      setOverrideSong(s)
+    } catch {}
+  }
+
+  if (!displaySong) return null
+
+  const coverUrl = buildImageUrl(displaySong.image_url)
+  const primaryTitle = displaySong.track_titles?.[0] || displaySong.name
+  const altTitles = displaySong.track_titles?.slice(1).filter(Boolean) ?? []
+  const duration = formatDur(parseDuration(displaySong.length))
+  const catColor = CATEGORY_COLORS[displaySong.category] ?? 'bg-surface-overlay text-text-muted border-[var(--border)]'
+  const catLabel = CATEGORY_LABELS[displaySong.category] ?? displaySong.category
+
+  const hasRecording = displaySong.recording_locations || displaySong.record_dates
+  const hasImportantDates = displaySong.preview_date || displaySong.release_date || displaySong.dates
+  const hasInstrumentals = displaySong.instrumentals || displaySong.instrumental_names
+  const hasSession = displaySong.session_titles || displaySong.session_tracking
 
   let notesDisplay: string | null = null
-  if (song.notes) {
+  if (displaySong.notes) {
     try {
-      const parsed = JSON.parse(song.notes)
+      const parsed = JSON.parse(displaySong.notes)
       if (typeof parsed === 'object' && parsed !== null) {
         notesDisplay = Object.entries(parsed)
           .filter(([, v]) => v)
@@ -70,7 +141,7 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
         notesDisplay = String(parsed)
       }
     } catch {
-      notesDisplay = song.notes
+      notesDisplay = displaySong.notes
     }
   }
 
@@ -93,7 +164,7 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
           <div className="absolute inset-0 bg-gradient-to-b from-transparent to-surface" />
           {onEdit && (
             <button
-              onClick={() => { onEdit(song.id); onClose() }}
+              onClick={() => { onEdit(displaySong.id); onClose() }}
               className="absolute top-3 right-12 z-10 w-7 h-7 flex items-center justify-center rounded-full bg-black/40 text-white/70 hover:text-white transition-colors"
               title="Edit song info"
             >
@@ -125,9 +196,9 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${catColor}`}>
                   {catLabel}
                 </span>
-                {song.era?.name && (
+                {displaySong.era?.name && (
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/60 border border-white/15">
-                    {song.era.name}
+                    {displaySong.era.name}
                   </span>
                 )}
               </div>
@@ -139,20 +210,98 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
         <div className="overflow-y-auto flex-1 px-5 py-4">
 
           <div>
-            <Row label="Artist" value={song.credited_artists || 'Juice WRLD'} />
+            <Row label="Artist" value={displaySong.credited_artists || 'Juice WRLD'} />
             <Row label="Alt names" value={altTitles.length > 0 ? altTitles.join('\n') : null} />
-            <Row label="Duration" value={parseDuration(song.length) ? duration : null} />
-            <Row label="Leak type" value={song.leak_type} />
-            <Row label="Date leaked" value={song.date_leaked} />
-            <Row label="Bitrate" value={song.bitrate} />
+            <Row label="Duration" value={parseDuration(displaySong.length) ? duration : null} />
+            <Row label="Leak type" value={displaySong.leak_type} />
+            <Row label="Date leaked" value={displaySong.date_leaked} />
+            <Row label="Bitrate" value={displaySong.bitrate} />
           </div>
 
-          {(song.producers || song.engineers) && (
+          {versionsEnabled && (
+            <>
+              <GroupLabel>Other Versions</GroupLabel>
+              <div className="pb-2.5 border-b border-[var(--border)]">
+                {loadingVersions ? (
+                  <p className="text-text-muted text-xs py-1">Loading…</p>
+                ) : versions.length === 0 ? (
+                  <p className="text-text-muted text-xs py-1">No other versions linked.</p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {versions.map(v => (
+                      <div key={v.id} className="group flex items-center gap-2">
+                        <button
+                          onClick={() => handleViewVersion(v.id)}
+                          className="flex-1 min-w-0 text-left hover:bg-surface-overlay rounded-lg px-1.5 py-1 -mx-1.5 transition-colors"
+                        >
+                          <span className="text-text-primary text-xs truncate block">{v.track_titles?.[0] || v.name}</span>
+                        </button>
+                        {onEdit && (
+                          <button
+                            onClick={() => handleUnlink(v.id)}
+                            title="Unlink this version"
+                            className="text-text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-0.5"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {onEdit && (
+                  showLinkSearch ? (
+                    <div className="mt-2 space-y-1.5">
+                      <div className="flex gap-1.5">
+                        <input
+                          value={linkQuery}
+                          onChange={(e) => setLinkQuery(e.target.value)}
+                          placeholder="Search song name…"
+                          autoFocus
+                          className="flex-1 min-w-0 bg-surface-overlay border border-[var(--border)] rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
+                        />
+                        <button
+                          onClick={() => { setShowLinkSearch(false); setLinkQuery(''); setLinkResults([]) }}
+                          className="text-text-muted hover:text-text-primary text-xs px-1"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {linkResults.length > 0 && (
+                        <div className="max-h-32 overflow-y-auto space-y-0.5">
+                          {linkResults.map(r => (
+                            <button
+                              key={r.id}
+                              disabled={linking}
+                              onClick={() => handleLink(r.id)}
+                              className="w-full text-left px-2 py-1.5 rounded text-xs text-text-secondary hover:bg-surface-overlay hover:text-text-primary transition-colors truncate disabled:opacity-50"
+                            >
+                              {r.track_titles?.[0] || r.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowLinkSearch(true)}
+                      className="mt-2 flex items-center gap-1.5 text-accent text-xs hover:underline"
+                    >
+                      <Link2 size={12} /> Link a version
+                    </button>
+                  )
+                )}
+              </div>
+            </>
+          )}
+
+          {(displaySong.producers || displaySong.engineers) && (
             <>
               <GroupLabel>Credits</GroupLabel>
               <div>
-                <Row label="Producers" value={song.producers} />
-                <Row label="Engineers" value={song.engineers} />
+                <Row label="Producers" value={displaySong.producers} />
+                <Row label="Engineers" value={displaySong.engineers} />
               </div>
             </>
           )}
@@ -161,8 +310,8 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
             <>
               <GroupLabel>Recording</GroupLabel>
               <div>
-                <Row label="Location" value={song.recording_locations} />
-                <Row label="Date" value={song.record_dates} />
+                <Row label="Location" value={displaySong.recording_locations} />
+                <Row label="Date" value={displaySong.record_dates} />
               </div>
             </>
           )}
@@ -171,9 +320,9 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
             <>
               <GroupLabel>Dates</GroupLabel>
               <div>
-                <Row label="Released" value={song.release_date} />
-                <Row label="Preview" value={song.preview_date} />
-                <Row label="Other" value={song.dates} />
+                <Row label="Released" value={displaySong.release_date} />
+                <Row label="Preview" value={displaySong.preview_date} />
+                <Row label="Other" value={displaySong.dates} />
               </div>
             </>
           )}
@@ -182,9 +331,9 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
             <>
               <GroupLabel>Instrumentals</GroupLabel>
               <div>
-                <Row label="Info" value={song.instrumentals} />
-                {song.instrumental_names !== song.instrumentals && (
-                  <Row label="Names" value={song.instrumental_names} />
+                <Row label="Info" value={displaySong.instrumentals} />
+                {displaySong.instrumental_names !== displaySong.instrumentals && (
+                  <Row label="Names" value={displaySong.instrumental_names} />
                 )}
               </div>
             </>
@@ -194,26 +343,26 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
             <>
               <GroupLabel>Session</GroupLabel>
               <div>
-                <Row label="Titles" value={song.session_titles} />
-                <Row label="Tracking" value={song.session_tracking} />
+                <Row label="Titles" value={displaySong.session_titles} />
+                <Row label="Tracking" value={displaySong.session_tracking} />
               </div>
             </>
           )}
 
-          {song.file_names && (
+          {displaySong.file_names && (
             <>
               <GroupLabel>File Names</GroupLabel>
               <p className="text-text-primary text-[11px] font-mono leading-relaxed pb-2.5 border-b border-[var(--border)]">
-                {song.file_names}
+                {displaySong.file_names}
               </p>
             </>
           )}
 
-          {song.additional_information && (
+          {displaySong.additional_information && (
             <>
               <GroupLabel>Additional Info</GroupLabel>
               <p className="text-text-primary text-xs leading-relaxed pb-2.5 border-b border-[var(--border)] whitespace-pre-wrap">
-                {song.additional_information}
+                {displaySong.additional_information}
               </p>
             </>
           )}
@@ -227,11 +376,11 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
             </>
           )}
 
-          {song.lyrics && (
+          {displaySong.lyrics && (
             <>
               <GroupLabel>Lyrics</GroupLabel>
               <pre className="text-text-secondary text-xs leading-relaxed whitespace-pre-wrap font-sans pb-2">
-                {song.lyrics}
+                {displaySong.lyrics}
               </pre>
             </>
           )}
