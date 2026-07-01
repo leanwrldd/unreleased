@@ -62,6 +62,7 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
   const [linkQuery, setLinkQuery] = useState('')
   const [linkResults, setLinkResults] = useState<JWApiSong[]>([])
   const [linking, setLinking] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
   const linkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const refreshVersions = (id: number): void => {
@@ -76,7 +77,7 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
   }
 
   useEffect(() => {
-    setShowLinkSearch(false); setLinkQuery(''); setLinkResults([])
+    setShowLinkSearch(false); setLinkQuery(''); setLinkResults([]); setLinkError(null)
     if (displaySong) refreshVersions(displaySong.id)
     else setVersions([])
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -97,19 +98,25 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
   const handleLink = async (otherId: number): Promise<void> => {
     if (!displaySong || linking) return
     setLinking(true)
+    setLinkError(null)
     try {
       await linkSongVersion(displaySong.id, otherId, account?.display_name ?? null)
       refreshVersions(displaySong.id)
       setShowLinkSearch(false); setLinkQuery(''); setLinkResults([])
-    } catch {} finally { setLinking(false) }
+    } catch (e) {
+      setLinkError(e instanceof Error ? e.message : 'Failed to link version')
+    } finally { setLinking(false) }
   }
 
   const handleUnlink = async (versionId: number): Promise<void> => {
     if (!displaySong) return
+    setLinkError(null)
     try {
       await unlinkSongVersion(versionId)
       refreshVersions(displaySong.id)
-    } catch {}
+    } catch (e) {
+      setLinkError(e instanceof Error ? e.message : 'Failed to unlink version')
+    }
   }
 
   const handleUpdateMeta = async (
@@ -117,10 +124,13 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
     meta: { version?: number | null; versionTitle?: string | null }
   ): Promise<void> => {
     if (!displaySong) return
+    setLinkError(null)
     try {
       await setVersionMeta(versionId, meta)
       refreshVersions(displaySong.id)
-    } catch {}
+    } catch (e) {
+      setLinkError(e instanceof Error ? e.message : 'Failed to update version info')
+    }
   }
 
   const handleViewVersion = async (id: number): Promise<void> => {
@@ -336,6 +346,9 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
                       <Link2 size={12} /> Link a version
                     </button>
                   )
+                )}
+                {linkError && (
+                  <p className="mt-2 text-red-400 text-xs">{linkError}</p>
                 )}
               </div>
             </>
