@@ -220,7 +220,7 @@ function SongsTab() {
             [<Code>searchall</Code>, 'string', 'Search names, artists, producers, track titles'],
             [<Code>lyrics</Code>, 'string', 'Full-text search within lyrics content'],
             [<Code>file_names_array</Code>, 'string', '"true" to return file_names as array instead of string'],
-            [<Code>versions</Code>, 'string', <>"true" to add <Code>version_title</Code> and a <Code>versions</Code> array to each song. Collection endpoint only — <Code>/songs/{'{id}'}/</Code> ignores it.</>],
+            [<Code>versions</Code>, 'string', <>"true" to add <Code>version_title</Code> and a <Code>versions</Code> array to each song. Collection endpoint only — <Code>{'/songs/{id}/'}</Code> ignores it.</>],
           ]}
         />
         <p className="text-xs text-text-muted font-semibold mt-2">Response shape:</p>
