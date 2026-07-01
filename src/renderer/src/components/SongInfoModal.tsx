@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { useShallow } from 'zustand/react/shallow'
-import { X, Music2, Pencil, Link2 } from 'lucide-react'
+import { X, Music2, Pencil } from 'lucide-react'
 import { JWApiSong, CATEGORY_LABELS, buildImageUrl, parseDuration, apiFetch } from '../lib/juicewrldApi'
-import { versionsEnabled, getVersionGroup, linkSongVersion, unlinkSongVersion, SongVersionMeta } from '../lib/versionsApi'
-import { useStore } from '../store/useStore'
+import { versionsEnabled, getVersionGroup, unlinkSongVersion, SongVersionMeta } from '../lib/versionsApi'
 
 function formatDur(secs: number): string {
   if (!secs) return '—'
@@ -45,7 +43,6 @@ interface Props {
 
 export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Element | null {
   const overlayRef = useRef<HTMLDivElement>(null)
-  const { account } = useStore(useShallow(s => ({ account: s.account })))
 
   // Clicking a linked version swaps the displayed song in place, without the
   // caller needing to manage that — falls back to the `song` prop otherwise.
@@ -56,14 +53,11 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
   // "Other versions" — a separate database from juicewrldapi.com (see
   // lib/versionsApi.ts), since that API has no concept of grouping e.g.
   // "Song (v1)" / "(v2)" / "(TV Mix)" together as the same underlying song.
+  // Linking itself only happens from the editor (Edit song → Versions) —
+  // this view is read-only aside from unlinking a bad match.
   const [versions, setVersions] = useState<{ song: JWApiSong; meta: SongVersionMeta }[]>([])
   const [loadingVersions, setLoadingVersions] = useState(false)
-  const [showLinkSearch, setShowLinkSearch] = useState(false)
-  const [linkQuery, setLinkQuery] = useState('')
-  const [linkResults, setLinkResults] = useState<JWApiSong[]>([])
-  const [linking, setLinking] = useState(false)
   const [linkError, setLinkError] = useState<string | null>(null)
-  const linkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const refreshVersions = (id: number): void => {
     if (!versionsEnabled) return
@@ -77,36 +71,11 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
   }
 
   useEffect(() => {
-    setShowLinkSearch(false); setLinkQuery(''); setLinkResults([]); setLinkError(null)
+    setLinkError(null)
     if (displaySong) refreshVersions(displaySong.id)
     else setVersions([])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displaySong?.id])
-
-  useEffect(() => {
-    if (linkDebounceRef.current) clearTimeout(linkDebounceRef.current)
-    if (!linkQuery.trim()) { setLinkResults([]); return }
-    linkDebounceRef.current = setTimeout(() => {
-      apiFetch<{ results: JWApiSong[] }>('/songs/', { search: linkQuery.trim(), page_size: 8 })
-        .then(data => setLinkResults((data.results ?? []).filter(r => r.id !== displaySong?.id)))
-        .catch(() => setLinkResults([]))
-    }, 350)
-    return () => { if (linkDebounceRef.current) clearTimeout(linkDebounceRef.current) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linkQuery])
-
-  const handleLink = async (otherId: number): Promise<void> => {
-    if (!displaySong || linking) return
-    setLinking(true)
-    setLinkError(null)
-    try {
-      await linkSongVersion(displaySong.id, otherId, account?.display_name ?? null)
-      refreshVersions(displaySong.id)
-      setShowLinkSearch(false); setLinkQuery(''); setLinkResults([])
-    } catch (e) {
-      setLinkError(e instanceof Error ? e.message : 'Failed to link version')
-    } finally { setLinking(false) }
-  }
 
   const handleUnlink = async (versionId: number): Promise<void> => {
     if (!displaySong) return
@@ -266,56 +235,13 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
                         {/* Version # and title are set from the editor (Edit song →
                             Versions), not here — keeps every linked song's title in
                             sync instead of letting this view drift out of step. */}
-                        {meta.addedBy && (
-                          <p className="text-text-muted text-[10px] px-1.5 pb-1">Added by {meta.addedBy}</p>
-                        )}
                       </div>
                     ))}
                   </div>
                 )}
 
-                {onEdit && (
-                  showLinkSearch ? (
-                    <div className="mt-2 space-y-1.5">
-                      <div className="flex gap-1.5">
-                        <input
-                          value={linkQuery}
-                          onChange={(e) => setLinkQuery(e.target.value)}
-                          placeholder="Search song name…"
-                          autoFocus
-                          className="flex-1 min-w-0 bg-surface-overlay border border-[var(--border)] rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
-                        />
-                        <button
-                          onClick={() => { setShowLinkSearch(false); setLinkQuery(''); setLinkResults([]) }}
-                          className="text-text-muted hover:text-text-primary text-xs px-1"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      {linkResults.length > 0 && (
-                        <div className="max-h-32 overflow-y-auto space-y-0.5">
-                          {linkResults.map(r => (
-                            <button
-                              key={r.id}
-                              disabled={linking}
-                              onClick={() => handleLink(r.id)}
-                              className="w-full text-left px-2 py-1.5 rounded text-xs text-text-secondary hover:bg-surface-overlay hover:text-text-primary transition-colors truncate disabled:opacity-50"
-                            >
-                              {r.track_titles?.[0] || r.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowLinkSearch(true)}
-                      className="mt-2 flex items-center gap-1.5 text-accent text-xs hover:underline"
-                    >
-                      <Link2 size={12} /> Link a version
-                    </button>
-                  )
-                )}
+                {/* Linking itself only happens from the editor (Edit song →
+                    Versions) — this view only allows unlinking a bad match. */}
                 {linkError && (
                   <p className="mt-2 text-red-400 text-xs">{linkError}</p>
                 )}
