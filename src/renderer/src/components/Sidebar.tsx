@@ -1,13 +1,14 @@
 ﻿import React, { useState, useEffect } from 'react'
-import { SearchCode, HardDrive, Settings, ShieldCheck, ListMusic, Library, LogIn, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
+import { SearchCode, HardDrive, Settings, ShieldCheck, ListMusic, Library, LogIn, LogOut, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import logo from '../assets/logo.png'
 import { useStore } from '../store/useStore'
 import { ViewType } from '../types'
 
 const LS_COLLAPSED = 'sidebar:collapsed'
+const LS_PLAYLISTS_EXPANDED = 'sidebar:playlistsExpanded'
 
 export default function Sidebar(): JSX.Element {
-  const { activeView, setActiveView, setShowSettings, account, logoutAccount, setShowUserAuth } = useStore()
+  const { activeView, setActiveView, setShowSettings, account, logoutAccount, setShowUserAuth, playlists, setPendingPlaylistId } = useStore()
   const isElectron = navigator.userAgent.includes('Electron')
   const isAdmin = !!account?.is_administrator
 
@@ -31,6 +32,20 @@ export default function Sidebar(): JSX.Element {
     const next = !collapsed
     setCollapsed(next)
     localStorage.setItem(LS_COLLAPSED, String(next))
+  }
+
+  const [playlistsExpanded, setPlaylistsExpanded] = useState<boolean>(
+    () => localStorage.getItem(LS_PLAYLISTS_EXPANDED) === 'true'
+  )
+  const togglePlaylistsExpanded = (): void => {
+    const next = !playlistsExpanded
+    setPlaylistsExpanded(next)
+    localStorage.setItem(LS_PLAYLISTS_EXPANDED, String(next))
+  }
+
+  const openPlaylist = (id: number): void => {
+    setPendingPlaylistId(id)
+    setActiveView('playlists')
   }
 
   const items: { icon: React.ReactNode; label: string; view: ViewType }[] = [
@@ -64,25 +79,54 @@ export default function Sidebar(): JSX.Element {
       {/* Nav items */}
       <nav className={`space-y-1 flex-1 ${collapsed ? 'px-2' : 'px-3'}`}>
         {items.map(({ icon, label, view }) => (
-          <button
-            key={view}
-            onClick={() => {
-              if (activeView === view && view === 'playlists') {
-                window.dispatchEvent(new CustomEvent('playlists:back'))
-              } else {
-                setActiveView(view)
-              }
-            }}
-            title={collapsed ? label : undefined}
-            className={`flex items-center w-full py-2 rounded text-sm font-medium transition-colors ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'} ${
-              activeView === view
-                ? 'bg-surface-raised text-text-primary'
-                : 'text-text-secondary hover:text-text-primary hover:bg-surface-raised'
-            }`}
-          >
-            {icon}
-            {showExpanded && <span className="flex-1 text-left">{label}</span>}
-          </button>
+          <div key={view}>
+            <div
+              className={`flex items-center w-full rounded text-sm font-medium transition-colors ${
+                activeView === view
+                  ? 'bg-surface-raised text-text-primary'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-raised'
+              }`}
+            >
+              <button
+                onClick={() => {
+                  if (activeView === view && view === 'playlists') {
+                    window.dispatchEvent(new CustomEvent('playlists:back'))
+                  } else {
+                    setActiveView(view)
+                  }
+                }}
+                title={collapsed ? label : undefined}
+                className={`flex items-center flex-1 min-w-0 py-2 ${collapsed ? 'justify-center px-2' : 'gap-3 px-3'}`}
+              >
+                {icon}
+                {showExpanded && <span className="flex-1 text-left truncate">{label}</span>}
+              </button>
+              {view === 'playlists' && showExpanded && playlists.length > 0 && (
+                <button
+                  onClick={togglePlaylistsExpanded}
+                  title={playlistsExpanded ? 'Hide playlists' : 'Show playlists'}
+                  className="p-2 pr-3 text-text-muted hover:text-text-primary transition-colors shrink-0"
+                >
+                  {playlistsExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+              )}
+            </div>
+
+            {view === 'playlists' && showExpanded && playlistsExpanded && playlists.length > 0 && (
+              <div className="mt-0.5 ml-[26px] space-y-0.5 border-l border-[var(--border)] pl-2">
+                {playlists.map((pl) => (
+                  <button
+                    key={pl.id}
+                    onClick={() => openPlaylist(pl.id)}
+                    title={pl.name}
+                    className="flex items-center w-full py-1.5 px-2 rounded text-xs text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors truncate"
+                  >
+                    <span className="truncate">{pl.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         ))}
       </nav>
 

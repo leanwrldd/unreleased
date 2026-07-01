@@ -95,6 +95,21 @@ function createWindow() {
     return { action: 'deny' }
   })
 
+  // Frameless windows don't get the browser's native F11-toggles-fullscreen
+  // behavior for free — wire it up so it behaves like users expect.
+  mainWindow.webContents.on('before-input-event', (_, input) => {
+    if (input.type === 'keyDown' && input.key === 'F11') {
+      mainWindow.setFullScreen(!mainWindow.isFullScreen())
+    }
+  })
+
+  // Let the renderer react when fullscreen is entered/exited by any means
+  // (F11 above, OS window-manager gestures, etc.) so UI like the WRLD tab's
+  // fullscreen toggle button can stay in sync instead of just tracking its
+  // own click state.
+  mainWindow.on('enter-full-screen', () => mainWindow.webContents.send('fullscreen-changed', true))
+  mainWindow.on('leave-full-screen', () => mainWindow.webContents.send('fullscreen-changed', false))
+
   // Track file downloads via session
   mainWindow.webContents.session.on('will-download', (event, item) => {
     const filename = item.getFilename()
@@ -220,6 +235,8 @@ ipcMain.handle('close-window', () => {
   mainWindow?.close()
 })
 ipcMain.handle('is-maximized', () => mainWindow?.isMaximized() ?? false)
+ipcMain.handle('set-fullscreen', (_, value) => mainWindow?.setFullScreen(!!value))
+ipcMain.handle('is-fullscreen', () => mainWindow?.isFullScreen() ?? false)
 
 // ── IPC: local file browsing ──────────────────────────────────────────────────
 ipcMain.handle('browse-local', async (_, dirPath) => {

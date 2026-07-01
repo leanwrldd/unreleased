@@ -86,6 +86,10 @@ interface AppState {
   playlists: PlaylistSummary[]
   showUserAuth: boolean
 
+  // Sidebar → PlaylistsView: open a specific playlist without needing a URL
+  // round-trip (works whether PlaylistsView is already mounted or not).
+  pendingPlaylistId: number | null
+
   // Editor
   pendingEditorSongId: number | null
   pendingEditProposal: { id: number; songId: number | null; proposedData: Record<string, unknown>; editorNotes: string } | null
@@ -147,6 +151,7 @@ interface AppActions {
   completeDiscordLogin: (code: string, state: string) => Promise<void>
   logoutAccount: () => Promise<void>
   refreshPlaylists: () => Promise<void>
+  setPendingPlaylistId: (id: number | null) => void
 
   setPendingEditorSongId: (id: number | null) => void
   setPendingEditProposal: (p: { id: number; songId: number | null; proposedData: Record<string, unknown>; editorNotes: string } | null) => void
@@ -328,6 +333,8 @@ export const useStore = create<AppStore>((set, get, store) => ({
   account: null,
   playlists: [],
   showUserAuth: false,
+  pendingPlaylistId: null,
+  setPendingPlaylistId: (id) => set({ pendingPlaylistId: id }),
 
   setShowUserAuth: (showUserAuth) => set({ showUserAuth }),
 

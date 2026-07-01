@@ -38,6 +38,66 @@ function PlaylistMosaic({ tracks, className = '' }: { tracks: Track[]; className
   )
 }
 
+// ── HeroBackdrop — Apple Music-style full-bleed blurred cover art behind the
+// playlist header, instead of a faint corner blob. Fades into the page's own
+// background at the bottom so the track list below sits on ordinary bg.
+function HeroBackdrop({ src }: { src?: string | null }): JSX.Element {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
+      {src && (
+        <img
+          src={src}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ filter: 'blur(50px) saturate(1.7) brightness(0.5)', transform: 'scale(1.3)' }}
+        />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/5 to-[var(--surface)]" />
+    </div>
+  )
+}
+
+// ── HeroPlayButton / HeroShuffleButton — Apple Music-style circular icon
+// controls, replacing the pill-shaped "Play"/"Shuffle" text buttons.
+function HeroPlayButton({ onClick }: { onClick: () => void }): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center justify-center w-14 h-14 rounded-full bg-accent text-black shadow-lg hover:scale-105 active:scale-95 transition-transform"
+      title="Play"
+    >
+      <Play size={22} fill="currentColor" className="ml-0.5" />
+    </button>
+  )
+}
+function HeroShuffleButton({ onClick }: { onClick: () => void }): JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center justify-center w-11 h-11 rounded-full bg-surface-overlay hover:bg-surface-raised text-text-primary border border-[var(--border)] transition-colors"
+      title="Shuffle"
+    >
+      <Shuffle size={17} />
+    </button>
+  )
+}
+
+// ── CardPlayOverlay — Apple Music-style play button that fades in over a
+// playlist tile's artwork on hover, bottom-right corner.
+function CardPlayOverlay({ onPlay }: { onPlay: () => void }): JSX.Element {
+  return (
+    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors">
+      <button
+        onClick={(e) => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); onPlay() }}
+        className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-accent text-black shadow-lg flex items-center justify-center opacity-0 translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all hover:scale-110"
+        title="Play"
+      >
+        <Play size={15} fill="currentColor" className="ml-0.5" />
+      </button>
+    </div>
+  )
+}
+
 function totalDurationLabel(tracks: Track[]): string {
   const secs = tracks.reduce((acc, t) => acc + (t.duration ?? 0), 0)
   if (secs === 0) return ''
@@ -176,7 +236,8 @@ function LocalPlaylistMosaic({ trackIds, libraryTracks, className = '' }: {
 
 export default function PlaylistsView(): JSX.Element {
   const { account, playlists, refreshPlaylists, playTrack, addToQueue, setShowUserAuth, likedTrackIds, setActiveView, setPendingEditorSongId,
-    localPlaylists, libraryTracks, loadLibrary, deleteLocalPlaylist, renameLocalPlaylist, updateLocalPlaylist, addToLocalPlaylist } = useStore()
+    localPlaylists, libraryTracks, loadLibrary, deleteLocalPlaylist, renameLocalPlaylist, updateLocalPlaylist, addToLocalPlaylist,
+    pendingPlaylistId, setPendingPlaylistId } = useStore()
   const canEdit = !!(account?.is_editor || account?.is_administrator)
 
   const [showLiked, setShowLiked] = useState(false)
@@ -321,6 +382,17 @@ export default function PlaylistsView(): JSX.Element {
     if (id) { setSelectedId(Number(id)) }
     if (view === 'shared') { setIsSharedView(true) }
   }, [])
+
+  // Open a playlist requested from the sidebar's expandable playlist list.
+  // A store field (not the URL-param effect above) is needed here because it
+  // has to work even when this component is already mounted — the URL effect
+  // only runs once, on mount.
+  useEffect(() => {
+    if (pendingPlaylistId == null) return
+    setSelectedId(pendingPlaylistId)
+    setIsSharedView(false)
+    setPendingPlaylistId(null)
+  }, [pendingPlaylistId, setPendingPlaylistId])
 
   // Close menus on outside click
   useEffect(() => {
@@ -603,24 +675,23 @@ export default function PlaylistsView(): JSX.Element {
               <ArrowLeft size={15} /> Playlists
             </button>
           </div>
-          <div className="relative px-6 pb-6 shrink-0">
-            <div className="relative z-10 flex gap-6 items-end">
+          <div className="relative overflow-hidden px-6 pb-6 shrink-0">
+            <HeroBackdrop src={localPl.coverImage ?? localTracks.find(t => t.albumArt)?.albumArt ?? null} />
+            <div className="relative z-10 flex gap-6 items-end pt-6">
               <div className="shrink-0 rounded-xl shadow-2xl overflow-hidden bg-surface-overlay flex items-center justify-center" style={{ width: 180, height: 180 }}>
                 <LocalPlaylistMosaic trackIds={localPl.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
               </div>
               <div className="pb-2">
                 <p className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-1">Local Playlist</p>
-                <h1 className="text-text-primary text-3xl font-bold mb-1">{localPl.name}</h1>
+                <h1 className="text-text-primary text-3xl font-black mb-1">{localPl.name}</h1>
                 <p className="text-text-muted text-sm">{localTracks.length} songs</p>
               </div>
             </div>
             <div className="relative z-10 flex items-center gap-3 mt-5">
-              <button onClick={() => localQTracks.length && playTrack(localQTracks[0], localQTracks)} className="flex items-center gap-2 px-5 py-2.5 bg-accent text-white rounded-full text-sm font-semibold hover:bg-accent-hover transition-colors shadow-lg">
-                <Play size={16} fill="white" className="ml-0.5" /> Play
-              </button>
-              <button onClick={() => { const sh = [...localQTracks].sort(() => Math.random()-0.5); sh.length && playTrack(sh[0], sh) }} className="flex items-center gap-2 px-5 py-2.5 bg-surface-overlay text-text-primary rounded-full text-sm font-semibold hover:bg-surface-raised transition-colors border border-[var(--border)]">
-                <Shuffle size={16} /> Shuffle
-              </button>
+              {localQTracks.length > 0 && <HeroPlayButton onClick={() => playTrack(localQTracks[0], localQTracks)} />}
+              {localQTracks.length > 1 && (
+                <HeroShuffleButton onClick={() => { const sh = [...localQTracks].sort(() => Math.random() - 0.5); playTrack(sh[0], sh) }} />
+              )}
             </div>
           </div>
           <div className="border-t border-[var(--border)] mx-6 mb-3 shrink-0" />
@@ -665,11 +736,15 @@ export default function PlaylistsView(): JSX.Element {
             <div className="grid gap-4 mb-8" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
               {localPlaylists.map(lp => (
                 <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCardMenu({ kind: 'local', playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}>
-                  <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
+                  <div className="relative aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
                     {lp.coverImage
                       ? <img src={lp.coverImage} alt="" className="w-full h-full object-cover" />
                       : <LocalPlaylistMosaic trackIds={lp.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
                     }
+                    <CardPlayOverlay onPlay={() => {
+                      const qt = lp.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter((t): t is LibraryTrack => !!t).map(libTrackToTrack)
+                      if (qt.length) playTrack(qt[0], qt)
+                    }} />
                   </div>
                   <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-md">
                     <HardDrive size={9} /> Local
@@ -721,10 +796,8 @@ export default function PlaylistsView(): JSX.Element {
         </div>
 
         {/* ── Hero (shown immediately using summary data) ── */}
-        <div className="relative px-6 pb-6 shrink-0">
-          {(playlistCoverUrl(coverData ?? {}) ?? tracks[0]?.imageUrl) && (
-            <div className="absolute inset-0 opacity-20 blur-3xl scale-110 pointer-events-none" style={{ background: `url(${playlistCoverUrl(coverData ?? {}) ?? tracks[0]?.imageUrl}) center/cover`, zIndex: 0 }} />
-          )}
+        <div className="relative overflow-hidden px-6 pb-6 shrink-0">
+          <HeroBackdrop src={playlistCoverUrl(coverData ?? {}) ?? tracks[0]?.imageUrl ?? null} />
 
           {/* Hidden file input */}
           <input
@@ -735,7 +808,7 @@ export default function PlaylistsView(): JSX.Element {
             onChange={e => { const f = e.target.files?.[0]; if (f) handleCoverUpload(f); e.target.value = '' }}
           />
 
-          <div className="relative z-10 flex gap-6 items-end">
+          <div className="relative z-10 flex gap-6 items-end pt-6">
             {/* Cover image — clickable to upload (owner only) */}
             <div className={`shrink-0 group/cover relative rounded-xl shadow-2xl overflow-hidden ${isSharedView ? "cursor-default" : "cursor-pointer"}`} style={{ width: 180, height: 180 }} onClick={() => !isSharedView && coverInputRef.current?.click()}>
               {loadingDetail && tracks.length === 0 ? (
@@ -841,16 +914,8 @@ export default function PlaylistsView(): JSX.Element {
 
               {/* Action row */}
               <div className="flex items-center gap-2 flex-wrap">
-                {tracks.length > 0 && (
-                  <button onClick={() => playTrack(tracks[0], tracks)} className="flex items-center gap-2 px-6 py-3 rounded-full bg-accent text-black text-sm font-bold hover:scale-105 active:scale-95 transition-transform shadow-lg">
-                    <Play size={17} fill="currentColor" /> Play
-                  </button>
-                )}
-                {tracks.length > 1 && (
-                  <button onClick={playShuffle} className="flex items-center gap-2 px-4 py-3 rounded-full bg-surface-overlay hover:bg-surface-raised text-text-primary text-sm font-semibold transition-colors border border-[var(--border)]">
-                    <Shuffle size={15} /> Shuffle
-                  </button>
-                )}
+                {tracks.length > 0 && <HeroPlayButton onClick={() => playTrack(tracks[0], tracks)} />}
+                {tracks.length > 1 && <HeroShuffleButton onClick={playShuffle} />}
                 <button onClick={() => handleZipDownload(tracks, detail?.name ?? summary?.name ?? 'playlist')} disabled={zipState === 'loading' || tracks.length === 0}
                   title={zipState === 'done' ? 'Download started!' : zipState === 'error' ? 'Failed' : 'Download all as ZIP'}
                   className={`p-2.5 rounded-full text-sm transition-colors disabled:opacity-40 ${zipState === 'done' ? 'text-accent bg-accent/10' : zipState === 'error' ? 'text-red-400 bg-red-400/10' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'}`}>
@@ -1104,8 +1169,9 @@ export default function PlaylistsView(): JSX.Element {
         </div>
 
         {/* Hero */}
-        <div className="relative px-6 pb-6 shrink-0">
-          <div className="relative z-10 flex gap-6 items-end">
+        <div className="relative overflow-hidden px-6 pb-6 shrink-0">
+          <HeroBackdrop src={localPl.coverImage ?? localTracks.find(t => t.albumArt)?.albumArt ?? null} />
+          <div className="relative z-10 flex gap-6 items-end pt-6">
             <div
               className="shrink-0 rounded-xl shadow-2xl overflow-hidden relative group cursor-pointer"
               style={{ width: 180, height: 180 }}
@@ -1146,15 +1212,9 @@ export default function PlaylistsView(): JSX.Element {
                 {localDurLabel && <><span>·</span><span className="flex items-center gap-1"><Clock size={12} />{localDurLabel}</span></>}
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {localQTracks.length > 0 && (
-                  <button onClick={() => playTrack(localQTracks[0], localQTracks)} className="flex items-center gap-2 px-6 py-3 rounded-full bg-accent text-black text-sm font-bold hover:scale-105 active:scale-95 transition-transform shadow-lg">
-                    <Play size={17} fill="currentColor" /> Play
-                  </button>
-                )}
+                {localQTracks.length > 0 && <HeroPlayButton onClick={() => playTrack(localQTracks[0], localQTracks)} />}
                 {localQTracks.length > 1 && (
-                  <button onClick={() => { const s = [...localQTracks].sort(() => Math.random() - 0.5); playTrack(s[0], s) }} className="flex items-center gap-2 px-4 py-3 rounded-full bg-surface-overlay hover:bg-surface-raised text-text-primary text-sm font-semibold transition-colors border border-[var(--border)]">
-                    <Shuffle size={15} /> Shuffle
-                  </button>
+                  <HeroShuffleButton onClick={() => { const s = [...localQTracks].sort(() => Math.random() - 0.5); playTrack(s[0], s) }} />
                 )}
                 {!localRenaming && (
                   <button onClick={() => { setLocalRenameVal(localPl.name); setLocalRenaming(true) }} className="p-2.5 rounded-full text-text-muted hover:text-text-primary hover:bg-surface-overlay text-sm transition-colors" title="Rename">
@@ -1260,7 +1320,7 @@ export default function PlaylistsView(): JSX.Element {
               onClick={() => setSelectedId(p.id)}
               onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCardMenu({ kind: 'api', playlist: p, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
             >
-              <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
+              <div className="relative aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
                 {covers[p.id] === undefined ? (
                   <div className="w-full h-full bg-surface-raised animate-pulse" />
                 ) : covers[p.id] ? (
@@ -1279,6 +1339,11 @@ export default function PlaylistsView(): JSX.Element {
                     </div>
                   )
                 })()}
+                <CardPlayOverlay onPlay={async () => {
+                  const d = await userApi.getPlaylist(p.id).catch(() => null)
+                  const trks = d ? d.items.map(i => userApi.liteSongToTrack(i.song)) : []
+                  if (trks.length) playTrack(trks[0], trks)
+                }} />
               </div>
               {/* Context menu button */}
               <button
@@ -1295,11 +1360,15 @@ export default function PlaylistsView(): JSX.Element {
           {/* Local playlists */}
           {localPlaylists.map(lp => (
             <div key={lp.id} className="group text-left relative cursor-pointer" onClick={() => setLocalSelectedId(lp.id)} onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCardMenu({ kind: 'local', playlist: lp, x: e.clientX, y: e.clientY, showPlaylists: false }) }}>
-              <div className="aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
+              <div className="relative aspect-square rounded-xl overflow-hidden bg-surface-overlay flex items-center justify-center mb-2.5 group-hover:scale-[1.03] transition-transform shadow-md">
                 {lp.coverImage
                   ? <img src={lp.coverImage} alt="" className="w-full h-full object-cover" />
                   : <LocalPlaylistMosaic trackIds={lp.trackIds} libraryTracks={libraryTracks} className="w-full h-full" />
                 }
+                <CardPlayOverlay onPlay={() => {
+                  const qt = lp.trackIds.map(id => libraryTracks.find(t => t.id === id)).filter((t): t is LibraryTrack => !!t).map(libTrackToTrack)
+                  if (qt.length) playTrack(qt[0], qt)
+                }} />
               </div>
               {/* Local badge */}
               <span className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-md">

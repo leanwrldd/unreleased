@@ -16,9 +16,6 @@ interface Props {
 
 export default function MediaLightbox({ items, index, onClose, onNav }: Props): JSX.Element | null {
   const [videoError, setVideoError] = useState(false)
-  // Matches App.tsx's check (which decides whether WindowControls renders) so
-  // this never disagrees with whether the title-bar buttons are actually there.
-  const isElectron = navigator.userAgent.includes('Electron')
   const item = items[index]
 
   // Reset video error when item changes
@@ -53,33 +50,15 @@ export default function MediaLightbox({ items, index, onClose, onNav }: Props): 
       className="fixed inset-0 z-[100] flex flex-col bg-black/95"
       onClick={onClose}
     >
-      {/* Top bar */}
+      {/* Top bar — filename only. The counter/download/close controls used to
+          live here too, right next to the Electron window's own minimize/
+          maximize/close buttons — confusing and easy to misclick. They now
+          float directly above the media itself instead. */}
       <div
-        className="flex items-center justify-between px-4 py-3 shrink-0 bg-black/60 backdrop-blur-sm"
+        className="flex items-center px-4 py-3 shrink-0 bg-black/60 backdrop-blur-sm"
         onClick={(e) => e.stopPropagation()}
       >
         <span className="text-white/80 text-sm truncate max-w-[60vw]">{item.name}</span>
-        <div className={`flex items-center gap-2${isElectron ? ' mr-[132px]' : ''}`}>
-          {items.length > 1 && (
-            <span className="text-white/40 text-xs">{index + 1} / {items.length}</span>
-          )}
-          <a
-            href={item.url}
-            download={item.name}
-            className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-            title="Download"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Download size={16} />
-          </a>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-            title="Close (Esc)"
-          >
-            <X size={18} />
-          </button>
-        </div>
       </div>
 
       {/* Media area */}
@@ -98,13 +77,33 @@ export default function MediaLightbox({ items, index, onClose, onNav }: Props): 
           </button>
         )}
 
-        {/* Content */}
-        <div onClick={(e) => e.stopPropagation()} className="max-w-full max-h-full flex items-center justify-center">
+        {/* Content, with its own controls (counter/download/close) directly above it */}
+        <div onClick={(e) => e.stopPropagation()} className="max-w-full max-h-full flex flex-col items-center gap-2">
+          <div className="flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1.5">
+            {items.length > 1 && (
+              <span className="text-white/40 text-xs">{index + 1} / {items.length}</span>
+            )}
+            <a
+              href={item.url}
+              download={item.name}
+              className="p-1.5 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+              title="Download"
+            >
+              <Download size={16} />
+            </a>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+              title="Close (Esc)"
+            >
+              <X size={18} />
+            </button>
+          </div>
           {item.type === 'image' ? (
             <img
               src={item.url}
               alt={item.name}
-              className="max-w-[90vw] max-h-[80vh] object-contain rounded shadow-2xl select-none"
+              className="max-w-[90vw] max-h-[72vh] object-contain rounded shadow-2xl select-none"
               draggable={false}
             />
           ) : videoError ? (
@@ -124,7 +123,7 @@ export default function MediaLightbox({ items, index, onClose, onNav }: Props): 
               src={item.url}
               controls
               autoPlay
-              className="max-w-[90vw] max-h-[80vh] rounded shadow-2xl"
+              className="max-w-[90vw] max-h-[72vh] rounded shadow-2xl"
               onError={() => setVideoError(true)}
             />
           )}

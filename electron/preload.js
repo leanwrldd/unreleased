@@ -8,6 +8,13 @@ contextBridge.exposeInMainWorld('electron', {
   maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
   closeWindow:    () => ipcRenderer.invoke('close-window'),
   isMaximized:    () => ipcRenderer.invoke('is-maximized'),
+  setFullscreen:  (value) => ipcRenderer.invoke('set-fullscreen', value),
+  isFullscreen:   ()      => ipcRenderer.invoke('is-fullscreen'),
+  onFullscreenChange: (cb) => {
+    const fn = (_, v) => cb(v)
+    ipcRenderer.on('fullscreen-changed', fn)
+    return () => ipcRenderer.removeListener('fullscreen-changed', fn)
+  },
   platform: process.platform,
 
   // Local filesystem
