@@ -237,6 +237,7 @@ export default function EditorPage(): JSX.Element {
   const [linkQuery, setLinkQuery] = useState('')
   const [linkResults, setLinkResults] = useState<JWApiSong[]>([])
   const [linking, setLinking] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
   const linkDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // This song's own version number/title within its group (separate from the
   // proposal patch below — these write straight to Supabase on blur, same as
@@ -332,7 +333,7 @@ export default function EditorPage(): JSX.Element {
   }, [])
 
   useEffect(() => {
-    setShowLinkSearch(false); setLinkQuery(''); setLinkResults([])
+    setShowLinkSearch(false); setLinkQuery(''); setLinkResults([]); setLinkError(null)
     if (song) refreshVersions(song.id)
     else setVersions([])
   }, [song, refreshVersions])
@@ -365,19 +366,25 @@ export default function EditorPage(): JSX.Element {
   const handleLink = async (otherId: number): Promise<void> => {
     if (!song || linking) return
     setLinking(true)
+    setLinkError(null)
     try {
       await linkSongVersion(song.id, otherId, account?.display_name ?? null)
       refreshVersions(song.id)
       setShowLinkSearch(false); setLinkQuery(''); setLinkResults([])
-    } catch {} finally { setLinking(false) }
+    } catch (e) {
+      setLinkError(e instanceof Error ? e.message : 'Failed to link version')
+    } finally { setLinking(false) }
   }
 
   const handleUnlink = async (versionId: number): Promise<void> => {
     if (!song) return
+    setLinkError(null)
     try {
       await unlinkSongVersion(versionId)
       refreshVersions(song.id)
-    } catch {}
+    } catch (e) {
+      setLinkError(e instanceof Error ? e.message : 'Failed to unlink version')
+    }
   }
 
   useEffect(() => {
@@ -783,6 +790,9 @@ export default function EditorPage(): JSX.Element {
                       >
                         <Link2 size={12} /> Link a version
                       </button>
+                    )}
+                    {linkError && (
+                      <p className="mt-1.5 text-red-400 text-xs">{linkError}</p>
                     )}
                   </div>
                 </div>
