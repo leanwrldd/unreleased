@@ -119,7 +119,7 @@ export default function SongInfoModal({ song, onClose, onEdit }: Props): JSX.Ele
       className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/70 backdrop-blur-sm p-0 md:p-4"
       onClick={(e) => { if (e.target === overlayRef.current) onClose() }}
     >
-      <div className="bg-surface border border-[var(--border)] rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-lg max-h-[92svh] md:max-h-[86vh] flex flex-col overflow-hidden">
+      <div className="select-text bg-surface border border-[var(--border)] rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-lg max-h-[92svh] md:max-h-[86vh] flex flex-col overflow-hidden">
 
         {/* Hero */}
         <div className="relative shrink-0 overflow-hidden">

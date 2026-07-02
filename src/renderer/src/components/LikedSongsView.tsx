@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Heart, Play, Loader2, MoreHorizontal, PlayCircle, ListPlus, Info, Pencil, Download } from 'lucide-react'
+import { Heart, Play, Loader2, MoreHorizontal } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
 import { Track, LibraryTrack } from '../types'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
-import { apiFetch, JWApiSong, buildStreamUrl } from '../lib/juicewrldApi'
+import { apiFetch, JWApiSong } from '../lib/juicewrldApi'
 import SongInfoModal from './SongInfoModal'
+import SongContextMenu, { SongContextMenuState } from './SongContextMenu'
 
 function libraryTrackToTrack(t: LibraryTrack): Track {
   return {
@@ -33,14 +34,11 @@ function formatDuration(seconds: number): string {
 }
 
 export default function LikedSongsView(): JSX.Element {
-  const { account, playTrack, playNext, toggleLike, setShowUserAuth, playlists, refreshPlaylists, setActiveView, setPendingEditorSongId, libraryTracks, likedTrackIds } = useStore()
+  const { account, playTrack, playNext, toggleLike, setShowUserAuth, setActiveView, setPendingEditorSongId, libraryTracks, likedTrackIds } = useStore()
   const canEdit = !!(account?.is_editor || account?.is_administrator)
   const [apiTracks, setApiTracks] = useState<Track[]>([])
   const [loading, setLoading] = useState(true)
-  // songId is null for local files — they have no backing API song record, so
-  // id-dependent menu items (Song info, Edit, Add to playlist) are hidden for them.
-  type CtxMenu = { track: Track; songId: number | null; x: number; y: number; showPlaylists: boolean }
-  const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<SongContextMenuState | null>(null)
   const [infoSong, setInfoSong] = useState<JWApiSong | null>(null)
 
   const load = useCallback(async () => {
@@ -58,12 +56,9 @@ export default function LikedSongsView(): JSX.Element {
 
   useEffect(() => { load() }, [load])
 
-  useEffect(() => {
-    if (!ctxMenu) return
-    const close = () => setCtxMenu(null)
-    window.addEventListener('click', close)
-    return () => window.removeEventListener('click', close)
-  }, [ctxMenu])
+  const openSongInfo = async (songId: number): Promise<void> => {
+    try { setInfoSong(await apiFetch<JWApiSong>(`/songs/${songId}/`)) } catch {}
+  }
 
   // Local-file likes live in the store (libraryTracks/likedTrackIds), so
   // unliking one just needs toggleLike — the `visible` list above recomputes
@@ -138,7 +133,7 @@ export default function LikedSongsView(): JSX.Element {
                 <div
                   key={track.id}
                   className="group flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-surface-raised transition-colors"
-                  onContextMenu={e => { e.preventDefault(); setCtxMenu({ track, songId, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                  onContextMenu={e => { e.preventDefault(); setCtxMenu({ track, songId, x: e.clientX, y: e.clientY }) }}
                 >
                   <span className="w-6 text-center text-xs text-text-muted tabular-nums shrink-0">{i + 1}</span>
                   <button onClick={() => playTrack(track, visible)} className="relative shrink-0">
@@ -153,7 +148,7 @@ export default function LikedSongsView(): JSX.Element {
                   </div>
                   <span className="text-text-muted text-xs tabular-nums shrink-0 hidden sm:block">{formatDuration(track.duration)}</span>
                   <button
-                    onClick={e => { e.stopPropagation(); setCtxMenu(prev => prev?.track.id === track.id ? null : { track, songId, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                    onClick={e => { e.stopPropagation(); setCtxMenu(prev => prev?.track.id === track.id ? null : { track, songId, x: e.clientX, y: e.clientY }) }}
                     className="p-1.5 text-text-muted hover:text-text-primary opacity-0 group-hover:opacity-100 transition-all shrink-0"
                     title="More options"
                   >
@@ -176,68 +171,15 @@ export default function LikedSongsView(): JSX.Element {
     </div>
 
     {ctxMenu && (
-      <div
-        className="fixed z-50 min-w-[180px] rounded-xl border border-[var(--border)] bg-surface-raised shadow-xl py-1 overflow-hidden"
-        style={{ left: Math.min(ctxMenu.x, window.innerWidth - 200), top: Math.min(ctxMenu.y, window.innerHeight - 240) }}
-        onClick={e => e.stopPropagation()}
-      >
-        <button onClick={() => { playTrack(ctxMenu.track, visible); setCtxMenu(null) }}
-          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
-          <Play size={14} className="text-text-muted" /> Play
-        </button>
-        <button onClick={() => { playNext(ctxMenu.track); setCtxMenu(null) }}
-          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
-          <PlayCircle size={14} className="text-text-muted" /> Play next
-        </button>
-        {ctxMenu.songId != null && (
-          <button onClick={async () => { const id = ctxMenu.songId as number; setCtxMenu(null); try { setInfoSong(await apiFetch<JWApiSong>(`/songs/${id}/`)) } catch {} }}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
-            <Info size={14} className="text-text-muted" /> Song info
-          </button>
-        )}
-        {canEdit && ctxMenu.songId != null && ctxMenu.songId > 0 && (
-          <button onClick={() => { setPendingEditorSongId(ctxMenu.songId as number); setActiveView('editor'); setCtxMenu(null) }}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
-            <Pencil size={14} className="text-text-muted" /> Edit
-          </button>
-        )}
-        {ctxMenu.songId != null && <div className="border-t border-[var(--border)] my-1" />}
-        {ctxMenu.songId != null && !['recording_session', 'unsurfaced'].includes(ctxMenu.track.genre) && (
-          <button
-            onClick={e => { e.stopPropagation(); setCtxMenu(prev => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null) }}
-            className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
-          >
-            <span className="flex items-center gap-2.5"><ListPlus size={14} className="text-text-muted" /> Add to playlist</span>
-            <span className="text-text-muted text-xs">›</span>
-          </button>
-        )}
-        {ctxMenu.songId != null && ctxMenu.showPlaylists && !['recording_session', 'unsurfaced'].includes(ctxMenu.track.genre) && (
-          <div className="border-t border-[var(--border)] max-h-40 overflow-y-auto">
-            {playlists.length === 0 ? (
-              <p className="px-3.5 py-2 text-xs text-text-muted">No playlists</p>
-            ) : playlists.map(p => (
-              <button key={p.id} onClick={async () => { const id = ctxMenu.songId as number; setCtxMenu(null); await userApi.addToPlaylist(p.id, id); await refreshPlaylists() }}
-                className="w-full text-left px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay truncate block">
-                {p.name}
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="border-t border-[var(--border)] my-1" />
-        {/* Download proxies through the API by path — only valid for API-hosted
-            tracks. Local files are already on disk, so this wouldn't make sense
-            for them (and would build a broken juicewrldapi.com URL). */}
-        {ctxMenu.songId != null && ctxMenu.track.path && (
-          <button onClick={() => { const a = document.createElement('a'); a.href = buildStreamUrl(ctxMenu.track.path!); a.download = `${ctxMenu.track.title}.mp3`; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.click(); setCtxMenu(null) }}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
-            <Download size={14} className="text-text-muted" /> Download
-          </button>
-        )}
-        <button onClick={() => { removeLiked(ctxMenu.track); setCtxMenu(null) }}
-          className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-red-400 hover:bg-surface-overlay transition-colors">
-          <Heart size={14} /> Unlike
-        </button>
-      </div>
+      <SongContextMenu
+        state={ctxMenu}
+        onClose={() => setCtxMenu(null)}
+        canEdit={canEdit}
+        onInfo={() => ctxMenu.songId != null && openSongInfo(ctxMenu.songId)}
+        onPlay={() => playTrack(ctxMenu.track, visible)}
+        onPlayNext={() => playNext(ctxMenu.track)}
+        removeAction={{ label: 'Unlike', onClick: () => removeLiked(ctxMenu.track) }}
+      />
     )}
     <SongInfoModal
       song={infoSong}

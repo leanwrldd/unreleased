@@ -16,6 +16,7 @@ import { formatDuration } from '../lib/lyrics'
 import LikedSongsView from './LikedSongsView'
 import { AlbumArtThumb } from './LibraryTab'
 import SongInfoModal from './SongInfoModal'
+import SongContextMenu, { SongContextMenuState } from './SongContextMenu'
 
 // ── PlaylistMosaic ────────────────────────────────────────────────────────────
 
@@ -136,7 +137,6 @@ function MenuItem({ icon: Icon, label, onClick, destructive = false, disabled = 
 type SortField = 'default' | 'title' | 'artist' | 'duration'
 interface SortState { field: SortField; dir: 'asc' | 'desc' }
 
-interface TrackMenuState { track: Track; songId: number; i: number; x: number; y: number; showPlaylists: boolean }
 type CardMenuState =
   | { kind: 'api';   playlist: PlaylistSummary; x: number; y: number; showPlaylists: boolean; renaming?: boolean; renameVal?: string }
   | { kind: 'local'; playlist: LocalPlaylist;   x: number; y: number; showPlaylists: boolean; renaming?: boolean; renameVal?: string }
@@ -253,7 +253,7 @@ export default function PlaylistsView(): JSX.Element {
   const [renameValue, setRenameValue] = useState('')
 
   // Context menus
-  const [trackMenu, setTrackMenu] = useState<TrackMenuState | null>(null)
+  const [trackMenu, setTrackMenu] = useState<SongContextMenuState | null>(null)
   const [cardMenu, setCardMenu] = useState<CardMenuState | null>(null)
   const [localRenaming, setLocalRenaming] = useState(false)
   const [localRenameVal, setLocalRenameVal] = useState('')
@@ -1048,7 +1048,7 @@ export default function PlaylistsView(): JSX.Element {
                   onDragOver={e => { if (!dragEnabled) return; e.preventDefault(); setDropIdx(displayIdx) }}
                   onDragEnd={() => { setDragIdx(null); setDropIdx(null) }}
                   onDrop={() => dragEnabled && handleDrop(displayIdx)}
-                  onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setTrackMenu({ track, songId, i: originalIdx, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                  onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setTrackMenu({ track, songId, x: e.clientX, y: e.clientY }) }}
                   className={`group grid items-center gap-3 px-4 py-2 rounded-lg transition-colors cursor-default select-none ${
                     isDragging ? 'opacity-40 bg-surface-raised' : isDropTarget ? 'border-t-2 border-accent bg-surface-overlay' : 'hover:bg-surface-raised'
                   }`}
@@ -1070,7 +1070,7 @@ export default function PlaylistsView(): JSX.Element {
                     {track.duration ? formatDuration(track.duration) : '--:--'}
                   </span>
                   <div className="flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={e => { e.stopPropagation(); setTrackMenu({ track, songId, i: originalIdx, x: e.clientX, y: e.clientY, showPlaylists: false }) }}
+                    <button onClick={e => { e.stopPropagation(); setTrackMenu({ track, songId, x: e.clientX, y: e.clientY }) }}
                       className="p-1.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-surface-overlay transition-colors hidden md:flex" title="More options">
                       <MoreHorizontal size={13} />
                     </button>
@@ -1088,65 +1088,15 @@ export default function PlaylistsView(): JSX.Element {
 
         {/* ── Track context menu ── */}
         {trackMenu && (
-          <div
-            className="fixed z-50 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[200px]"
-            style={{ left: Math.min(trackMenu.x, window.innerWidth - 220), top: Math.min(trackMenu.y, window.innerHeight - 340) }}
-            onClick={e => e.stopPropagation()}
-          >
-            <MenuItem icon={Play} label="Play" onClick={() => { playTrack(trackMenu.track, displayTracks); setTrackMenu(null) }} />
-            <MenuItem icon={ListPlus} label="Add to queue" onClick={() => { addToQueue(trackMenu.track); setTrackMenu(null) }} />
-            <MenuItem icon={Info} label="Song info" onClick={() => { openSongInfo(trackMenu.songId); setTrackMenu(null) }} disabled={trackMenu.songId < 0} />
-            {canEdit && trackMenu.songId > 0 && (
-              <MenuItem icon={Pencil} label="Edit" onClick={() => { setPendingEditorSongId(trackMenu.songId); setActiveView('editor'); setTrackMenu(null) }} />
-            )}
-            <div className="border-t border-[var(--border)] my-1" />
-            {!['recording_session', 'unsurfaced'].includes(trackMenu.track.genre) && (
-              <>
-                <button
-                  className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-sm text-text-primary transition-colors hover:bg-surface-overlay"
-                  onClick={e => { e.stopPropagation(); setTrackMenu(prev => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null) }}
-                >
-                  <span className="flex items-center gap-2.5"><FolderInput size={14} className="text-text-muted" />Add to playlist</span>
-                  <span className="text-text-muted text-xs">›</span>
-                </button>
-              </>
-            )}
-            {trackMenu.showPlaylists && !['recording_session', 'unsurfaced'].includes(trackMenu.track.genre) && (
-              <div className="border-t border-[var(--border)] max-h-48 overflow-y-auto">
-                {otherPlaylists.length === 0 ? (
-                  <p className="px-3.5 py-2 text-xs text-text-muted">No other playlists</p>
-                ) : otherPlaylists.map(p => {
-                  const membership = isMember(p.id, trackMenu.songId)
-                  return (
-                    <button key={p.id} onClick={async () => {
-                      if (membership) return
-                      await userApi.addToPlaylist(p.id, trackMenu.songId)
-                      const targetSet = membershipCache.current.get(p.id) ?? new Set<number>()
-                      targetSet.add(trackMenu.songId)
-                      membershipCache.current.set(p.id, targetSet)
-                      setTrackMenu(null)
-                      await refreshPlaylists()
-                    }}
-                      className={`w-full text-left px-3.5 py-2 text-sm transition-colors flex items-center justify-between gap-2 ${
-                        membership ? 'text-text-muted cursor-default' : 'text-text-primary hover:bg-surface-overlay'
-                      }`}
-                    >
-                      <span className="truncate">{p.name}</span>
-                      {membership && <Check size={12} className="text-accent shrink-0" />}
-                      {membership === null && <span className="text-[10px] text-text-muted shrink-0">?</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-            <div className="border-t border-[var(--border)] my-1" />
-            <MenuItem icon={Download} label="Download" onClick={() => {
-              const a = document.createElement('a')
-              a.href = buildStreamUrl(trackMenu.track.path); a.download = `${trackMenu.track.title}.mp3`; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.click()
-              setTrackMenu(null)
-            }} />
-            {!isSharedView && <MenuItem icon={Trash2} label="Remove from playlist" destructive onClick={() => { removeTrack(trackMenu.songId); setTrackMenu(null) }} />}
-          </div>
+          <SongContextMenu
+            state={trackMenu}
+            onClose={() => setTrackMenu(null)}
+            canEdit={canEdit}
+            onInfo={() => openSongInfo(trackMenu.songId as number)}
+            onPlay={() => playTrack(trackMenu.track, displayTracks)}
+            onAddToQueue={() => addToQueue(trackMenu.track)}
+            removeAction={!isSharedView ? { label: 'Remove from playlist', onClick: () => removeTrack(trackMenu.songId as number) } : undefined}
+          />
         )}
 
         <SongInfoModal

@@ -879,7 +879,7 @@ export default function EditorPage(): JSX.Element {
       </div>
 
       {/* ── Sticky footer ── */}
-      {song && (
+      {(song || isNewSongDraft) && (
         <div className="shrink-0 border-t border-[var(--border)] bg-surface backdrop-blur-sm px-4 py-3 space-y-2.5">
           <input
             value={edNotes} onChange={e => setEdNotes(e.target.value)}
