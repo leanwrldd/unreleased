@@ -10,6 +10,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 import SongInfoModal from './SongInfoModal'
 import SongContextMenu from './SongContextMenu'
+import { CompactGroupRow, useExpandedGroups } from './CompactGroupRow'
 import {
   apiFetch, songToTrack, parseDuration, CATEGORY_LABELS, JWAPI_BASE,
   JWApiSong, JWApiPaginatedResponse, JWApiStats, JWApiEra,
@@ -17,8 +18,10 @@ import {
 import { fisherYates } from '../store/queueSlice'
 import { Track } from '../types'
 import * as userApi from '../lib/userApi'
-import { versionsEnabled, linkSongVersion, getAllVersionGroups, getOwnVersionMeta, setGroupVersionTitle } from '../lib/versionsApi'
+import { versionsEnabled, linkSongVersion, getOwnVersionMeta, setGroupVersionTitle } from '../lib/versionsApi'
 import type { SongVersionMeta } from '../lib/versionsApi'
+import { fetchAllCompactGroups } from '../lib/compactGroups'
+import type { CompactGroup } from '../lib/compactGroups'
 
 type Category = 'released' | 'unreleased' | 'unsurfaced' | 'recording_session' | ''
 type ViewMode = 'list' | 'grid'
@@ -183,6 +186,9 @@ function BulkContextMenu({
   onLogin,
   canLinkVersions,
   onLinkVersions,
+  canAddToPlaylist,
+  excludedCount,
+  contained,
 }: {
   state: BulkContextMenuState
   onClose: () => void
@@ -196,6 +202,13 @@ function BulkContextMenu({
   onLogin: () => void
   canLinkVersions: boolean
   onLinkVersions: () => void
+  /** False when every selected song is a session/unsurfaced (playlists
+   *  don't support those) — hides "Add to playlist" entirely. */
+  canAddToPlaylist: boolean
+  /** How many selected songs are session/unsurfaced and get skipped. */
+  excludedCount: number
+  /** Playlist ids that already contain every eligible selected song. */
+  contained: Set<number>
 }): JSX.Element {
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -235,6 +248,11 @@ function BulkContextMenu({
           >
             <ChevronDown size={12} className="rotate-90" /> Back
           </button>
+          {excludedCount > 0 && (
+            <p className="px-3 pb-1.5 text-[11px] text-text-muted">
+              {excludedCount} session/unsurfaced song{excludedCount === 1 ? '' : 's'} excluded
+            </p>
+          )}
           {!account ? (
             <div className="px-3 pb-2">
               <p className="text-xs text-text-muted mb-2">Log in to save to playlists.</p>
@@ -250,23 +268,29 @@ function BulkContextMenu({
               {playlists.length === 0 && (
                 <p className="px-3 py-2 text-xs text-text-muted">No playlists yet.</p>
               )}
-              {playlists.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={(e) => { e.stopPropagation(); onAddToPlaylist(p.id) }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-                >
-                  <ListMusic size={13} className="shrink-0 text-text-muted" />
-                  <span className="flex-1 truncate text-xs">{p.name}</span>
-                </button>
-              ))}
+              {playlists.map((p) => {
+                const allIn = contained.has(p.id)
+                return (
+                  <button
+                    key={p.id}
+                    onClick={(e) => { e.stopPropagation(); onAddToPlaylist(p.id) }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                  >
+                    <ListMusic size={13} className={`shrink-0 ${allIn ? 'text-accent' : 'text-text-muted'}`} />
+                    <span className="flex-1 truncate text-xs">{p.name}</span>
+                    {allIn && <Check size={12} className="text-accent shrink-0" />}
+                  </button>
+                )
+              })}
             </div>
           )}
         </>
       ) : (
         <>
           <MenuItem icon={<ListPlus size={14} />} label="Add to queue" onClick={onAddToQueue} />
-          <MenuItem icon={<Plus size={14} />} label="Add to playlist" onClick={onTogglePlaylists} />
+          {canAddToPlaylist && (
+            <MenuItem icon={<Plus size={14} />} label="Add to playlist" onClick={onTogglePlaylists} />
+          )}
           {canLinkVersions && (
             <MenuItem icon={<Link2 size={14} />} label="Link versions" onClick={onLinkVersions} />
           )}
@@ -437,35 +461,6 @@ function SongRow({
         </div>
       )}
     </div>
-  )
-}
-
-// ─── Version group row (compact view) ─────────────────────────────────────────
-// Collapses every song sharing a version_title into one row; expanding it
-// reveals the individual songs ("versions") nested underneath via SongRow.
-function GroupRow({
-  coverSong, title, count, expanded, onToggle,
-}: {
-  /** First song in the group — its cover art represents the whole group. */
-  coverSong: JWApiSong
-  title: string
-  count: number
-  expanded: boolean
-  onToggle: () => void
-}): JSX.Element {
-  const track = songToTrack(coverSong)
-  return (
-    <button
-      onClick={onToggle}
-      className="w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 hover:bg-surface-overlay rounded-lg transition-colors text-left"
-    >
-      {expanded ? <ChevronUp size={14} className="text-text-muted shrink-0" /> : <ChevronDown size={14} className="text-text-muted shrink-0" />}
-      <div className="shrink-0 w-10 h-10 md:w-9 md:h-9 rounded overflow-hidden bg-surface-overlay">
-        <AlbumArtThumbnail track={track} size={36} shimmer={false} />
-      </div>
-      <span className="flex-1 min-w-0 text-text-primary text-sm font-medium truncate">{title}</span>
-      <span className="text-text-muted text-xs shrink-0">{count} version{count === 1 ? '' : 's'}</span>
-    </button>
   )
 }
 
@@ -684,55 +679,21 @@ export default function ApiTrackerView(): JSX.Element {
   // Compact view — shows only songs grouped into a titled version group,
   // collapsed to one row per group; expanding it reveals the individual
   // songs ("versions") nested underneath. Deliberately fetched independently
-  // of the Tracker's own paginated `songs` list (see getAllVersionGroups) —
-  // tying it to sortedSongs previously meant a group's members could be
+  // of the Tracker's own paginated `songs` list (see fetchAllCompactGroups)
+  // — tying it to sortedSongs previously meant a group's members could be
   // missed if they hadn't scrolled into view yet, and re-querying on every
   // page load compounded into serious lag as more pages loaded.
-  interface CompactGroupData {
-    groupId: number
-    title: string
-    members: { song: JWApiSong; meta: SongVersionMeta }[]
-  }
   const [compactView, setCompactView] = useState(false)
-  const [compactGroups, setCompactGroups] = useState<CompactGroupData[]>([])
+  const [compactGroups, setCompactGroups] = useState<CompactGroup<JWApiSong>[]>([])
   const [loadingCompact, setLoadingCompact] = useState(false)
-  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set())
-  const toggleGroupExpanded = (groupId: number): void => {
-    setExpandedGroups(prev => {
-      const next = new Set(prev)
-      if (next.has(groupId)) next.delete(groupId)
-      else next.add(groupId)
-      return next
-    })
-  }
+  const { expanded: expandedGroups, toggle: toggleGroupExpanded, clear: clearExpandedGroups } = useExpandedGroups()
 
   useEffect(() => {
     if (!compactView || !versionsEnabled) { setCompactGroups([]); return }
     let cancelled = false
     setLoadingCompact(true)
-    getAllVersionGroups().then(async (metas) => {
-      const byGroup = new Map<number, SongVersionMeta[]>()
-      for (const m of metas) {
-        if (!byGroup.has(m.groupId)) byGroup.set(m.groupId, [])
-        byGroup.get(m.groupId)!.push(m)
-      }
-      const uniqueIds = [...new Set(metas.map(m => m.songId))]
-      const songMap = new Map<number, JWApiSong>()
-      await Promise.all(uniqueIds.map(id =>
-        apiFetch<JWApiSong>(`/songs/${id}/`).then(s => { songMap.set(id, s) }).catch(() => {})
-      ))
-      if (cancelled) return
-      const groups: CompactGroupData[] = [...byGroup.entries()]
-        .map(([groupId, groupMetas]) => ({
-          groupId,
-          title: groupMetas.find(m => m.versionTitle)?.versionTitle ?? '',
-          members: groupMetas
-            .map(m => ({ song: songMap.get(m.songId), meta: m }))
-            .filter((x): x is { song: JWApiSong; meta: SongVersionMeta } => !!x.song),
-        }))
-        .filter(g => g.members.length > 0)
-      setCompactGroups(groups)
-      setLoadingCompact(false)
+    fetchAllCompactGroups().then(groups => {
+      if (!cancelled) { setCompactGroups(groups); setLoadingCompact(false) }
     })
     return () => { cancelled = true }
   }, [compactView])
@@ -983,6 +944,38 @@ export default function ApiTrackerView(): JSX.Element {
   }, [selectMode])
 
   const selectedSongs = useMemo(() => [...selected.values()], [selected])
+  // Sessions/unsurfaced songs can't go in playlists — same rule the
+  // single-song menu already enforces (see canAddToPlaylist in
+  // SongContextMenu.tsx). "Add to playlist" should reflect that instead of
+  // silently dropping them during the actual add.
+  const bulkEligibleSongs = useMemo(
+    () => selectedSongs.filter(s => !['recording_session', 'unsurfaced'].includes(s.category)),
+    [selectedSongs]
+  )
+  const canBulkAddToPlaylist = bulkEligibleSongs.length > 0
+
+  // Which playlists already contain *every* eligible selected song — shown
+  // as a checkmark so re-adding to a playlist the whole selection is
+  // already in isn't a silent no-op.
+  const [bulkContained, setBulkContained] = useState<Set<number>>(new Set())
+  useEffect(() => {
+    if (!account || !canBulkAddToPlaylist || playlists.length === 0 || !(showBulkPlaylists || bulkContextMenu?.showPlaylists)) {
+      setBulkContained(new Set())
+      return
+    }
+    const ids = bulkEligibleSongs.map(s => s.id)
+    Promise.all(
+      playlists.map(p =>
+        userApi.getPlaylist(p.id)
+          .then(d => {
+            const memberIds = new Set((d.items ?? []).map(it => it.song.id))
+            return { id: p.id, allIn: ids.every(id => memberIds.has(id)) }
+          })
+          .catch(() => ({ id: p.id, allIn: false }))
+      )
+    ).then(results => setBulkContained(new Set(results.filter(r => r.allIn).map(r => r.id))))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playlists, account, bulkEligibleSongs, showBulkPlaylists, bulkContextMenu?.showPlaylists])
 
   const bulkAddToQueue = (): void => {
     selectedSongs.filter(s => s.path).forEach(s => addToQueue(songToTrack(s)))
@@ -990,8 +983,7 @@ export default function ApiTrackerView(): JSX.Element {
   }
 
   const bulkAddToPlaylist = async (playlistId: number): Promise<void> => {
-    const eligible = selectedSongs.filter(s => !['recording_session', 'unsurfaced'].includes(s.category))
-    await Promise.all(eligible.map(s => userApi.addToPlaylist(playlistId, s.id).catch(() => {})))
+    await Promise.all(bulkEligibleSongs.map(s => userApi.addToPlaylist(playlistId, s.id).catch(() => {})))
     await refreshPlaylists()
     exitSelectMode()
   }
@@ -1108,7 +1100,7 @@ export default function ApiTrackerView(): JSX.Element {
 
             {versionsEnabled && (
               <button
-                onClick={() => { setCompactView(v => !v); setExpandedGroups(new Set()) }}
+                onClick={() => { setCompactView(v => !v); clearExpandedGroups() }}
                 className={`flex items-center gap-1.5 px-2.5 py-2.5 md:py-2 rounded-lg text-xs transition-colors shrink-0 ${
                   compactView
                     ? 'bg-accent/15 text-accent border border-accent/30'
@@ -1232,8 +1224,8 @@ export default function ApiTrackerView(): JSX.Element {
               <div className="space-y-0.5">
                 {compactGroups.map((group) => (
                   <div key={group.groupId}>
-                    <GroupRow
-                      coverSong={group.members[0].song}
+                    <CompactGroupRow
+                      coverTrack={songToTrack(group.members[0].item)}
                       title={group.title}
                       count={group.members.length}
                       expanded={expandedGroups.has(group.groupId)}
@@ -1241,7 +1233,7 @@ export default function ApiTrackerView(): JSX.Element {
                     />
                     {expandedGroups.has(group.groupId) && (
                       <div className="ml-4 pl-4 border-l border-[var(--border)] space-y-0.5">
-                        {group.members.map(({ song: member, meta }) => (
+                        {group.members.map(({ item: member, meta }) => (
                           <SongRow
                             key={member.id}
                             song={member}
@@ -1354,7 +1346,8 @@ export default function ApiTrackerView(): JSX.Element {
           <div className="relative">
             <button
               onClick={() => setShowBulkPlaylists(v => !v)}
-              disabled={selected.size === 0}
+              disabled={selected.size === 0 || !canBulkAddToPlaylist}
+              title={!canBulkAddToPlaylist ? "Sessions/unsurfaced songs can't be added to playlists" : undefined}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-overlay hover:bg-surface-raised text-text-primary rounded-lg text-xs font-medium disabled:opacity-50 transition-colors"
             >
               <Plus size={13} /> Add to playlist
@@ -1365,6 +1358,11 @@ export default function ApiTrackerView(): JSX.Element {
                 <div className="absolute right-0 bottom-full mb-1 z-50 w-56 bg-surface border border-[var(--border)] rounded-xl shadow-2xl overflow-hidden">
                   <div className="px-3 py-2 border-b border-[var(--border)] text-[11px] uppercase tracking-wider text-text-muted font-semibold">
                     Add to playlist
+                    {bulkEligibleSongs.length !== selectedSongs.length && (
+                      <span className="block normal-case tracking-normal font-normal text-text-muted/80 mt-0.5">
+                        {selectedSongs.length - bulkEligibleSongs.length} session/unsurfaced song{selectedSongs.length - bulkEligibleSongs.length === 1 ? '' : 's'} excluded
+                      </span>
+                    )}
                   </div>
                   {!account ? (
                     <div className="p-3">
@@ -1381,16 +1379,20 @@ export default function ApiTrackerView(): JSX.Element {
                       {playlists.length === 0 && (
                         <p className="px-3 py-2 text-xs text-text-muted">No playlists yet.</p>
                       )}
-                      {playlists.map(p => (
-                        <button
-                          key={p.id}
-                          onClick={() => { bulkAddToPlaylist(p.id); setShowBulkPlaylists(false) }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-                        >
-                          <ListMusic size={14} className="shrink-0 text-text-muted" />
-                          <span className="flex-1 truncate">{p.name}</span>
-                        </button>
-                      ))}
+                      {playlists.map(p => {
+                        const allIn = bulkContained.has(p.id)
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => { bulkAddToPlaylist(p.id); setShowBulkPlaylists(false) }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-sm text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+                          >
+                            <ListMusic size={14} className={`shrink-0 ${allIn ? 'text-accent' : 'text-text-muted'}`} />
+                            <span className="flex-1 truncate">{p.name}</span>
+                            {allIn && <Check size={12} className="text-accent shrink-0" />}
+                          </button>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
@@ -1479,6 +1481,9 @@ export default function ApiTrackerView(): JSX.Element {
           onLogin={() => { setShowUserAuth(true); setBulkContextMenu(null) }}
           canLinkVersions={versionsEnabled && canEdit && selected.size >= 2}
           onLinkVersions={() => { bulkLinkVersions(); setBulkContextMenu(null) }}
+          canAddToPlaylist={canBulkAddToPlaylist}
+          excludedCount={selectedSongs.length - bulkEligibleSongs.length}
+          contained={bulkContained}
         />
       )}
 

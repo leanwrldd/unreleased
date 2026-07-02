@@ -4,7 +4,7 @@ import {
   ListMusic, Play, Loader2, Plus, Trash2, Pencil, ArrowLeft,
   X, Check, Heart, Shuffle, Music2, Clock, GripVertical,
   ListPlus, Download, Share2, Archive, Info, FolderInput, MoreHorizontal,
-  Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ImageOff, Globe, Lock, Link, ListEnd, HardDrive,
+  Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ImageOff, Globe, Lock, Link, ListEnd, HardDrive, Layers,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import * as userApi from '../lib/userApi'
@@ -17,6 +17,10 @@ import LikedSongsView from './LikedSongsView'
 import { AlbumArtThumb } from './LibraryTab'
 import SongInfoModal from './SongInfoModal'
 import SongContextMenu, { SongContextMenuState } from './SongContextMenu'
+import { CompactGroupRow, CompactEmptyIcon, useExpandedGroups } from './CompactGroupRow'
+import { groupItemsByVersion } from '../lib/compactGroups'
+import type { CompactGroup } from '../lib/compactGroups'
+import { versionsEnabled } from '../lib/versionsApi'
 
 // ── PlaylistMosaic ────────────────────────────────────────────────────────────
 
@@ -268,6 +272,16 @@ export default function PlaylistsView(): JSX.Element {
   const [sort, setSort] = useState<SortState>({ field: 'default', dir: 'asc' })
   const [search, setSearch] = useState('')
 
+  // Compact view — same grouping as the Tracker's (see lib/compactGroups.ts):
+  // collapses tracks sharing a version_title into one row. Uses the
+  // playlist-scoped groupItemsByVersion since `tracks` here is already the
+  // playlist's full, unpaginated list — no need to ask Supabase for every
+  // group app-wide like the Tracker has to.
+  const [compactView, setCompactView] = useState(false)
+  const [compactGroups, setCompactGroups] = useState<CompactGroup<Track>[]>([])
+  const [loadingCompact, setLoadingCompact] = useState(false)
+  const { expanded: expandedGroups, toggle: toggleGroupExpanded, clear: clearExpandedGroups } = useExpandedGroups()
+
   // Zip / share / bulk-add
   const [zipState, setZipState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [shareCopied, setShareCopied] = useState(false)
@@ -363,6 +377,16 @@ export default function PlaylistsView(): JSX.Element {
       membershipCache.current.set(detail.id, new Set(detail.items.map(i => i.song.id)))
     }
   }, [detail])
+
+  useEffect(() => {
+    if (!compactView || !versionsEnabled) { setCompactGroups([]); return }
+    let cancelled = false
+    setLoadingCompact(true)
+    groupItemsByVersion(tracks, t => userApi.trackIdToSongId(t.id) ?? -1).then(groups => {
+      if (!cancelled) { setCompactGroups(groups); setLoadingCompact(false) }
+    })
+    return () => { cancelled = true }
+  }, [compactView, tracks])
 
   // Load local library so playlist tracks resolve
   useEffect(() => { loadLibrary() }, [])
@@ -1000,9 +1024,9 @@ export default function PlaylistsView(): JSX.Element {
           </div>
         ) : (
           <div className="px-2 pb-8">
-            {/* Search */}
-            <div className="px-2 mb-3">
-              <div className="relative">
+            {/* Search + compact view */}
+            <div className="px-2 mb-3 flex items-center gap-2">
+              <div className="relative flex-1">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                 <input
                   value={search}
@@ -1016,8 +1040,81 @@ export default function PlaylistsView(): JSX.Element {
                   </button>
                 )}
               </div>
+              {versionsEnabled && (
+                <button
+                  onClick={() => { setCompactView(v => !v); clearExpandedGroups() }}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                    compactView
+                      ? 'bg-accent/15 text-accent border border-accent/30'
+                      : 'bg-surface-overlay text-text-muted hover:text-text-secondary border border-transparent'
+                  }`}
+                  title="Collapse tracks into their version groups"
+                >
+                  <Layers size={13} />
+                  <span className="hidden sm:inline">Compact</span>
+                </button>
+              )}
             </div>
 
+            {compactView ? (
+              loadingCompact ? (
+                <div className="flex items-center justify-center h-40 gap-2 text-text-muted">
+                  <Loader2 size={18} className="animate-spin" />
+                  <span className="text-sm">Loading version groups…</span>
+                </div>
+              ) : compactGroups.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 gap-2">
+                  <CompactEmptyIcon size={32} className="text-text-muted opacity-30" />
+                  <p className="text-text-muted text-sm">No version groups in this playlist</p>
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {compactGroups.map((group) => (
+                    <div key={group.groupId}>
+                      <CompactGroupRow
+                        coverTrack={group.members[0].item}
+                        title={group.title}
+                        count={group.members.length}
+                        expanded={expandedGroups.has(group.groupId)}
+                        onToggle={() => toggleGroupExpanded(group.groupId)}
+                      />
+                      {expandedGroups.has(group.groupId) && (
+                        <div className="ml-4 pl-4 border-l border-[var(--border)] space-y-0.5">
+                          {group.members.map(({ item: track, meta }) => {
+                            const songId = track.id ? (userApi.trackIdToSongId(track.id) ?? -1) : -1
+                            return (
+                              <div
+                                key={track.id}
+                                onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setTrackMenu({ track, songId, x: e.clientX, y: e.clientY }) }}
+                                className="group flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-surface-raised transition-colors cursor-default"
+                                onDoubleClick={() => playTrack(track, group.members.map(m => m.item))}
+                              >
+                                <AlbumArtThumbnail track={track} size={32} className="rounded-md shrink-0" shimmer={false} />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-text-primary text-sm font-medium truncate">
+                                    {track.title}
+                                    {meta.version && <span className="text-text-muted"> ({meta.version})</span>}
+                                  </p>
+                                  <p className="text-text-muted text-xs truncate">{track.artist}</p>
+                                </div>
+                                <button
+                                  onClick={e => { e.stopPropagation(); setTrackMenu({ track, songId, x: e.clientX, y: e.clientY }) }}
+                                  className="p-1.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-surface-overlay opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                                  title="More options"
+                                >
+                                  <MoreHorizontal size={13} />
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : (
+              <>
             {/* Column headers */}
             <div className="grid items-center gap-3 px-4 pb-2 text-text-muted text-xs uppercase tracking-widest" style={{ gridTemplateColumns: '16px 28px 40px 1fr 56px 36px' }}>
               <span />
@@ -1083,6 +1180,8 @@ export default function PlaylistsView(): JSX.Element {
                 </div>
               )
             })}
+              </>
+            )}
           </div>
         )}
 

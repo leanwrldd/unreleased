@@ -3,7 +3,7 @@ import {
   Folder, Music2, ChevronRight, ArrowLeft, Home, Play, Loader2,
   FolderOpen, HardDrive, LayoutList, LayoutGrid, ImageIcon, Video,
   Download, ArrowUpDown, ArrowUp, ArrowDown, Link, Check, Info, ListPlus,
-  X, Pencil, PackageOpen, CheckSquare2, Square, MonitorSmartphone, Globe,
+  X, Pencil, PackageOpen, CheckSquare2, Square, MonitorSmartphone, Globe, Search,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import {
@@ -175,6 +175,17 @@ export default function ApiFilesView(): JSX.Element {
   const [infoSong, setInfoSong] = useState<JWApiSong | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ entry: JWApiFileEntry; x: number; y: number } | null>(null)
 
+  // Search — recursive across the whole file tree via /files/browse/'s
+  // `search` param (same endpoint findSessionZips uses), not scoped to the
+  // current folder. Results replace the browsed folder's entries while
+  // active rather than living in a separate list, so sorting/select-mode/
+  // context menus all keep working on it unchanged.
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [searchResults, setSearchResults] = useState<JWApiFileEntry[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const isSearching = debouncedSearch.trim().length > 0
+
   // Multi-select state
   const [selectMode, setSelectMode] = useState(false)
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
@@ -274,6 +285,9 @@ export default function ApiFilesView(): JSX.Element {
   }
 
   const navigate = useCallback(async (path: string, pushHistory = true) => {
+    // Navigating to a folder (including clicking a directory result while
+    // searching) always exits search mode and lands in normal browsing.
+    setSearch(''); setDebouncedSearch('')
     setLoading(true)
     setError(null)
     try {
@@ -295,6 +309,23 @@ export default function ApiFilesView(): JSX.Element {
   // Keep a ref to navigate so popstate listener always has the latest version
   const navigateRef = useRef(navigate)
   useEffect(() => { navigateRef.current = navigate }, [navigate])
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  useEffect(() => {
+    if (!isSearching) { setSearchResults([]); return }
+    let cancelled = false
+    setSearchLoading(true)
+    apiFetch<JWApiBrowseResponse>('/files/browse/', { search: debouncedSearch.trim() })
+      .then(data => { if (!cancelled) setSearchResults(parseEntries(data)) })
+      .catch(() => { if (!cancelled) setSearchResults([]) })
+      .finally(() => { if (!cancelled) setSearchLoading(false) })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, isSearching])
 
   // On mount: read path from URL (or apiFilesPath from store); listen for browser back/forward
   useEffect(() => {
@@ -467,8 +498,8 @@ export default function ApiFilesView(): JSX.Element {
   // ── Sorted entries ─────────────────────────────────────────────────────────
 
   const sortedEntries = useMemo(
-    () => sortEntries(entries, sortBy, sortDir),
-    [entries, sortBy, sortDir]
+    () => sortEntries(isSearching ? searchResults : entries, sortBy, sortDir),
+    [isSearching, searchResults, entries, sortBy, sortDir]
   )
 
   const crumbs = breadcrumbs(currentPath)
@@ -538,37 +569,70 @@ export default function ApiFilesView(): JSX.Element {
             </div>
           </div>
 
+          {/* Search — API mode. Recursive across the whole file tree (same
+              /files/browse/ `search` param the session-ZIP lookup uses),
+              not scoped to the current folder. */}
+          {!localMode && (
+            <div className="relative mb-2">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search files…"
+                className="w-full bg-surface-overlay border border-[var(--border)] rounded-lg pl-8 pr-8 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/40"
+              />
+              {search && (
+                <button
+                  onClick={() => { setSearch(''); setDebouncedSearch('') }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+                  title="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Nav bar — API mode */}
           {!localMode && (
-            <div className="flex items-center gap-1.5">
-              <button onClick={goBack} disabled={history.length === 0 && !currentPath}
-                className="p-1.5 rounded-lg hover:bg-surface-overlay disabled:opacity-30 disabled:pointer-events-none transition-colors" title="Back">
-                <ArrowLeft size={15} className="text-text-muted" />
-              </button>
-              <button onClick={goHome} className="p-1.5 rounded-lg hover:bg-surface-overlay transition-colors" title="Root">
-                <Home size={15} className="text-text-muted" />
-              </button>
-              <div className="flex items-center gap-0.5 overflow-hidden ml-1 flex-1 min-w-0">
-                <button
-                  onClick={goHome}
-                  className={`text-xs px-1.5 py-0.5 rounded transition-colors shrink-0 ${
-                    crumbs.length === 0 ? 'text-text-primary font-medium' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'
-                  }`}
-                >Root</button>
-                {crumbs.map((crumb, i) => (
-                  <div key={crumb.path} className="flex items-center gap-0.5 min-w-0 shrink-0">
-                    <ChevronRight size={12} className="text-text-muted shrink-0" />
-                    <button
-                      onClick={() => navigate(crumb.path)}
-                      className={`text-xs px-1.5 py-0.5 rounded transition-colors truncate max-w-[140px] ${
-                        i === crumbs.length - 1 ? 'text-text-primary font-medium' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'
-                      }`}
-                      title={crumb.path}
-                    >{crumb.label}</button>
-                  </div>
-                ))}
+            isSearching ? (
+              <div className="flex items-center gap-1.5 text-xs text-text-muted">
+                {searchLoading
+                  ? <><Loader2 size={12} className="animate-spin" /> Searching…</>
+                  : <>{searchResults.length} result{searchResults.length === 1 ? '' : 's'} for "{debouncedSearch.trim()}"</>}
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <button onClick={goBack} disabled={history.length === 0 && !currentPath}
+                  className="p-1.5 rounded-lg hover:bg-surface-overlay disabled:opacity-30 disabled:pointer-events-none transition-colors" title="Back">
+                  <ArrowLeft size={15} className="text-text-muted" />
+                </button>
+                <button onClick={goHome} className="p-1.5 rounded-lg hover:bg-surface-overlay transition-colors" title="Root">
+                  <Home size={15} className="text-text-muted" />
+                </button>
+                <div className="flex items-center gap-0.5 overflow-hidden ml-1 flex-1 min-w-0">
+                  <button
+                    onClick={goHome}
+                    className={`text-xs px-1.5 py-0.5 rounded transition-colors shrink-0 ${
+                      crumbs.length === 0 ? 'text-text-primary font-medium' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'
+                    }`}
+                  >Root</button>
+                  {crumbs.map((crumb, i) => (
+                    <div key={crumb.path} className="flex items-center gap-0.5 min-w-0 shrink-0">
+                      <ChevronRight size={12} className="text-text-muted shrink-0" />
+                      <button
+                        onClick={() => navigate(crumb.path)}
+                        className={`text-xs px-1.5 py-0.5 rounded transition-colors truncate max-w-[140px] ${
+                          i === crumbs.length - 1 ? 'text-text-primary font-medium' : 'text-text-muted hover:text-text-primary hover:bg-surface-overlay'
+                        }`}
+                        title={crumb.path}
+                      >{crumb.label}</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
           )}
         </div>
 
@@ -709,9 +773,9 @@ export default function ApiFilesView(): JSX.Element {
         )}
         {/* Content */}
         {!localMode && <div className="flex-1 overflow-y-auto px-5 pb-4">
-          {loading ? (
+          {(isSearching ? searchLoading : loading) ? (
             <div className="flex items-center justify-center h-40 gap-2 text-text-muted">
-              <Loader2 size={18} className="animate-spin" /><span className="text-sm">Loading…</span>
+              <Loader2 size={18} className="animate-spin" /><span className="text-sm">{isSearching ? 'Searching…' : 'Loading…'}</span>
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-40 gap-2">
@@ -721,12 +785,12 @@ export default function ApiFilesView(): JSX.Element {
           ) : sortedEntries.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 gap-2">
               <Music2 size={32} className="text-text-muted opacity-30" />
-              <p className="text-text-muted text-sm">Nothing here</p>
+              <p className="text-text-muted text-sm">{isSearching ? `No files match "${debouncedSearch.trim()}"` : 'Nothing here'}</p>
             </div>
           ) : viewMode === 'list' ? (
             /* ── List view ────────────────────────────────────────────────────── */
             <div className="space-y-0.5">
-              {currentPath && (
+              {currentPath && !isSearching && (
                 <button onClick={goBack} className="flex items-center gap-3 w-full px-3 py-2 rounded-lg hover:bg-surface-overlay transition-colors text-left">
                   <div className="w-9 h-9 flex items-center justify-center shrink-0"><FolderOpen size={18} className="text-text-muted" /></div>
                   <span className="text-text-muted text-sm">..</span>
@@ -788,7 +852,12 @@ export default function ApiFilesView(): JSX.Element {
                         <div className="w-9 h-9 flex items-center justify-center"><Music2 size={18} className="text-text-muted opacity-40" /></div>
                       )}
                     </div>
-                    <span className={`flex-1 text-sm truncate ${isDir ? 'text-text-primary font-medium cursor-pointer' : 'text-text-secondary'}`}>{entry.name}</span>
+                    <span className="flex-1 min-w-0">
+                      <span className={`block text-sm truncate ${isDir ? 'text-text-primary font-medium cursor-pointer' : 'text-text-secondary'}`}>{entry.name}</span>
+                      {isSearching && parentFolder(entry.path) && (
+                        <span className="block text-text-muted text-[10px] truncate">{parentFolder(entry.path)}</span>
+                      )}
+                    </span>
                     {!isDir && entry.size != null && (
                       <span className="hidden md:inline text-text-muted text-xs shrink-0 w-14 text-right">{(entry.size / 1_048_576).toFixed(1)} MB</span>
                     )}
@@ -836,7 +905,7 @@ export default function ApiFilesView(): JSX.Element {
           ) : (
             /* ── Grid view ────────────────────────────────────────────────────── */
             <div className="grid gap-3 pt-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-              {currentPath && (
+              {currentPath && !isSearching && (
                 <button onClick={goBack} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-surface-overlay hover:bg-surface-raised transition-colors">
                   <div className="w-full aspect-square flex items-center justify-center"><FolderOpen size={40} className="text-text-muted" /></div>
                   <span className="text-text-muted text-xs">..</span>

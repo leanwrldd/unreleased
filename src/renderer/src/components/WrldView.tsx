@@ -800,7 +800,7 @@ export default function WrldView(): JSX.Element {
             {/* Left column — Apple Music style. A true 50/50 split with the
                 lyrics column, not a narrow fixed-width sidebar next to a huge
                 mostly-empty lyrics pane. */}
-            <div className="flex flex-col items-center justify-center shrink-0 px-8 xl:px-12 gap-5 overflow-y-auto"
+            <div className="relative flex flex-col items-center justify-center shrink-0 px-8 xl:px-12 gap-5 overflow-y-auto"
               style={{ width: '50%', minWidth: 320 }}>
 
               {/* Album art */}
@@ -944,11 +944,19 @@ export default function WrldView(): JSX.Element {
                 </div>
               </div>
 
-              {/* Queue — pops up directly under the interface instead of
-                  taking its own side column, matching Apple Music. */}
+              {/* Queue — floats over the lower part of the interface instead
+                  of taking its own side column, matching Apple Music. This
+                  has to be a true overlay (not flow content): the column
+                  above is itself scrollable (overflow-y-auto, for short
+                  viewports), so a long queue sitting in normal flow would
+                  add to that column's total content height and could tip
+                  the whole thing into scrolling — dragging the album art
+                  and controls out of view along with it. */}
               {showQueue && !radioFmActive && (
-                <div className="w-full" style={{ maxWidth: 320 }}>
-                  <WrldQueuePanel variant="inline" onClose={() => setShowQueue(false)} />
+                <div className="absolute inset-x-0 bottom-4 z-20 flex justify-center px-8 xl:px-12 pointer-events-none">
+                  <div className="w-full pointer-events-auto" style={{ maxWidth: 320 }}>
+                    <WrldQueuePanel variant="inline" onClose={() => setShowQueue(false)} />
+                  </div>
                 </div>
               )}
             </div>
