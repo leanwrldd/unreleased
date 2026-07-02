@@ -16,12 +16,8 @@ import {
   ChevronUp,
   Check,
   MoreHorizontal,
-  ListPlus,
   Radio,
-  ListEnd,
   Info,
-  Pencil,
-  HardDrive,
   Loader2,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
@@ -29,9 +25,9 @@ import { formatDuration } from '../lib/lyrics'
 import { apiFetch, JWApiSong } from '../lib/juicewrldApi'
 import { trackIdToSongId } from '../lib/userApi'
 import { FullTrack } from '../types'
-import AddToPlaylistMenu from './AddToPlaylistMenu'
 import SongInfoModal from './SongInfoModal'
 import MetadataEditor from './MetadataEditor'
+import SongContextMenu from './SongContextMenu'
 import { LibraryTrack } from '../types'
 
 let _seek: ((t: number) => void) | null = null
@@ -93,8 +89,6 @@ export default function Player(): JSX.Element {
   const canEditSong = !!(account?.is_editor || account?.is_administrator)
 
   const [showContextMenu, setShowContextMenu] = useState(false)
-  const [showAddToPlaylist, setShowAddToPlaylist] = useState(false)
-  const [addToPlaylistPos, setAddToPlaylistPos] = useState<{ top: number; left: number } | null>(null)
   const [showSongInfo, setShowSongInfo] = useState(false)
   const [songInfoData, setSongInfoData] = useState<JWApiSong | null>(null)
   const contextMenuBtnRef = useRef<HTMLButtonElement>(null)
@@ -103,9 +97,6 @@ export default function Player(): JSX.Element {
   const { radioFmActive, radioFmNowPlaying, radioFmMatchedSong } = useStore()
   const { libraryTracks } = useStore()
   const [editingLocalTrack, setEditingLocalTrack] = useState<LibraryTrack | null>(null)
-  const [addingToLib, setAddingToLib] = useState(false)
-  const [addedToLib, setAddedToLib] = useState(false)
-  const isElectron = !!(window as any).electron
 
 
   // FM elapsed time — ticks locally between WS updates
@@ -703,7 +694,7 @@ export default function Player(): JSX.Element {
 
   // Cover art error state — reset when track changes
   const [coverArtError, setCoverArtError] = useState(false)
-  useEffect(() => { setCoverArtError(false); setAddedToLib(false); setAddingToLib(false) }, [currentTrack?.id])
+  useEffect(() => { setCoverArtError(false) }, [currentTrack?.id])
 
   // Output device picker
   const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([])
@@ -910,86 +901,22 @@ export default function Player(): JSX.Element {
                   )}
 
                   {showContextMenu && !radioFmActive && currentTrack && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setShowContextMenu(false)} />
-                      <div className="absolute bottom-7 left-0 z-50 w-48 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 overflow-hidden">
-                        <div className="px-3 py-2 border-b border-[var(--border)] mb-1">
-                          <p className="text-text-primary text-xs font-semibold truncate">{currentTrack.title}</p>
-                          <p className="text-text-muted text-[10px] truncate">{currentTrack.artist}</p>
-                        </div>
-                        <button
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-                          onClick={() => { playNext(currentTrack); setShowContextMenu(false) }}
-                        >
-                          <ListEnd size={14} /> Play Next
-                        </button>
-                        {currentSongId != null && !['recording_session', 'unsurfaced'].includes(currentTrack?.genre ?? '') && (
-                          <button
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-                            onClick={() => {
-                              if (contextMenuBtnRef.current) {
-                                const r = contextMenuBtnRef.current.getBoundingClientRect()
-                                // Estimate menu height ~340px; position above button with clamping
-                                const menuH = 340
-                                setAddToPlaylistPos({ top: Math.max(8, r.top - menuH - 8), left: Math.max(8, Math.min(r.left, window.innerWidth - 256)) })
-                              }
-                              setShowAddToPlaylist(true)
-                              setShowContextMenu(false)
-                            }}
-                          >
-                            <ListPlus size={14} /> Add to playlist
-                          </button>
-                        )}
-                        {currentSongId != null && (
-                          <button
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-                            onClick={openSongInfo}
-                          >
-                            <Info size={14} /> Song info
-                          </button>
-                        )}
-                        {currentSongId == null && currentTrack?.id.startsWith('local-') && (
-                          <button
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-                            onClick={() => {
-                              const lt = libraryTracks.find(t => t.id === currentTrack?.id)
-                              if (lt) { setEditingLocalTrack(lt); setShowContextMenu(false) }
-                            }}
-                          >
-                            <Pencil size={14} /> Edit metadata
-                          </button>
-                        )}
-                        {currentSongId != null && isElectron && (
-                          <button
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-                            onClick={async () => {
-                              if (addingToLib || addedToLib || !currentTrack) return
-                              setAddingToLib(true); setShowContextMenu(false)
-                              try {
-                                const url = 'https://juicewrldapi.com/juicewrld/files/download/?path=' + encodeURIComponent(currentTrack.path || '')
-                                await (window as any).electron.ipcRenderer.invoke('download-to-library', {
-                                  url,
-                                  songName: currentTrack.title,
-                                  artist: currentTrack.artist,
-                                  songPath: currentTrack.path
-                                })
-                                setAddedToLib(true)
-                              } finally { setAddingToLib(false) }
-                            }}
-                          >
-                            {addingToLib ? <Loader2 size={14} className="animate-spin" /> : addedToLib ? <Check size={14} className="text-accent" /> : <HardDrive size={14} />}
-                            {addedToLib ? 'Added to library' : addingToLib ? 'Adding...' : 'Add to library'}
-                          </button>
-                        )}
-                      </div>
-                    </>
-                  )}
-
-                  {showAddToPlaylist && currentSongId != null && addToPlaylistPos != null && createPortal(
-                    <div className="fixed z-[9999]" style={{ top: addToPlaylistPos.top, left: addToPlaylistPos.left }}>
-                      <AddToPlaylistMenu songId={currentSongId} anchorClass="relative" onClose={() => { setShowAddToPlaylist(false); setAddToPlaylistPos(null) }} />
-                    </div>,
-                    document.body
+                    <SongContextMenu
+                      state={{
+                        track: currentTrack,
+                        songId: currentSongId,
+                        x: contextMenuBtnRef.current?.getBoundingClientRect().left ?? 0,
+                        y: contextMenuBtnRef.current?.getBoundingClientRect().top ?? 0,
+                      }}
+                      onClose={() => setShowContextMenu(false)}
+                      canEdit={canEditSong}
+                      onInfo={openSongInfo}
+                      onPlayNext={() => playNext(currentTrack)}
+                      onEditLocalMetadata={currentSongId == null && currentTrack.id.startsWith('local-') ? () => {
+                        const lt = libraryTracks.find(t => t.id === currentTrack.id)
+                        if (lt) setEditingLocalTrack(lt)
+                      } : undefined}
+                    />
                   )}
                 </div>
               </div>

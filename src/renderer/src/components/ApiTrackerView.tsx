@@ -1,17 +1,18 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Search, Play, Loader2, Music2, X, Check,
-  LayoutList, LayoutGrid, Info, Download, ListPlus, PanelLeft,
-  ChevronUp, ChevronDown, MoreHorizontal, Folder, Pencil, Plus, ListMusic, HardDrive, PackageOpen,
+  LayoutList, LayoutGrid, Info, ListPlus, PanelLeft,
+  ChevronUp, ChevronDown, MoreHorizontal, Plus, ListMusic, PackageOpen,
   CheckSquare2, Square, Link2, Layers,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { useShallow } from 'zustand/react/shallow'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 import SongInfoModal from './SongInfoModal'
+import SongContextMenu from './SongContextMenu'
 import {
-  apiFetch, songToTrack, parseDuration, CATEGORY_LABELS, buildStreamUrl, findSessionZips, JWAPI_BASE,
-  JWApiSong, JWApiPaginatedResponse, JWApiStats, JWApiEra, JWApiFileEntry,
+  apiFetch, songToTrack, parseDuration, CATEGORY_LABELS, JWAPI_BASE,
+  JWApiSong, JWApiPaginatedResponse, JWApiStats, JWApiEra,
 } from '../lib/juicewrldApi'
 import { fisherYates } from '../store/queueSlice'
 import { Track } from '../types'
@@ -39,30 +40,6 @@ function formatDur(secs: number): string {
   const m = Math.floor(secs / 60)
   const s = Math.floor(secs % 60)
   return `${m}:${s.toString().padStart(2, '0')}`
-}
-
-function downloadSong(song: JWApiSong): void {
-  const url = buildStreamUrl(song.path)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = (song.track_titles?.[0] || song.name) + '.mp3'
-  a.target = '_blank'
-  a.rel = 'noopener noreferrer'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-}
-
-function downloadZipEntry(entry: JWApiFileEntry): void {
-  const url = buildStreamUrl(entry.path)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = entry.name
-  a.target = '_blank'
-  a.rel = 'noopener noreferrer'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
 }
 
 // ─── Stats bar ────────────────────────────────────────────────────────────────
@@ -167,13 +144,10 @@ function CategorySidebar({
 }
 
 // ─── Context menu ─────────────────────────────────────────────────────────────
-interface ContextMenuState {
-  song: JWApiSong
-  x: number
-  y: number
-  showPlaylists: boolean
-}
-
+// Per-song right-click menu lives in SongContextMenu.tsx (shared across every
+// place a song can be right-clicked — Tracker, Liked Songs, Playlists, the
+// Player bar, WRLD). Only the bulk multi-select menu below is local to the
+// Tracker, since bulk actions don't apply anywhere else.
 interface BulkContextMenuState {
   x: number
   y: number
@@ -193,293 +167,6 @@ function MenuItem({ icon, label, onClick }: { icon: React.ReactNode; label: stri
       {icon}
       {label}
     </button>
-  )
-}
-
-function SongContextMenu({
-  state,
-  onClose,
-  onInfo,
-  onQueue,
-  onShowInFiles,
-  onEdit,
-  canEdit,
-  onTogglePlaylists,
-  onSelect,
-}: {
-  state: ContextMenuState
-  onClose: () => void
-  onInfo: () => void
-  onQueue: () => void
-  onShowInFiles: () => void
-  onEdit: () => void
-  canEdit: boolean
-  onTogglePlaylists: () => void
-  onSelect: () => void
-}): JSX.Element {
-  const { playlists, account, refreshPlaylists, setShowUserAuth } = useStore(
-    useShallow(s => ({ playlists: s.playlists, account: s.account, refreshPlaylists: s.refreshPlaylists, setShowUserAuth: s.setShowUserAuth }))
-  )
-  const menuRef = useRef<HTMLDivElement>(null)
-  const songId = userApi.trackIdToSongId(`jw-${state.song.id}`)
-  const [busyId, setBusyId] = useState<number | null>(null)
-  const [doneId, setDoneId] = useState<number | null>(null)
-  const [creating, setCreating] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [addingToLib, setAddingToLib] = useState(false)
-  const [addedToLib, setAddedToLib] = useState(false)
-  const [contained, setContained] = useState<Set<number>>(new Set())
-  const [zipLoading, setZipLoading] = useState(false)
-  const [zipCandidates, setZipCandidates] = useState<JWApiFileEntry[] | null>(null)
-  const [showZipList, setShowZipList] = useState(false)
-  const el = (window as any).electron
-
-  const loadSessionZips = async (): Promise<void> => {
-    if (zipLoading) return
-    setZipLoading(true)
-    try {
-      const candidates = await findSessionZips(state.song)
-      if (candidates.length === 1) {
-        downloadZipEntry(candidates[0])
-        onClose()
-      } else {
-        setZipCandidates(candidates)
-        setShowZipList(true)
-      }
-    } catch {
-      setZipCandidates([])
-      setShowZipList(true)
-    } finally {
-      setZipLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    const handle = (e: MouseEvent): void => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose()
-    }
-    const handleKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('mousedown', handle)
-    document.addEventListener('keydown', handleKey)
-    return () => {
-      document.removeEventListener('mousedown', handle)
-      document.removeEventListener('keydown', handleKey)
-    }
-  }, [onClose])
-
-  // Check which playlists already contain this song
-  useEffect(() => {
-    if (!account || songId == null || playlists.length === 0) return
-    Promise.all(
-      playlists.map(p =>
-        userApi.getPlaylist(p.id)
-          .then(d => ({ id: p.id, has: (d.items ?? []).some(it => it.song.id === songId) }))
-          .catch(() => ({ id: p.id, has: false }))
-      )
-    ).then(results => {
-      setContained(new Set(results.filter(r => r.has).map(r => r.id)))
-    })
-  }, [playlists, songId, account])
-
-  const addTo = async (id: number): Promise<void> => {
-    if (songId == null) return
-    setBusyId(id)
-    try {
-      await userApi.addToPlaylist(id, songId)
-      setDoneId(id)
-      setContained(prev => new Set([...prev, id]))
-      await refreshPlaylists()
-    } catch {}
-    finally { setBusyId(null) }
-  }
-
-  const createAndAdd = async (): Promise<void> => {
-    const name = newName.trim()
-    if (!name || songId == null) return
-    setBusyId(-1)
-    try {
-      const playlist = await userApi.createPlaylist(name)
-      await userApi.addToPlaylist(playlist.id, songId)
-      await refreshPlaylists()
-      onClose()
-    } catch {}
-    finally { setBusyId(null) }
-  }
-
-  // Adjust to stay on screen
-  const menuWidth = 208
-  const menuHeight = state.showPlaylists || showZipList ? 320 : 200
-  const top = Math.max(8, Math.min(state.y, window.innerHeight - menuHeight - 8))
-  const left = Math.max(8, Math.min(state.x, window.innerWidth - menuWidth - 8))
-
-  return (
-    <div
-      ref={menuRef}
-      style={{ position: 'fixed', zIndex: 9999, top, left }}
-      className="w-52 bg-surface border border-[var(--border)] rounded-xl shadow-2xl overflow-hidden py-1"
-    >
-      {/* Song header */}
-      <div className="px-3 py-2 border-b border-[var(--border)] mb-1">
-        <p className="text-text-primary text-xs font-semibold truncate">{state.song.name}</p>
-        <p className="text-text-muted text-[10px] truncate">{state.song.credited_artists || 'Juice WRLD'}</p>
-      </div>
-
-      {state.showPlaylists ? (
-        /* Playlist sub-panel */
-        <>
-          <button
-            onClick={(e) => { e.stopPropagation(); onTogglePlaylists() }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-muted hover:text-text-primary transition-colors"
-          >
-            <ChevronDown size={12} className="rotate-90" /> Back
-          </button>
-          {!account ? (
-            <div className="px-3 pb-2">
-              <p className="text-xs text-text-muted mb-2">Log in to save to playlists.</p>
-              <button
-                onClick={() => { setShowUserAuth(true); onClose() }}
-                className="w-full py-1.5 rounded-lg bg-accent/15 text-accent text-xs font-semibold"
-              >
-                Log in
-              </button>
-            </div>
-          ) : (
-            <div className="max-h-44 overflow-y-auto">
-              {playlists.length === 0 && (
-                <p className="px-3 py-2 text-xs text-text-muted">No playlists yet.</p>
-              )}
-              {playlists.map((p) => {
-                const alreadyIn = contained.has(p.id)
-                return (
-                  <button
-                    key={p.id}
-                    onClick={(e) => { e.stopPropagation(); addTo(p.id) }}
-                    disabled={busyId === p.id}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-                  >
-                    <ListMusic size={13} className={`shrink-0 ${alreadyIn ? 'text-accent' : 'text-text-muted'}`} />
-                    <span className="flex-1 truncate text-xs">{p.name}</span>
-                    {busyId === p.id
-                      ? <Loader2 size={12} className="animate-spin" />
-                      : (doneId === p.id || alreadyIn)
-                        ? <Check size={12} className="text-accent shrink-0" />
-                        : null}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-          {account && (
-            <div className="border-t border-[var(--border)] pt-1 px-2 pb-1">
-              {creating ? (
-                <div className="flex gap-1">
-                  <input
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && createAndAdd()}
-                    placeholder="Playlist name"
-                    autoFocus
-                    className="flex-1 min-w-0 bg-surface-overlay border border-[var(--border)] rounded px-2 py-1 text-xs text-text-primary focus:outline-none"
-                  />
-                  <button onClick={createAndAdd} disabled={busyId === -1} className="p-1.5 rounded bg-accent/15 text-accent">
-                    {busyId === -1 ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setCreating(true)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-accent hover:bg-surface-raised rounded transition-colors"
-                >
-                  <Plus size={12} /> New playlist
-                </button>
-              )}
-            </div>
-          )}
-        </>
-      ) : showZipList ? (
-        /* Recording-session ZIP candidates — shown when the search found
-           more than one .zip match and we can't safely auto-pick. */
-        <>
-          <button
-            onClick={(e) => { e.stopPropagation(); setShowZipList(false) }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-text-muted hover:text-text-primary transition-colors"
-          >
-            <ChevronDown size={12} className="rotate-90" /> Back
-          </button>
-          {zipCandidates && zipCandidates.length > 0 ? (
-            <div className="max-h-44 overflow-y-auto">
-              <p className="px-3 pb-1 text-[10px] text-text-muted">Multiple matches found — pick one:</p>
-              {zipCandidates.map(c => (
-                <button
-                  key={c.path}
-                  onClick={(e) => { e.stopPropagation(); downloadZipEntry(c); onClose() }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
-                >
-                  <PackageOpen size={13} className="shrink-0 text-text-muted" />
-                  <span className="flex-1 truncate text-xs">{c.name}</span>
-                </button>
-              ))}
-            </div>
-          ) : (
-            <p className="px-3 py-3 text-xs text-text-muted">No matching ZIP found for this session.</p>
-          )}
-        </>
-      ) : (
-        /* Main menu */
-        <>
-          <MenuItem icon={<Info size={14} />} label="Song info" onClick={() => { onInfo(); onClose() }} />
-          <MenuItem icon={<CheckSquare2 size={14} />} label="Select" onClick={() => { onSelect(); onClose() }} />
-          {state.song.path && (
-            <MenuItem icon={<ListPlus size={14} />} label="Add to queue" onClick={() => { onQueue(); onClose() }} />
-          )}
-          {!['recording_session', 'unsurfaced'].includes(state.song.category) && (
-            <MenuItem icon={<Plus size={14} />} label="Add to playlist" onClick={onTogglePlaylists} />
-          )}
-          {state.song.path && (
-            <MenuItem icon={<Folder size={14} />} label="Show in Files" onClick={() => { onShowInFiles(); onClose() }} />
-          )}
-          {canEdit && (
-            <MenuItem icon={<Pencil size={14} />} label="Edit" onClick={() => { onEdit(); onClose() }} />
-          )}
-          {!state.song.path && state.song.category === 'recording_session' && (
-            <>
-              <div className="my-1 border-t border-[var(--border)]" />
-              <MenuItem
-                icon={zipLoading ? <Loader2 size={14} className="animate-spin" /> : <PackageOpen size={14} />}
-                label={zipLoading ? 'Finding files…' : 'Download session (ZIP)'}
-                onClick={loadSessionZips}
-              />
-            </>
-          )}
-          {state.song.path && (
-            <>
-              <div className="my-1 border-t border-[var(--border)]" />
-              <MenuItem icon={<Download size={14} />} label="Download" onClick={() => { downloadSong(state.song); onClose() }} />
-              {el && (
-                <MenuItem
-                  icon={addingToLib ? <Loader2 size={14} className="animate-spin" /> : addedToLib ? <Check size={14} className="text-accent" /> : <HardDrive size={14} />}
-                  label={addedToLib ? 'Added to library' : addingToLib ? 'Adding...' : 'Add to library'}
-                  onClick={async () => {
-                    if (addingToLib || addedToLib) return
-                    setAddingToLib(true)
-                    try {
-                      const url = 'https://juicewrldapi.com/juicewrld/files/download/?path=' + encodeURIComponent(state.song.path!)
-                      const result = await el.ipcRenderer.invoke('download-to-library', {
-                        url,
-                        songName: state.song.name,
-                        artist: state.song.credited_artists || 'Juice WRLD',
-                        songPath: state.song.path
-                      })
-                      if (!result.error) setAddedToLib(true)
-                    } finally { setAddingToLib(false) }
-                  }}
-                />
-              )}
-            </>
-          )}
-        </>
-      )}
-    </div>
   )
 }
 
@@ -954,7 +641,7 @@ export default function ApiTrackerView(): JSX.Element {
   const canEdit = !!(account?.is_editor || account?.is_administrator)
 
   const [selectedSong, setSelectedSong] = useState<JWApiSong | null>(null)
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ song: JWApiSong; x: number; y: number } | null>(null)
   const [bulkContextMenu, setBulkContextMenu] = useState<BulkContextMenuState | null>(null)
 
   // Multi-select — mirrors the same pattern used in ApiFilesView's bulk select.
@@ -1283,7 +970,7 @@ export default function ApiTrackerView(): JSX.Element {
       setBulkContextMenu({ x: e.clientX, y: e.clientY, showPlaylists: false })
       return
     }
-    setContextMenu({ song, x: e.clientX, y: e.clientY, showPlaylists: false })
+    setContextMenu({ song, x: e.clientX, y: e.clientY })
   }, [selectMode])
 
   // ESC exits select mode
@@ -1767,14 +1454,13 @@ export default function ApiTrackerView(): JSX.Element {
 
       {contextMenu && (
         <SongContextMenu
-          state={contextMenu}
+          state={{ track: songToTrack(contextMenu.song), songId: contextMenu.song.id, x: contextMenu.x, y: contextMenu.y }}
+          song={contextMenu.song}
           onClose={() => setContextMenu(null)}
           onInfo={() => handleInfo(contextMenu.song)}
-          onQueue={() => handleQueue(songToTrack(contextMenu.song))}
+          onAddToQueue={() => handleQueue(songToTrack(contextMenu.song))}
           onShowInFiles={() => handleShowInFiles(contextMenu.song)}
-          onEdit={() => { setPendingEditorSongId(contextMenu.song.id); setActiveView('editor') }}
           canEdit={canEdit}
-          onTogglePlaylists={() => setContextMenu((prev) => prev ? { ...prev, showPlaylists: !prev.showPlaylists } : null)}
           onSelect={() => toggleSelect(contextMenu.song)}
         />
       )}

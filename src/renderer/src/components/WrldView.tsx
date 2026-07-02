@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useMemo, useState, memo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, ChevronDown, ChevronLeft, Play, Pause, SkipBack, SkipForward as SkipFwd, Shuffle, Repeat, Repeat1, Volume2, VolumeX, MoreHorizontal, ListPlus, Info, Heart, Maximize2, Minimize2, ListMusic, GripVertical, Trash2 } from 'lucide-react'
+import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, ChevronDown, ChevronLeft, Play, Pause, SkipBack, SkipForward as SkipFwd, Shuffle, Repeat, Repeat1, Volume2, VolumeX, MoreHorizontal, Info, Heart, Maximize2, Minimize2, ListMusic, GripVertical, Trash2 } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { useShallow } from 'zustand/react/shallow'
 import { parseLrc, getCurrentLineIndex, isLrcFormat, formatDuration } from '../lib/lyrics'
@@ -9,9 +9,9 @@ import { buildImageUrl, apiFetch, songToTrack, JWAPI_BASE, playlistCoverUrl } fr
 import { getActiveRadioClient } from '../lib/radioSocketService'
 import type { JWApiSong } from '../lib/juicewrldApi'
 import * as userApi from '../lib/userApi'
-import AddToPlaylistMenu from './AddToPlaylistMenu'
 import SongInfoModal from './SongInfoModal'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
+import SongContextMenu from './SongContextMenu'
 
 // ── WrldData types ────────────────────────────────────────────────────────────
 
@@ -1117,8 +1117,6 @@ const SongMenu = memo(function SongMenu({ light }: { light: boolean }): JSX.Elem
   const canEdit = !!(account?.is_editor || account?.is_administrator)
 
   const [open, setOpen] = useState(false)
-  const [showAddToPlaylist, setShowAddToPlaylist] = useState(false)
-  const [addToPlaylistPos, setAddToPlaylistPos] = useState<{ top: number; left: number } | null>(null)
   const [showSongInfo, setShowSongInfo] = useState(false)
   const [songInfoData, setSongInfoData] = useState<JWApiSong | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -1150,62 +1148,42 @@ const SongMenu = memo(function SongMenu({ light }: { light: boolean }): JSX.Elem
         <MoreHorizontal size={18} />
       </button>
 
-      {open && (
+      {/* FM radio is server-driven — only Song info applies while it's
+          playing, so it gets its own minimal popup rather than the full
+          shared menu (which would otherwise offer Like/playlist/version
+          actions that don't make sense mid-broadcast). */}
+      {open && radioFmActive && fmSongId != null && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute top-full right-0 mt-1.5 z-50 w-48 bg-black/90 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl py-1 overflow-hidden">
             <div className="px-3 py-2 border-b border-white/10 mb-1">
-              <p className="text-white/90 text-xs font-semibold truncate">
-                {radioFmActive ? (radioFmNowPlaying?.title ?? '') : (currentTrack?.title ?? '')}
-              </p>
-              <p className="text-white/40 text-[10px] truncate">
-                {radioFmActive ? (radioFmNowPlaying?.artist ?? '') : (currentTrack?.artist ?? '')}
-              </p>
+              <p className="text-white/90 text-xs font-semibold truncate">{radioFmNowPlaying?.title ?? ''}</p>
+              <p className="text-white/40 text-[10px] truncate">{radioFmNowPlaying?.artist ?? ''}</p>
             </div>
-
-            {!radioFmActive && currentTrack && (
-              <button
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-                onClick={() => { toggleLike(currentTrack.id); setOpen(false) }}
-              >
-                <Heart size={14} fill={likedTrackIds.includes(currentTrack.id) ? 'currentColor' : 'none'} className={likedTrackIds.includes(currentTrack.id) ? 'text-accent' : ''} />
-                {likedTrackIds.includes(currentTrack.id) ? 'Unlike' : 'Like'}
-              </button>
-            )}
-
-            {!radioFmActive && currentSongId != null && (
-              <button
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-                onClick={() => {
-                  if (btnRef.current) {
-                    const r = btnRef.current.getBoundingClientRect()
-                    const menuH = 340
-                    setAddToPlaylistPos({ top: Math.max(8, r.bottom - menuH), left: Math.max(8, Math.min(r.left, window.innerWidth - 256)) })
-                  }
-                  setShowAddToPlaylist(true)
-                  setOpen(false)
-                }}
-              >
-                <ListPlus size={14} /> Add to playlist
-              </button>
-            )}
-
-            {(currentSongId != null || fmSongId != null) && (
-              <button
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-                onClick={() => openInfo((radioFmActive ? fmSongId : currentSongId) as number)}
-              >
-                <Info size={14} /> Song info
-              </button>
-            )}
+            <button
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+              onClick={() => openInfo(fmSongId)}
+            >
+              <Info size={14} /> Song info
+            </button>
           </div>
         </>
       )}
 
-      {showAddToPlaylist && currentSongId != null && addToPlaylistPos != null && createPortal(
-        <div className="fixed z-[9999]" style={{ top: addToPlaylistPos.top, left: addToPlaylistPos.left }}>
-          <AddToPlaylistMenu songId={currentSongId} anchorClass="relative" onClose={() => { setShowAddToPlaylist(false); setAddToPlaylistPos(null) }} />
-        </div>,
+      {open && !radioFmActive && currentTrack && createPortal(
+        <SongContextMenu
+          state={{
+            track: currentTrack,
+            songId: currentSongId,
+            x: (btnRef.current?.getBoundingClientRect().right ?? 208) - 208,
+            y: (btnRef.current?.getBoundingClientRect().bottom ?? 0) + 6,
+          }}
+          onClose={() => setOpen(false)}
+          canEdit={canEdit}
+          onInfo={() => currentSongId != null && openInfo(currentSongId)}
+          liked={likedTrackIds.includes(currentTrack.id)}
+          onToggleLike={() => toggleLike(currentTrack.id)}
+        />,
         document.body
       )}
 
