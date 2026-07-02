@@ -59,3 +59,25 @@ export async function groupItemsByVersion<T>(items: T[], getSongId: (item: T) =>
   const itemMap = new Map(items.map(item => [getSongId(item), item]))
   return buildGroups([...metaMap.values()], id => itemMap.get(id))
 }
+
+/** Client-side search filter for compact groups — both fetch strategies
+ *  above are independent of whatever's in each view's search box, so
+ *  without this, typing a search query while compact view is active would
+ *  silently do nothing. If the query matches the group's title, the whole
+ *  group is kept (searching "TV Mix" should show that entire group);
+ *  otherwise members are filtered individually via `getSearchText`. */
+export function filterCompactGroups<T>(
+  groups: CompactGroup<T>[],
+  query: string,
+  getSearchText: (item: T) => string
+): CompactGroup<T>[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return groups
+  return groups
+    .map(g => {
+      const groupMatches = g.title.toLowerCase().includes(q)
+      const members = groupMatches ? g.members : g.members.filter(m => getSearchText(m.item).toLowerCase().includes(q))
+      return { ...g, members }
+    })
+    .filter(g => g.members.length > 0)
+}

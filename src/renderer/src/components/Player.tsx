@@ -1031,7 +1031,7 @@ export default function Player(): JSX.Element {
 
             <div className="relative w-20 progress-track flex items-center group/vol">
               <span
-                className="absolute -top-6 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-md bg-surface-highest border border-[var(--border)] text-text-primary text-[10px] tabular-nums opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
+                className="absolute -top-8 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-surface-highest border border-[var(--border)] text-text-primary text-sm font-semibold tabular-nums opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
               >
                 {Math.round(volume * 100)}%
               </span>

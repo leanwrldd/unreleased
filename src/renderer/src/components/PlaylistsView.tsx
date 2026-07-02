@@ -18,7 +18,7 @@ import { AlbumArtThumb } from './LibraryTab'
 import SongInfoModal from './SongInfoModal'
 import SongContextMenu, { SongContextMenuState } from './SongContextMenu'
 import { CompactGroupRow, CompactEmptyIcon, useExpandedGroups } from './CompactGroupRow'
-import { groupItemsByVersion } from '../lib/compactGroups'
+import { groupItemsByVersion, filterCompactGroups } from '../lib/compactGroups'
 import type { CompactGroup } from '../lib/compactGroups'
 import { versionsEnabled } from '../lib/versionsApi'
 
@@ -368,6 +368,13 @@ export default function PlaylistsView(): JSX.Element {
     }
     return result
   }, [tracks, search, sort])
+
+  // groupItemsByVersion doesn't know about the search box, so without this
+  // typing a query while compact view is active would just do nothing.
+  const filteredCompactGroups = useMemo(
+    () => filterCompactGroups(compactGroups, search, t => `${t.title} ${t.artist}`),
+    [compactGroups, search]
+  )
 
   // ── Effects ────────────────────────────────────────────────────────────────
 
@@ -1062,14 +1069,16 @@ export default function PlaylistsView(): JSX.Element {
                   <Loader2 size={18} className="animate-spin" />
                   <span className="text-sm">Loading version groups…</span>
                 </div>
-              ) : compactGroups.length === 0 ? (
+              ) : filteredCompactGroups.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 gap-2">
                   <CompactEmptyIcon size={32} className="text-text-muted opacity-30" />
-                  <p className="text-text-muted text-sm">No version groups in this playlist</p>
+                  <p className="text-text-muted text-sm">
+                    {compactGroups.length === 0 ? 'No version groups in this playlist' : `No version groups match "${search}"`}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-0.5">
-                  {compactGroups.map((group) => (
+                  {filteredCompactGroups.map((group) => (
                     <div key={group.groupId}>
                       <CompactGroupRow
                         coverTrack={group.members[0].item}
@@ -1099,11 +1108,20 @@ export default function PlaylistsView(): JSX.Element {
                                 </div>
                                 <button
                                   onClick={e => { e.stopPropagation(); setTrackMenu({ track, songId, x: e.clientX, y: e.clientY }) }}
-                                  className="p-1.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-surface-overlay opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                                  className="p-1.5 text-text-muted hover:text-text-primary rounded-lg hover:bg-surface-overlay transition-colors shrink-0"
                                   title="More options"
                                 >
                                   <MoreHorizontal size={13} />
                                 </button>
+                                {!isSharedView && (
+                                  <button
+                                    onClick={e => { e.stopPropagation(); removeTrack(songId) }}
+                                    className="p-1.5 text-text-muted hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors shrink-0"
+                                    title="Remove"
+                                  >
+                                    <X size={13} />
+                                  </button>
+                                )}
                               </div>
                             )
                           })}
