@@ -16,7 +16,7 @@ import {
 import { fisherYates } from '../store/queueSlice'
 import { Track } from '../types'
 import * as userApi from '../lib/userApi'
-import { versionsEnabled, linkSongVersion, getAllVersionGroups } from '../lib/versionsApi'
+import { versionsEnabled, linkSongVersion, getAllVersionGroups, getOwnVersionMeta, setGroupVersionTitle } from '../lib/versionsApi'
 import type { SongVersionMeta } from '../lib/versionsApi'
 
 type Category = 'released' | 'unreleased' | 'unsurfaced' | 'recording_session' | ''
@@ -757,25 +757,72 @@ function SongRow({
 // Collapses every song sharing a version_title into one row; expanding it
 // reveals the individual songs ("versions") nested underneath via SongRow.
 function GroupRow({
-  title, count, expanded, onToggle,
+  coverSong, title, count, expanded, onToggle,
 }: {
+  /** First song in the group — its cover art represents the whole group. */
+  coverSong: JWApiSong
   title: string
   count: number
   expanded: boolean
   onToggle: () => void
 }): JSX.Element {
+  const track = songToTrack(coverSong)
   return (
     <button
       onClick={onToggle}
       className="w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 hover:bg-surface-overlay rounded-lg transition-colors text-left"
     >
       {expanded ? <ChevronUp size={14} className="text-text-muted shrink-0" /> : <ChevronDown size={14} className="text-text-muted shrink-0" />}
-      <div className="shrink-0 w-10 h-10 md:w-9 md:h-9 rounded overflow-hidden bg-surface-overlay flex items-center justify-center">
-        <Layers size={16} className="text-text-muted" />
+      <div className="shrink-0 w-10 h-10 md:w-9 md:h-9 rounded overflow-hidden bg-surface-overlay">
+        <AlbumArtThumbnail track={track} size={36} shimmer={false} />
       </div>
       <span className="flex-1 min-w-0 text-text-primary text-sm font-medium truncate">{title}</span>
       <span className="text-text-muted text-xs shrink-0">{count} version{count === 1 ? '' : 's'}</span>
     </button>
+  )
+}
+
+// ─── Version title prompt (shown after linking, if the group has no title yet) ─
+function VersionTitlePromptModal({
+  saving, onSave, onSkip,
+}: {
+  saving: boolean
+  onSave: (title: string) => void
+  onSkip: () => void
+}): JSX.Element {
+  const [value, setValue] = useState('')
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onSkip() }}
+    >
+      <div className="bg-surface border border-[var(--border)] rounded-2xl shadow-2xl w-full max-w-sm p-5">
+        <h3 className="text-text-primary text-sm font-semibold mb-1">Name this version group</h3>
+        <p className="text-text-muted text-xs mb-3">
+          These songs are now linked as versions of each other, but the group has no title yet (e.g. "TV Mix", "Alternate").
+        </p>
+        <input
+          autoFocus
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && value.trim() && !saving) onSave(value.trim()) }}
+          placeholder="Version title"
+          className="w-full bg-surface-overlay border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none mb-3"
+        />
+        <div className="flex justify-end gap-2">
+          <button onClick={onSkip} disabled={saving} className="px-3 py-1.5 text-xs text-text-muted hover:text-text-primary transition-colors disabled:opacity-50">
+            Skip
+          </button>
+          <button
+            onClick={() => value.trim() && onSave(value.trim())}
+            disabled={!value.trim() || saving}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium disabled:opacity-50"
+          >
+            {saving && <Loader2 size={12} className="animate-spin" />} Save
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -916,6 +963,11 @@ export default function ApiTrackerView(): JSX.Element {
   const [bulkZipStatus, setBulkZipStatus] = useState<'idle' | 'zipping' | 'done' | 'error'>('idle')
   const [showBulkPlaylists, setShowBulkPlaylists] = useState(false)
   const [bulkLinkStatus, setBulkLinkStatus] = useState<'idle' | 'linking' | 'done' | 'error'>('idle')
+  // Shown after a link completes if the resulting group still has no
+  // version_title — untitled groups are functionally useless in compact
+  // view (see getAllVersionGroups, which only surfaces titled groups).
+  const [titlePromptGroupId, setTitlePromptGroupId] = useState<number | null>(null)
+  const [savingTitlePrompt, setSavingTitlePrompt] = useState(false)
 
   const toggleSelect = (song: JWApiSong): void => {
     setSelectMode(true)
@@ -1012,6 +1064,11 @@ export default function ApiTrackerView(): JSX.Element {
   const hasMoreRef = useRef(false)
   const loadingRef = useRef(true)
   const sentinelVisibleRef = useRef(false)
+  // Compact view renders far less content than the underlying song list, so
+  // the sentinel stays permanently visible and would otherwise auto-page
+  // through the entire library in the background — pause that while active.
+  const compactViewRef = useRef(false)
+  useEffect(() => { compactViewRef.current = compactView }, [compactView])
 
   const [viewMode, setViewModeState] = useState<ViewMode>(
     () => (localStorage.getItem(LS_TRACKER_VIEW) as ViewMode) || 'list'
@@ -1143,7 +1200,7 @@ export default function ApiTrackerView(): JSX.Element {
         if (!cancelled) {
           loadingRef.current = false
           setLoading(false)
-          if (sentinelVisibleRef.current && hasMoreRef.current) {
+          if (sentinelVisibleRef.current && hasMoreRef.current && !compactViewRef.current) {
             setPage((p) => p + 1)
           }
         }
@@ -1158,7 +1215,7 @@ export default function ApiTrackerView(): JSX.Element {
     const obs = new IntersectionObserver(([entry]) => {
       sentinelVisibleRef.current = entry.isIntersecting
       // User scrolled to sentinel while we weren't loading
-      if (entry.isIntersecting && hasMoreRef.current && !loadingRef.current) {
+      if (entry.isIntersecting && hasMoreRef.current && !loadingRef.current && !compactViewRef.current) {
         setPage((p) => p + 1)
       }
     }, { threshold: 0.1 })
@@ -1282,7 +1339,10 @@ export default function ApiTrackerView(): JSX.Element {
 
   // Links every selected song together as versions of one another — pairing
   // each against the first selected song merges all of their groups (see
-  // linkSongVersion's group-merge logic in versionsApi.ts).
+  // linkSongVersion's group-merge logic in versionsApi.ts). If none of them
+  // already had a version_title, the merged group ends up untitled — prompt
+  // for one rather than leaving a silently untitled (and in compact view,
+  // invisible) group.
   const bulkLinkVersions = async (): Promise<void> => {
     const ids = selectedSongs.map(s => s.id)
     if (ids.length < 2) return
@@ -1290,6 +1350,8 @@ export default function ApiTrackerView(): JSX.Element {
     try {
       const [first, ...rest] = ids
       for (const id of rest) await linkSongVersion(first, id, account?.display_name ?? null)
+      const meta = await getOwnVersionMeta(first)
+      if (meta && !meta.versionTitle) setTitlePromptGroupId(meta.groupId)
       setBulkLinkStatus('done')
     } catch {
       setBulkLinkStatus('error')
@@ -1484,6 +1546,7 @@ export default function ApiTrackerView(): JSX.Element {
                 {compactGroups.map((group) => (
                   <div key={group.groupId}>
                     <GroupRow
+                      coverSong={group.members[0].song}
                       title={group.title}
                       count={group.members.length}
                       expanded={expandedGroups.has(group.groupId)}
@@ -1730,6 +1793,22 @@ export default function ApiTrackerView(): JSX.Element {
           onLogin={() => { setShowUserAuth(true); setBulkContextMenu(null) }}
           canLinkVersions={versionsEnabled && canEdit && selected.size >= 2}
           onLinkVersions={() => { bulkLinkVersions(); setBulkContextMenu(null) }}
+        />
+      )}
+
+      {titlePromptGroupId !== null && (
+        <VersionTitlePromptModal
+          saving={savingTitlePrompt}
+          onSkip={() => setTitlePromptGroupId(null)}
+          onSave={async (title) => {
+            setSavingTitlePrompt(true)
+            try {
+              await setGroupVersionTitle(titlePromptGroupId, title)
+            } finally {
+              setSavingTitlePrompt(false)
+              setTitlePromptGroupId(null)
+            }
+          }}
         />
       )}
     </div>
