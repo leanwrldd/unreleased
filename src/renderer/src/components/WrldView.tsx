@@ -594,8 +594,8 @@ export default function WrldView(): JSX.Element {
           underneath them (z-[10000] / z-[9990]). */}
       <button
         onClick={() => (fullscreen ? exitFullscreen() : enterFullscreen())}
-        className={`absolute z-30 flex items-center justify-center w-8 h-8 rounded-full transition-all top-3 md:top-4
-          ${isElectronApp ? 'right-[176px]' : 'right-12 md:right-4'}
+        className={`absolute z-30 flex items-center justify-center w-8 h-8 rounded-full transition-all top-2 md:top-3
+          ${isElectronApp ? 'right-[176px]' : 'right-12 md:right-3'}
           bg-black/10 dark:bg-black/25 text-black/50 dark:text-white/50 hover:text-black/80 dark:hover:text-white/90 hover:bg-black/20 dark:hover:bg-black/50 backdrop-blur-sm`}
         title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
       >
@@ -787,7 +787,7 @@ export default function WrldView(): JSX.Element {
                     style={{ left: `${volume * 100}%`, transform: 'translate(-50%, -50%)', background: txtPri }}
                   />
                 </div>
-                <span className="shrink-0 text-[11px] tabular-nums w-8 text-right" style={{ color: txtTer }}>
+                <span className="shrink-0 text-sm font-semibold tabular-nums w-10 text-right" style={{ color: txtTer }}>
                   {Math.round(volume * 100)}%
                 </span>
               </div>
@@ -935,7 +935,7 @@ export default function WrldView(): JSX.Element {
                       style={{ left: `${volume * 100}%`, transform: 'translate(-50%, -50%)', background: txtPri }}
                     />
                     <span
-                      className="absolute -top-7 -translate-x-1/2 px-1.5 py-0.5 rounded-md bg-black/80 text-white text-[10px] tabular-nums opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
+                      className="absolute -top-9 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-black/80 text-white text-sm font-semibold tabular-nums opacity-0 group-hover/vol:opacity-100 transition-opacity pointer-events-none"
                       style={{ left: `${volume * 100}%` }}
                     >
                       {Math.round(volume * 100)}%
@@ -1661,6 +1661,16 @@ const LyricsPanel = memo(function LyricsPanel({
                 onClick={() => seekAudio(line.time)}
                 className="cursor-pointer select-none origin-left"
                 style={{
+                  // The active line grows via `scale()`, anchored at its left
+                  // edge (`origin-left`) so it doesn't jump around — but scale
+                  // is purely visual and doesn't reflow layout, so a line
+                  // already near the container's full width would have its
+                  // right edge pushed past the viewport once scaled up, and
+                  // get clipped by this panel's overflow-hidden. Capping each
+                  // line's own width to 1/maxScale leaves enough headroom
+                  // that even the largest growth (the active state) still
+                  // fits.
+                  maxWidth:   padded ? '80%' : '82%',
                   fontSize:   baseFontSize,
                   // Bold weight is the active line's CSS class only — not
                   // animated. Most fonts (including this app's system-font

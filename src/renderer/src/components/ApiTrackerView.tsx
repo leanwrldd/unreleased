@@ -20,7 +20,7 @@ import { Track } from '../types'
 import * as userApi from '../lib/userApi'
 import { versionsEnabled, linkSongVersion, getOwnVersionMeta, setGroupVersionTitle } from '../lib/versionsApi'
 import type { SongVersionMeta } from '../lib/versionsApi'
-import { fetchAllCompactGroups } from '../lib/compactGroups'
+import { fetchAllCompactGroups, filterCompactGroups } from '../lib/compactGroups'
 import type { CompactGroup } from '../lib/compactGroups'
 
 type Category = 'released' | 'unreleased' | 'unsurfaced' | 'recording_session' | ''
@@ -902,6 +902,15 @@ export default function ApiTrackerView(): JSX.Element {
     })
   }, [songs, orderField, orderDir])
 
+  // fetchAllCompactGroups is independent of the search box (it has to fetch
+  // every group app-wide regardless), so the search query has to be applied
+  // client-side afterward or typing while compact view is active would do
+  // nothing.
+  const filteredCompactGroups = useMemo(
+    () => filterCompactGroups(compactGroups, debouncedSearch, s => `${s.track_titles?.join(' ') ?? ''} ${s.name} ${s.credited_artists ?? ''}`),
+    [compactGroups, debouncedSearch]
+  )
+
   const handlePlay = useCallback((song: JWApiSong) => {
     const track = songToTrack(song)
     // If shuffle is already on, start radio mode from this track instead of
@@ -1215,14 +1224,16 @@ export default function ApiTrackerView(): JSX.Element {
                 <Loader2 size={18} className="animate-spin" />
                 <span className="text-sm">Loading version groups…</span>
               </div>
-            ) : compactGroups.length === 0 ? (
+            ) : filteredCompactGroups.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-2">
                 <Layers size={32} className="text-text-muted opacity-30" />
-                <p className="text-text-muted text-sm">No version groups yet</p>
+                <p className="text-text-muted text-sm">
+                  {compactGroups.length === 0 ? 'No version groups yet' : `No version groups match "${debouncedSearch}"`}
+                </p>
               </div>
             ) : (
               <div className="space-y-0.5">
-                {compactGroups.map((group) => (
+                {filteredCompactGroups.map((group) => (
                   <div key={group.groupId}>
                     <CompactGroupRow
                       coverTrack={songToTrack(group.members[0].item)}
