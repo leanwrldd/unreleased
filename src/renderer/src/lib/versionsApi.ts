@@ -130,6 +130,29 @@ export async function getAllVersionGroups(): Promise<SongVersionMeta[]> {
   }
 }
 
+/** Version metadata for a known, bounded set of songs (e.g. a playlist's
+ *  tracks) — only songs actually linked into a group come back. Unlike
+ *  getAllVersionGroups, this doesn't fetch full song objects since the
+ *  caller already has them; cheap enough to use for any already-loaded,
+ *  non-paginated song list. Chunked to keep query strings a sane length. */
+export async function getVersionMetaForSongs(songIds: number[]): Promise<Map<number, SongVersionMeta>> {
+  if (!versionsEnabled || songIds.length === 0) return new Map()
+  const CHUNK = 150
+  const out = new Map<number, SongVersionMeta>()
+  try {
+    for (let i = 0; i < songIds.length; i += CHUNK) {
+      const chunk = songIds.slice(i, i + CHUNK)
+      const rows = await supaFetch<SongVersionRow[]>(
+        `/song_versions?song_id=in.(${chunk.join(',')})&select=${ROW_FIELDS}`
+      )
+      for (const row of rows) out.set(row.song_id, toMeta(row))
+    }
+    return out
+  } catch {
+    return out
+  }
+}
+
 /** Groups two songs as versions of each other. If one is already in a group,
  *  the other joins it (inheriting its title); if both are in different
  *  groups already, the groups merge (all members repointed to the lower
