@@ -893,6 +893,14 @@ export default function Player(): JSX.Element {
     navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false))
     navigator.mediaSession.setActionHandler('nexttrack',     () => nextTrack())
     navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack())
+    // Chrome on Android supplies its own default ±10s seekbackward/seekforward
+    // actions whenever those handlers are left unset, and prefers them over
+    // nexttrack/previoustrack in the notification's compact view — so the
+    // lock-screen/notification shows rewind/fast-forward instead of skip.
+    // Explicitly disabling them (handler → null) stops Chrome from injecting
+    // the defaults, so it falls back to the skip buttons we do handle.
+    try { navigator.mediaSession.setActionHandler('seekbackward', null) } catch {/* unsupported action */}
+    try { navigator.mediaSession.setActionHandler('seekforward',  null) } catch {/* unsupported action */}
     return () => {
       navigator.mediaSession.setActionHandler('play',          null)
       navigator.mediaSession.setActionHandler('pause',         null)
