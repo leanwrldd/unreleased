@@ -45,6 +45,13 @@ function resolvePlaybackUrl(track: { id: string; streamUrl?: string; path: strin
   return track.streamUrl ?? toFileUrl(track.path)
 }
 
+// iPadOS 13+ masquerades as macOS in the UA string but is still touch-only,
+// so it's detected via multi-touch support rather than the UA alone.
+const isIOS = typeof navigator !== 'undefined' && (
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+)
+
 // How long the pause-fade ramps volume when "smooth fade when pausing" is on.
 const PAUSE_FADE_MS = 400
 
@@ -893,14 +900,19 @@ export default function Player(): JSX.Element {
     navigator.mediaSession.setActionHandler('pause', () => setIsPlaying(false))
     navigator.mediaSession.setActionHandler('nexttrack',     () => nextTrack())
     navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack())
-    // Chrome on Android supplies its own default ±10s seekbackward/seekforward
-    // actions whenever those handlers are left unset, and prefers them over
-    // nexttrack/previoustrack in the notification's compact view — so the
-    // lock-screen/notification shows rewind/fast-forward instead of skip.
-    // Explicitly disabling them (handler → null) stops Chrome from injecting
-    // the defaults, so it falls back to the skip buttons we do handle.
-    try { navigator.mediaSession.setActionHandler('seekbackward', null) } catch {/* unsupported action */}
-    try { navigator.mediaSession.setActionHandler('seekforward',  null) } catch {/* unsupported action */}
+    // Chrome (Android) and Safari (iOS) disagree on how to get skip buttons
+    // instead of ±10s seek buttons in the lock-screen/notification controls:
+    //  - Chrome supplies its own default seekbackward/seekforward actions
+    //    whenever those handlers are left unset, and prefers them over
+    //    nexttrack/previoustrack — so they must be explicitly registered and
+    //    nulled to suppress the defaults.
+    //  - WebKit does the opposite: merely *registering* a seekbackward/
+    //    seekforward handler — even as null — is what makes it show seek
+    //    buttons instead of previous/next. They must never be touched at all.
+    if (!isIOS) {
+      try { navigator.mediaSession.setActionHandler('seekbackward', null) } catch {/* unsupported action */}
+      try { navigator.mediaSession.setActionHandler('seekforward',  null) } catch {/* unsupported action */}
+    }
     return () => {
       navigator.mediaSession.setActionHandler('play',          null)
       navigator.mediaSession.setActionHandler('pause',         null)
