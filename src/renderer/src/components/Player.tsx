@@ -925,6 +925,13 @@ export default function Player(): JSX.Element {
   useEffect(() => {
     if (!('mediaSession' in navigator)) return
     if (!mediaSessionActive) return
+    // Experiment: reporting a duration/seekable range to iOS's Now Playing
+    // widget appears to be what puts it into "scrub a single item" mode,
+    // showing ±10s skip buttons instead of previous/next — even in native
+    // AVPlayer apps (see https://developer.apple.com/forums/thread/818270,
+    // an unresolved Apple report of the identical behavior). Withholding
+    // position state on iOS is unverified but the only untried lever left.
+    if (isIOS) return
     const audio = getActive()
     if (!audio || !audio.duration || isNaN(audio.duration)) return
     try {
