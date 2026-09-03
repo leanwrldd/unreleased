@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('electron', {
   // Window controls
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   forceUpdate:     () => ipcRenderer.invoke('force-update'),
+  installUpdate:   () => ipcRenderer.invoke('install-update'),
   minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
   maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
   closeWindow:    () => ipcRenderer.invoke('close-window'),
@@ -18,6 +19,7 @@ contextBridge.exposeInMainWorld('electron', {
     return () => ipcRenderer.removeListener('fullscreen-changed', fn)
   },
   platform: process.platform,
+  getRuntimePlatform: () => ipcRenderer.invoke('get-runtime-platform'),
 
   // Floating pop-out windows (see main.js createFloatWindow). The *Self
   // variants act on whichever window called them — pop-outs must not use
@@ -85,6 +87,9 @@ contextBridge.exposeInMainWorld('electron', {
   localCreate: (dirPath, name, kind) => ipcRenderer.invoke('local-create', dirPath, name, kind),
   localRename: (filePath, name)      => ipcRenderer.invoke('local-rename', filePath, name),
   localDelete: (filePath)            => ipcRenderer.invoke('local-delete', filePath),
+  // Opens an OS file picker and copies the chosen file(s) into dirPath.
+  // Resolves { ok, paths } | { canceled }.
+  localUpload: (dirPath)             => ipcRenderer.invoke('local-upload', dirPath),
   selectImageFile: ()    => ipcRenderer.invoke('select-image-file'),
   fetchImageAsDataUrl: (url) => ipcRenderer.invoke('fetch-image-as-data-url', url),
   openDiscordLogin: (url) => ipcRenderer.invoke('open-discord-login', url),

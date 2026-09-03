@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, CSSProperties, ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { useEffect, useState, CSSProperties, ReactNode } from 'react'
+import { ModalOverlay, LockToggle } from './Modal'
 import {
   X, Music2, Pencil, Flag, PictureInPicture2, Minimize2,
   Clock, Hash, MicVocal, Music, Wrench, FileText, Piano, MapPin,
@@ -81,8 +81,6 @@ interface Props {
 }
 
 export default function SongInfoModal({ song, onClose, onEdit, floating = false, docked = false }: Props): JSX.Element | null {
-  const overlayRef = useRef<HTMLDivElement>(null)
-
   // Desktop: song info lives in its own pop-out window — every existing
   // in-app <SongInfoModal> caller redirects there instead of rendering the
   // overlay, unless the user disabled that pop-out. The overlay is the
@@ -209,26 +207,29 @@ export default function SongInfoModal({ song, onClose, onEdit, floating = false,
     }
   }
 
-  // Portal to <body> so the overlay is never trapped inside a caller with a
-  // CSS transform/animation/overflow (e.g. NowPlaying's slide-in panel) — a
-  // transformed ancestor becomes the containing block for position: fixed,
-  // which would otherwise render this "modal" clipped inside that panel.
-  return createPortal(
-    <div
-      ref={overlayRef}
-      className={`fixed inset-0 z-[160] flex ${floating ? '' : 'items-end md:items-center justify-center bg-black/70 backdrop-blur-sm p-0 md:p-4'}`}
-      onClick={(e) => { if (e.target === overlayRef.current) onClose() }}
+  // ModalOverlay portals to <body> so the overlay is never trapped inside a
+  // caller with a CSS transform/animation/overflow (e.g. NowPlaying's
+  // slide-in panel) — a transformed ancestor becomes the containing block for
+  // position: fixed, which would otherwise render this "modal" clipped
+  // inside that panel.
+  return (
+    <ModalOverlay
+      onClose={onClose}
+      floating={floating}
+      zIndexClassName="z-[160]"
+      panelClassName="bg-surface border border-[var(--border)] rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-lg max-h-[92svh] md:max-h-[86vh]"
+      minWidth={420} minHeight={480}
     >
-      <div className={`select-text bg-surface flex flex-col overflow-hidden ${floating
-        ? 'w-full h-full'
-        : 'border border-[var(--border)] rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-lg max-h-[92svh] md:max-h-[86vh]'}`}
-      >
-
-        {/* Hero — in a pop-out it doubles as the frameless window's drag
-            handle; the buttons opt back out below or they'd be undraggable. */}
+      {({ onHandleMouseDown, locked, toggleLock }) => (
+      <div className="select-text bg-surface w-full h-full flex flex-col overflow-hidden">
+        {/* Hero — in a pop-out it doubles as the frameless window's native OS
+            drag handle; in-app it's a JS drag handle instead (see
+            ModalOverlay) so the modal can be moved around the page. The
+            buttons opt back out below or they'd be undraggable/unclickable. */}
         <div
-          className="relative shrink-0 overflow-hidden"
+          className={`relative shrink-0 overflow-hidden ${floating ? '' : 'cursor-grab active:cursor-grabbing'}`}
           style={floating ? ({ WebkitAppRegion: 'drag' } as CSSProperties) : undefined}
+          onMouseDown={onHandleMouseDown}
         >
           {coverUrl && (
             <div
@@ -241,6 +242,15 @@ export default function SongInfoModal({ song, onClose, onEdit, floating = false,
             className="absolute top-3 right-3 z-10 flex items-center gap-1.5"
             style={floating ? ({ WebkitAppRegion: 'no-drag' } as CSSProperties) : undefined}
           >
+            {!floating && (
+              <LockToggle
+                locked={locked}
+                onClick={toggleLock}
+                className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors ${
+                  locked ? 'bg-accent/80 text-white' : 'bg-black/40 text-white/70 hover:text-white'
+                }`}
+              />
+            )}
             {/* Manual pop-out — only when shown in-app on desktop (i.e. the
                 Song-info pop-out was turned off); detaches into its own window. */}
             {!floating && el?.openFloatWindow && (
@@ -475,8 +485,8 @@ export default function SongInfoModal({ song, onClose, onEdit, floating = false,
 
         </div>
       </div>
-    </div>,
-    document.body
+      )}
+    </ModalOverlay>
   )
 }
 
@@ -496,8 +506,9 @@ export function GlobalSongInfoHost(): JSX.Element | null {
     return () => { stale = true }
   }, [infoSongId])
 
-  if (infoSongId == null || !song) return null
   const canEdit = useCanEdit()
+
+  if (infoSongId == null || !song) return null
   return (
     <SongInfoModal
       docked

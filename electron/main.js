@@ -1,28 +1,32 @@
 ﻿const { app, BrowserWindow, shell, dialog, Menu, Tray, ipcMain, nativeImage, protocol, net, globalShortcut, screen, clipboard, session, powerMonitor } = require('electron')
 const { autoUpdater } = require('electron-updater')
+const { loadOfflineLibraryFile, updateOfflineLibraryFile } = require('./offlineLibrary')
+const { spawn } = require('child_process')
 const path = require('path')
 const fs = require('fs')
 const https = require('https')
 const { pathToFileURL, fileURLToPath } = require('url')
 const { Readable } = require('stream')
 const discordRpc = require('./discordRpc')
+const { configureRuntime } = require('./platform')
 
 // Response() only accepts web ReadableStreams, not Node streams
 const webStreamFromNode = (stream) => Readable.toWeb(stream)
 
-const isDev = !app.isPackaged || process.env.NODE_ENV === 'development'
+const isSmokeTest = process.argv.includes('--smoke-test')
+const isDev = (!app.isPackaged || process.env.NODE_ENV === 'development') && !isSmokeTest
 
-// Forcing --ozone-platform=wayland alongside a Vulkan-capable GPU makes
-// Chromium's GPU process crash-loop with exponential backoff before it gives
-// up and falls back — that backoff is what stalls startup for ~45s on some
-// Wayland/Vulkan setups (e.g. Arch + Hyprland). Auto-detecting the platform
-// and skipping Vulkan avoids the incompatible combo entirely.
-if (process.platform === 'linux') {
-  app.commandLine.appendSwitch('ozone-platform-hint', 'auto')
-  app.commandLine.appendSwitch('disable-features', 'Vulkan')
-}
+// Must run before ready: Chromium reads Ozone/GPU switches while booting.
+// Explicit --ozone-platform flags are preserved; see platform.js.
+const runtimePlatform = configureRuntime(app)
 
-app.setAppUserModelId('Unreleased')
+// Dev runs (unpackaged, launched via `electron .`) must NOT share the
+// packaged app's AppUserModelID — Windows uses this id to decide whether two
+// processes/shortcuts are "the same app" for taskbar grouping, jump lists,
+// and pinning. Sharing it let a stray dev run poison the shell's cached icon
+// for the real installed app (dev's raw node_modules/electron/dist/electron.exe
+// showing up in place of the installed Unreleased.exe).
+if (process.platform === 'win32') app.setAppUserModelId(app.isPackaged ? 'Unreleased' : 'Unreleased.Dev')
 Menu.setApplicationMenu(null)
 
 // Only one instance may run at a time — launching a second copy (e.g. double-
@@ -58,6 +62,11 @@ let appSettings = {
   minimizeTo: 'taskbar',
   startupView: 'api-tracker',
   discordRpcEnabled: true,
+  // What the "Listening to X" header in Discord's Rich Presence shows —
+  // 'app' leaves it unset (falls back to the app's own registered name,
+  // "Unreleased"), 'artist' shows the track's artist (or "Juice WRLD" when
+  // none is known — radio/unmatched local files), 'song' shows the title.
+  discordRpcLabel: 'artist',
   offlineLibraryPath: path.join(app.getPath('userData'), 'offline-audio'),
   // When on, opening the mini player hides every other window (main + other
   // pop-outs); they're restored when the mini player closes.
@@ -77,10 +86,6 @@ let appSettings = {
   // name. Written by rememberSize(); wiped when rememberWindowSizes is turned
   // off so re-enabling starts from the built-in defaults again.
   windowSizes: {},
-  // 'fork' | 'legacy' — which GitHub repo the stable update feed points at.
-  // See UPDATE_REPOS below. Developer-settings-only; doesn't affect the beta
-  // feed, which is always juicewrldapi.com regardless of this.
-  updateSource: 'fork',
 }
 let settingsLoadError = null
 try {
@@ -147,7 +152,7 @@ function memSnapshot() {
   } catch { return '' }
 }
 
-runLog('main', `=== app start === v${app.getVersion?.() || '?'} pid=${process.pid} ${memSnapshot()}`)
+runLog('main', `=== app start === v${app.getVersion?.() || '?'} pid=${process.pid} platform=${runtimePlatform.platform} display=${runtimePlatform.displayServer} ${memSnapshot()}`)
 
 // Main-process crashes: log them (and to updater.log) before the app dies.
 process.on('uncaughtException', (err) => {
@@ -212,10 +217,19 @@ let updateCheckInProgress = false
 let updateDownloadedPending = false
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
 
+// Set for the duration of the app-launch check so 'update-downloaded' can tell
+// a fresh-at-startup download (or a previous session's update that never got
+// installed, e.g. the user declined the restart prompt and later relaunched
+// instead of hitting Restart) apart from one found mid-session. Startup
+// installs silently and relaunches; mid-session still asks before restarting
+// the user's active work.
+let isStartupUpdateCheck = false
+
 function runUpdateCheck(reason) {
   if (isDev || updateCheckInProgress || updateDownloadedPending) return
   log(`Checking for updates (${reason})...`)
   updateCheckInProgress = true
+  if (reason === 'startup') isStartupUpdateCheck = true
   autoUpdater.checkForUpdatesAndNotify()
     .catch(err => log('checkForUpdates error:', err.message))
     .finally(() => { updateCheckInProgress = false })
@@ -233,14 +247,9 @@ function readBetaCode() {
   try { return fs.readFileSync(betaMarkerPath, 'utf-8').trim() || null } catch { return null }
 }
 
-// Stable feed can point at either GitHub repo release.py publishes to (see
-// scripts/python/release.py — every stable release is mirrored to both).
-// 'fork' is the default; 'legacy' is a Developer-settings escape hatch back
-// to the original repo.
-const UPDATE_REPOS = {
-  fork:   { owner: 'Juice-WRLD-API', repo: 'Unreleased' },
-  legacy: { owner: 'leanwrldd', repo: 'unreleased' },
-}
+// Stable feed's GitHub repo — see scripts/python/release.py, which publishes
+// every stable release here.
+const UPDATE_REPO = { owner: 'Juice-WRLD-API', repo: 'Unreleased' }
 
 // Switches the updater between the normal stable (GitHub) feed and the
 // gated beta feed. electron-updater allows re-pointing the feed at runtime,
@@ -254,7 +263,7 @@ function applyUpdateFeed(code) {
     autoUpdater.requestHeaders = { 'X-Beta-Code': code }
     autoUpdater.allowPrerelease = true
   } else {
-    const { owner, repo } = UPDATE_REPOS[appSettings.updateSource] || UPDATE_REPOS.fork
+    const { owner, repo } = UPDATE_REPO
     autoUpdater.setFeedURL({ provider: 'github', owner, repo })
     autoUpdater.requestHeaders = null
     autoUpdater.allowPrerelease = false
@@ -287,9 +296,17 @@ const initialBetaCode = readBetaCode()
 applyUpdateFeed(initialBetaCode)
 if (initialBetaCode) log('Beta access marker present — gated beta update feed enabled')
 
+// On Windows, BrowserWindow/Tray icons are loaded by native code that can't
+// read files packed inside app.asar — it silently falls back to Electron's
+// default icon (only the taskbar/alt-tab icon is affected; the .exe's own
+// PE resource icon, used by File Explorer and shortcuts, is unaffected).
+// So when packaged, load icon.ico from the extraResources copy sitting next
+// to app.asar instead of the one bundled inside it.
 const iconPath = process.platform === 'linux'
   ? path.join(__dirname, '..', 'resources', 'icon-512.png')
-  : path.join(__dirname, 'icon.ico')
+  : app.isPackaged
+    ? path.join(process.resourcesPath, 'icon.ico')
+    : path.join(__dirname, 'icon.ico')
 const preloadPath = path.join(__dirname, 'preload.js')
 
 let mainWindow = null
@@ -368,7 +385,10 @@ const floatWindows = new Map()
 // actually keeps the mini player visible over one.
 function applyAlwaysOnTop(win, on) {
   if (!win || win.isDestroyed()) return
-  win.setAlwaysOnTop(on, 'screen-saver')
+  // Electron's named z-order levels are implemented on Windows/macOS only.
+  // Linux window managers/compositors own the exact stacking policy.
+  if (process.platform === 'linux') win.setAlwaysOnTop(on)
+  else win.setAlwaysOnTop(on, 'screen-saver')
   // macOS: ride along onto other apps' fullscreen Spaces instead of staying
   // stuck to the desktop the mini player was opened on. skipTransformProcessType
   // avoids the dock-icon flicker the call otherwise causes.
@@ -390,6 +410,10 @@ let miniTopKeeper = null
 
 function startTopKeeper(win) {
   stopTopKeeper()
+  // Re-adding a window to the topmost z-order band is a Windows workaround.
+  // Repeating it on Linux can cause focus/flicker issues and cannot override a
+  // Wayland compositor's security policy anyway.
+  if (process.platform !== 'win32') return
   miniTopKeeper = setInterval(() => {
     if (!win || win.isDestroyed()) { stopTopKeeper(); return }
     if (!win.isAlwaysOnTop() || !win.isVisible() || win.isMinimized() || win.isFocused()) return
@@ -471,7 +495,20 @@ function rememberSize(win, key) {
 // pop-out), falling back to the main window. Also resolves the window's size,
 // since centering depends on it.
 function floatBounds(view) {
-  const base = FLOAT_SIZES[view]
+  const base = runtimePlatform.nativeWayland && view === 'mini-player'
+    // Native Wayland does not permit reliable app-driven resizing after a
+    // surface is mapped. Start the mini player at its panel size instead; the
+    // renderer keeps a panel open in this fixed-height mode.
+    ? { ...FLOAT_SIZES[view], height: MINI_EXPANDED_HEIGHT, minHeight: MINI_EXPANDED_MIN_HEIGHT }
+    : FLOAT_SIZES[view]
+  if (runtimePlatform.nativeWayland) {
+    // Wayland deliberately hides global coordinates and lets the compositor
+    // place new surfaces. Supplying X/Y would be ignored and can trigger GTK
+    // warnings, so only restore a size that fits the primary work area.
+    const { workArea } = screen.getPrimaryDisplay()
+    const { width, height } = { ...base, ...savedWindowSize(view, base, workArea) }
+    return { width, height }
+  }
   const ref = BrowserWindow.getFocusedWindow() || mainWindow
   const { workArea } = ref && !ref.isDestroyed()
     ? screen.getDisplayMatching(ref.getBounds())
@@ -485,7 +522,11 @@ function floatBounds(view) {
 }
 
 function createFloatWindow(view, params) {
-  const query = { float: view, ...sanitizeFloatParams(params) }
+  const query = {
+    float: view,
+    ...sanitizeFloatParams(params),
+    ...(runtimePlatform.nativeWayland && view === 'mini-player' ? { fixedHeight: 'true' } : {}),
+  }
   const existing = floatWindows.get(view)
   if (existing && !existing.isDestroyed()) {
     if (existing.isMinimized()) existing.restore()
@@ -498,6 +539,7 @@ function createFloatWindow(view, params) {
   const win = new BrowserWindow({
     ...FLOAT_SIZES[view],
     ...floatBounds(view),
+    ...(runtimePlatform.nativeWayland && view === 'mini-player' ? { minHeight: MINI_EXPANDED_MIN_HEIGHT } : {}),
     ...(FLOAT_OPTIONS[view] || {}),
     title: floatTitle(view),
     backgroundColor: '#0a0a0a', icon: iconPath, frame: false,
@@ -734,6 +776,38 @@ function createWindow() {
     show: false,
   })
 
+  if (isSmokeTest) {
+    const timeout = setTimeout(() => {
+      console.error(`[smoke] timed out on ${runtimePlatform.displayServer}`)
+      app.exit(1)
+    }, 20000)
+    mainWindow.webContents.once('did-fail-load', (_event, code, description, _url, isMainFrame) => {
+      if (!isMainFrame) return
+      clearTimeout(timeout)
+      console.error(`[smoke] renderer failed on ${runtimePlatform.displayServer}: ${code} ${description}`)
+      app.exit(1)
+    })
+    mainWindow.webContents.once('did-finish-load', async () => {
+      try {
+        // A loaded HTML file is not enough: wait for React to mount a child in
+        // #root so CI also catches renderer bootstrap failures.
+        await new Promise((resolve) => setTimeout(resolve, 250))
+        const mounted = await mainWindow.webContents.executeJavaScript(
+          "Boolean(document.querySelector('#root')?.firstElementChild)",
+          true,
+        )
+        if (!mounted) throw new Error('React did not mount into #root')
+        clearTimeout(timeout)
+        console.log(`[smoke] renderer mounted on ${runtimePlatform.platform}/${runtimePlatform.displayServer}`)
+        app.exit(0)
+      } catch (error) {
+        clearTimeout(timeout)
+        console.error(`[smoke] renderer bootstrap failed on ${runtimePlatform.displayServer}: ${error.message}`)
+        app.exit(1)
+      }
+    })
+  }
+
   // The renderer's <title> would otherwise clobber the now-playing title.
   mainWindow.on('page-title-updated', (e) => e.preventDefault())
 
@@ -941,7 +1015,7 @@ ipcMain.handle('force-update', async () => {
 
   try {
     broadcastToWindows('update-status', { type: 'checking' })
-    const { owner, repo } = UPDATE_REPOS[appSettings.updateSource] || UPDATE_REPOS.fork
+    const { owner, repo } = UPDATE_REPO
     const release = await fetchJson(`https://api.github.com/repos/${owner}/${repo}/releases/latest`)
     const assetSuffix = process.platform === 'win32' ? '.exe' : process.platform === 'darwin' ? '.dmg' : '.AppImage'
     const asset = release.assets.find(a => a.name.endsWith(assetSuffix))
@@ -982,6 +1056,10 @@ ipcMain.handle('check-for-updates', () => {
   log('Manual update check triggered')
   return autoUpdater.checkForUpdatesAndNotify()
 })
+ipcMain.handle('install-update', () => {
+  log('Manual install-update triggered')
+  quitAndInstallSilently()
+})
 ipcMain.handle('minimize-window', () => {
   if (appSettings.minimizeTo === 'tray' && tray) {
     hideWindowToTray()
@@ -1008,6 +1086,7 @@ ipcMain.handle('relaunch-app', () => {
 ipcMain.handle('is-maximized', () => mainWindow?.isMaximized() ?? false)
 ipcMain.handle('set-fullscreen', (_, value) => mainWindow?.setFullScreen(!!value))
 ipcMain.handle('is-fullscreen', () => mainWindow?.isFullScreen() ?? false)
+ipcMain.handle('get-runtime-platform', () => runtimePlatform)
 // Toggles DevTools on whichever window asked (main or a pop-out), not always
 // mainWindow — lets a float window's own Diagnostics/hotkey inspect itself.
 ipcMain.handle('toggle-devtools', (event) => event.sender.toggleDevTools())
@@ -1107,6 +1186,10 @@ const MINI_EXPANDED_HEIGHT = 540
 ipcMain.handle('mini-player-set-expanded', (event, expanded) => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (!win || win.isDestroyed()) return
+  // Programmatic resize APIs are intentionally unavailable on native
+  // Wayland. The fixed-height renderer mode never calls this handler, but
+  // keep the boundary safe if a stale renderer or IPC replay does.
+  if (runtimePlatform.nativeWayland) return
   const { minWidth, height: compactHeight } = FLOAT_SIZES['mini-player']
   const [w, h] = win.getSize()
   if (expanded) {
@@ -1350,6 +1433,31 @@ ipcMain.handle('local-delete', async (event, filePath) => {
   }
 })
 
+// Copies one or more OS-picked files into a Local Files folder. Reuses the
+// same collision-safe naming as copy/move-library-file rather than failing
+// like local-create does — picking several files at once shouldn't abort on
+// the first name clash.
+ipcMain.handle('local-upload', async (event, dirPath) => {
+  if (typeof dirPath !== 'string' || !dirPath) return { error: 'No folder' }
+  const win = BrowserWindow.fromWebContents(event.sender) ?? mainWindow
+  const result = await dialog.showOpenDialog(win, {
+    title: 'Upload files',
+    properties: ['openFile', 'multiSelections'],
+  })
+  if (result.canceled || result.filePaths.length === 0) return { canceled: true }
+  const paths = []
+  for (const src of result.filePaths) {
+    const target = uniqueDestPath(dirPath, path.basename(src))
+    try {
+      fs.copyFileSync(src, target)
+      paths.push(target)
+    } catch (e) {
+      fileOpError(event, 'Upload', path.basename(src), e.message)
+    }
+  }
+  return { ok: true, paths }
+})
+
 // Parent the dialog to whichever window asked (Settings can live in a
 // pop-out) — falling back to the main window for safety.
 ipcMain.handle('pick-folder', async (event) => {
@@ -1391,7 +1499,7 @@ ipcMain.handle('show-item-in-folder', (_, p) => {
 // macOS/Linux have no bundled repair stub (nothing analogous to the NSIS
 // installer), so they always fall back to the releases page.
 ipcMain.handle('open-online-installer', async () => {
-  const { owner, repo } = UPDATE_REPOS[appSettings.updateSource] || UPDATE_REPOS.fork
+  const { owner, repo } = UPDATE_REPO
   if (process.platform === 'win32') {
     const bundled = app.isPackaged ? path.join(process.resourcesPath, 'Unreleased-Setup.exe') : null
     if (bundled && fs.existsSync(bundled)) {
@@ -1443,12 +1551,8 @@ ipcMain.handle('set-app-setting', (_, key, value) => {
   saveSettings()
   if (key === 'autoDownload') autoUpdater.autoDownload = value
   if (key === 'discordRpcEnabled') discordRpc.setEnabled(value)
+  if (key === 'discordRpcLabel') discordRpc.refreshLabel(value)
   if (key === 'windowTitleNowPlaying') updateMainWindowTitle()
-  // Re-point the feed immediately — if a beta code is active this is a no-op
-  // until the user leaves beta (applyUpdateFeed only reads updateSource in
-  // the non-beta branch), but it should still take effect right away rather
-  // than requiring a restart.
-  if (key === 'updateSource') applyUpdateFeed(activeBetaCode)
   return true
 })
 
@@ -1510,7 +1614,7 @@ ipcMain.handle('beta-leave', () => {
 
 // ── IPC: Discord Rich Presence ────────────────────────────────────────────────
 ipcMain.handle('discord-rpc-set-activity', (_, nowPlaying) => {
-  discordRpc.setNowPlaying(nowPlaying)
+  discordRpc.setNowPlaying({ ...nowPlaying, labelMode: appSettings.discordRpcLabel })
   return true
 })
 
@@ -1875,13 +1979,12 @@ const offlineLibraryDataPath = path.join(app.getPath('userData'), 'offline-libra
 function getOfflineAudioDir() { return appSettings.offlineLibraryPath }
 
 function loadOfflineLibrary() {
-  try {
-    const data = JSON.parse(fs.readFileSync(offlineLibraryDataPath, 'utf-8'))
-    return { tracks: data.tracks || {}, playlists: data.playlists || {} }
-  } catch { return { tracks: {}, playlists: {} } }
+  return loadOfflineLibraryFile(offlineLibraryDataPath)
 }
-function saveOfflineLibrary(data) {
-  try { fs.writeFileSync(offlineLibraryDataPath, JSON.stringify(data)) } catch(e) { log('saveOfflineLibrary error:', e.message) }
+function updateOfflineLibrary(mutate) {
+  return updateOfflineLibraryFile(offlineLibraryDataPath, mutate, (e) => {
+    log('updateOfflineLibrary error:', e instanceof Error ? e.message : String(e))
+  })
 }
 
 ipcMain.handle('offline-get-library', () => loadOfflineLibrary())
@@ -1916,15 +2019,15 @@ function isAllowedLibraryDownloadHost(url) {
 
 ipcMain.handle('offline-download-track', async (event, { id, url, ext, path: songPath, meta }) => {
   if (!isAllowedLibraryDownloadHost(url)) return { error: 'Download blocked: untrusted host' }
-  const lib = loadOfflineLibrary()
-  const existing = lib.tracks[id]
+  const existing = loadOfflineLibrary().tracks[id]
   const localPath = path.join(getOfflineAudioDir(), `${id}.${ext || 'mp3'}`)
 
   // Audio unchanged and still on disk — just refresh the display metadata
   // (title/lyrics/art may have been edited without the file itself moving).
   if (existing && existing.path === songPath && fs.existsSync(existing.localPath)) {
-    lib.tracks[id] = { ...existing, ...meta, path: songPath }
-    saveOfflineLibrary(lib)
+    updateOfflineLibrary((library) => {
+      library.tracks[id] = { ...(library.tracks[id] || existing), ...meta, path: songPath }
+    })
     let size = 0
     try { size = fs.statSync(existing.localPath).size } catch {}
     return { localPath: existing.localPath, skipped: true, size }
@@ -1939,52 +2042,52 @@ ipcMain.handle('offline-download-track', async (event, { id, url, ext, path: son
     return { error: 'Download failed: ' + e.message }
   }
 
-  lib.tracks[id] = { ...meta, path: songPath, localPath, ext: ext || 'mp3', downloadedAt: Date.now() }
-  saveOfflineLibrary(lib)
+  updateOfflineLibrary((library) => {
+    library.tracks[id] = { ...meta, path: songPath, localPath, ext: ext || 'mp3', downloadedAt: Date.now() }
+  })
   let size = 0
   try { size = fs.statSync(localPath).size } catch {}
   return { localPath, size }
 })
 
 ipcMain.handle('offline-remove-track', (_, id) => {
-  const lib = loadOfflineLibrary()
-  const entry = lib.tracks[id]
-  if (entry) {
+  updateOfflineLibrary((library) => {
+    const entry = library.tracks[id]
+    if (!entry) return
     try { fs.unlinkSync(entry.localPath) } catch {}
-    delete lib.tracks[id]
-    saveOfflineLibrary(lib)
-  }
+    delete library.tracks[id]
+  })
   return true
 })
 
 ipcMain.handle('offline-set-playlist', (_, key, songIds, name) => {
-  const lib = loadOfflineLibrary()
-  lib.playlists[key] = { songIds, name, updatedAt: Date.now() }
-  // Prune any previously-offline track that's no longer referenced by ANY
-  // synced playlist (song was removed from the playlist, or the playlist's
-  // song list shrank on resync).
-  const stillReferenced = new Set(Object.values(lib.playlists).flatMap(p => p.songIds))
-  for (const trackId of Object.keys(lib.tracks)) {
-    if (!stillReferenced.has(trackId)) {
-      try { fs.unlinkSync(lib.tracks[trackId].localPath) } catch {}
-      delete lib.tracks[trackId]
+  updateOfflineLibrary((library) => {
+    library.playlists[key] = { songIds, name, updatedAt: Date.now() }
+    // Prune any previously-offline track that's no longer referenced by ANY
+    // synced playlist (song was removed from the playlist, or the playlist's
+    // song list shrank on resync).
+    const stillReferenced = new Set(Object.values(library.playlists).flatMap(p => p.songIds))
+    for (const trackId of Object.keys(library.tracks)) {
+      if (!stillReferenced.has(trackId)) {
+        try { fs.unlinkSync(library.tracks[trackId].localPath) } catch {}
+        delete library.tracks[trackId]
+      }
     }
-  }
-  saveOfflineLibrary(lib)
+  })
   return true
 })
 
 ipcMain.handle('offline-remove-playlist', (_, key) => {
-  const lib = loadOfflineLibrary()
-  delete lib.playlists[key]
-  const stillReferenced = new Set(Object.values(lib.playlists).flatMap(p => p.songIds))
-  for (const trackId of Object.keys(lib.tracks)) {
-    if (!stillReferenced.has(trackId)) {
-      try { fs.unlinkSync(lib.tracks[trackId].localPath) } catch {}
-      delete lib.tracks[trackId]
+  updateOfflineLibrary((library) => {
+    delete library.playlists[key]
+    const stillReferenced = new Set(Object.values(library.playlists).flatMap(p => p.songIds))
+    for (const trackId of Object.keys(library.tracks)) {
+      if (!stillReferenced.has(trackId)) {
+        try { fs.unlinkSync(library.tracks[trackId].localPath) } catch {}
+        delete library.tracks[trackId]
+      }
     }
-  }
-  saveOfflineLibrary(lib)
+  })
   return true
 })
 
@@ -1999,28 +2102,28 @@ ipcMain.handle('offline-set-library-path', async (_, newPath) => {
     return { error: 'Could not create folder: ' + e.message }
   }
 
-  const lib = loadOfflineLibrary()
   const failed = []
-  for (const trackId of Object.keys(lib.tracks)) {
-    const track = lib.tracks[trackId]
-    const oldFile = track.localPath
-    if (!oldFile || !fs.existsSync(oldFile)) continue
-    const newFile = path.join(newPath, path.basename(oldFile))
-    try {
-      fs.renameSync(oldFile, newFile)
-      track.localPath = newFile
-    } catch (e) {
-      // Cross-device moves can fail with EXDEV — fall back to copy + delete.
+  updateOfflineLibrary((library) => {
+    for (const trackId of Object.keys(library.tracks)) {
+      const track = library.tracks[trackId]
+      const oldFile = track.localPath
+      if (!oldFile || !fs.existsSync(oldFile)) continue
+      const newFile = path.join(newPath, path.basename(oldFile))
       try {
-        fs.copyFileSync(oldFile, newFile)
-        fs.unlinkSync(oldFile)
+        fs.renameSync(oldFile, newFile)
         track.localPath = newFile
-      } catch (e2) {
-        failed.push(trackId)
+      } catch (e) {
+        // Cross-device moves can fail with EXDEV — fall back to copy + delete.
+        try {
+          fs.copyFileSync(oldFile, newFile)
+          fs.unlinkSync(oldFile)
+          track.localPath = newFile
+        } catch (e2) {
+          failed.push(trackId)
+        }
       }
     }
-  }
-  saveOfflineLibrary(lib)
+  })
 
   appSettings.offlineLibraryPath = newPath
   saveSettings()
@@ -3394,6 +3497,7 @@ app.whenReady().then(() => {
   )
 
   createWindow()
+  if (isSmokeTest) return
   createTray()
   discordRpc.setEnabled(appSettings.discordRpcEnabled !== false)
 
@@ -3439,6 +3543,7 @@ autoUpdater.on('update-available', (info) => {
 
 autoUpdater.on('update-not-available', (info) => {
   log('Up to date:', info.version)
+  isStartupUpdateCheck = false
   broadcastToWindows('update-status', { type: 'not-available', version: info.version })
 })
 
@@ -3451,10 +3556,62 @@ autoUpdater.on('download-progress', (p) => {
   })
 })
 
+// electron-builder's assisted (oneClick: false) NSIS installer only relaunches
+// the app from its interactive Finish-page checkbox — the --force-run flag
+// electron-updater passes on quitAndInstall(silent, forceRunAfter) is never
+// read by the template in silent (/S) mode, so a silent install just quits
+// and never comes back. Work around it ourselves: spawn a detached watcher
+// before quitting that waits for this process to exit and for the installer
+// to finish overwriting our exe (detected by the file becoming unlockable
+// again), then starts the app back up.
+function quitAndInstallSilently() {
+  if (process.platform !== 'win32') {
+    autoUpdater.quitAndInstall(true, true)
+    return
+  }
+  const exePath = process.execPath
+  const watcherPath = path.join(app.getPath('temp'), `unreleased-update-relaunch-${process.pid}.ps1`)
+  const script = [
+    `param([int]$AppPid, [string]$AppExePath, [int]$TimeoutSeconds = 120)`,
+    `try { Wait-Process -Id $AppPid -ErrorAction SilentlyContinue -Timeout $TimeoutSeconds } catch {}`,
+    `$deadline = (Get-Date).AddSeconds($TimeoutSeconds)`,
+    `while ((Get-Date) -lt $deadline) {`,
+    `  try { $s = [System.IO.File]::Open($AppExePath, 'Open', 'ReadWrite', 'None'); $s.Close(); break } catch { Start-Sleep -Milliseconds 400 }`,
+    `}`,
+    `Start-Sleep -Milliseconds 500`,
+    `if (Test-Path $AppExePath) { Start-Process -FilePath $AppExePath }`,
+    `Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue`,
+  ].join('\n')
+  try {
+    fs.writeFileSync(watcherPath, script, 'utf-8')
+    const child = spawn('powershell.exe', [
+      '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden',
+      '-File', watcherPath, '-AppPid', String(process.pid), '-AppExePath', exePath,
+    ], { detached: true, stdio: 'ignore' })
+    child.unref()
+  } catch (e) {
+    log('Failed to spawn update relaunch watcher:', e.message)
+  }
+  autoUpdater.quitAndInstall(true, false)
+}
+
 autoUpdater.on('update-downloaded', (info) => {
   log('Update downloaded:', info.version)
   updateDownloadedPending = true
   broadcastToWindows('update-status', { type: 'downloaded', version: info.version })
+
+  // At launch there's no in-progress work to interrupt — and this is also the
+  // path that catches an update the user downloaded but declined to restart
+  // into last time (checkForUpdatesAndNotify re-validates the cached
+  // installer against latest.yml and fires this same event without
+  // re-downloading). Install it now instead of prompting again.
+  if (isStartupUpdateCheck) {
+    isStartupUpdateCheck = false
+    log('Update ready at launch — installing silently')
+    quitAndInstallSilently()
+    return
+  }
+
   dialog.showMessageBox(mainWindow, {
     type: 'info',
     title: 'Update ready',
@@ -3463,10 +3620,10 @@ autoUpdater.on('update-downloaded', (info) => {
     buttons: ['Restart now', 'Later'],
     defaultId: 0,
   }).then(({ response }) => {
-    // isSilent + isForceRunAfter: install without showing the installer UI and
-    // relaunch. The Windows installer is an assisted (wizard) installer now, so
-    // a non-silent run here would pop the wizard mid-update.
-    if (response === 0) autoUpdater.quitAndInstall(true, true)
+    // Silent install: the Windows installer is an assisted (wizard) installer
+    // now, so a non-silent run here would pop the wizard mid-update. Relaunch
+    // is handled ourselves — see quitAndInstallSilently.
+    if (response === 0) quitAndInstallSilently()
   })
 })
 
@@ -3524,5 +3681,6 @@ autoUpdater.on('error', (err) => {
     return
   }
 
+  isStartupUpdateCheck = false
   broadcastToWindows('update-status', { type: 'error', message: msg })
 })

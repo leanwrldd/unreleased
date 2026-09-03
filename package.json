@@ -1,15 +1,22 @@
 {
   "name": "unreleased",
-  "version": "2.0.10",
+  "version": "2.1.8",
   "description": "A music player for Juice WRLD",
+  "desktopName": "com.juicewrldapi.player.desktop",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite --port 3018 --strictPort --host",
     "build": "tsc --noEmit && vite build",
     "typecheck:electron": "tsc -p tsconfig.electron.json",
+    "test:electron": "node --test electron/*.test.js",
+    "test:platform": "node --test electron/platform.test.js",
+    "test:offline-library": "node --test electron/offlineLibrary.test.js",
     "preview": "vite preview",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3018 && electron .\"",
-    "electron:build": "npm run build && electron-builder"
+    "electron:dev:wayland": "concurrently \"npm run dev\" \"wait-on http://localhost:3018 && electron . --ozone-platform=wayland\"",
+    "electron:dev:x11": "concurrently \"npm run dev\" \"wait-on http://localhost:3018 && electron . --ozone-platform=x11\"",
+    "electron:build": "npm run build && electron-builder",
+    "electron:smoke": "electron . --smoke-test"
   },
   "keywords": [],
   "author": "leanwrldd",
@@ -63,6 +70,7 @@
     "files": [
       "**/*",
       "!src/**/*",
+      "!electron/*.test.js",
       "!build/**/*",
       "!out/**/*",
       "!release/**/*",
@@ -122,6 +130,10 @@
         {
           "from": "build/bundled/Unreleased-Setup.exe",
           "to": "Unreleased-Setup.exe"
+        },
+        {
+          "from": "electron/icon.ico",
+          "to": "icon.ico"
         }
       ]
     },
@@ -135,6 +147,7 @@
     "linux": {
       "icon": "resources/icon-512.png",
       "category": "Audio",
+      "syncDesktopName": true,
       "target": [
         "AppImage"
       ],
@@ -142,8 +155,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "leanwrldd",
-      "repo": "unreleased"
+      "owner": "Juice-WRLD-API",
+      "repo": "Unreleased"
     }
   }
 }

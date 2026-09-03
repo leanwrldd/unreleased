@@ -24,6 +24,7 @@ import { navigateMainWindow, attachToMainWindow } from '../lib/windowSync'
 import type { ViewType } from '../types'
 import ReportForm from './ReportForm'
 import LegalModal, { type LegalDoc } from './LegalModal'
+import { ModalOverlay, LockToggle, useSandboxStore } from './Modal'
 import EraCoversSection from './EraCoversSection'
 
 const ACCENT_PRESETS = [
@@ -98,6 +99,7 @@ const SETTINGS_SEARCH_INDEX: { tab: Tab; label: string; sub?: string; electronOn
   { tab: 'appearance', label: 'Lyrics alignment' },
   { tab: 'appearance', label: 'Blur inactive lyrics', sub: 'Soften every synced line except the one playing' },
   { tab: 'appearance', label: 'Lyric colors', sub: 'Current line and other lines' },
+  { tab: 'appearance', label: 'Full era names', sub: 'Show eras spelled out instead of abbreviated' },
   { tab: 'appearance', label: 'Navigation position', sub: 'Where the nav menu sits — left, right, top, bottom' },
   { tab: 'appearance', label: 'App menu button', sub: 'Where the File / Edit / View… menu opens from', electronOnly: true },
   { tab: 'appearance', label: 'Menu items', sub: 'Reorder or hide sidebar tabs' },
@@ -272,12 +274,12 @@ interface AppSettings {
   minimizeTo: 'taskbar' | 'tray'
   startupView: string
   discordRpcEnabled: boolean
+  discordRpcLabel: 'app' | 'artist' | 'song'
   offlineLibraryPath: string
   miniPlayerHidesWindows: boolean
   confirmCloseWhilePlaying: boolean
   windowTitleNowPlaying: boolean
   rememberWindowSizes: boolean
-  updateSource: 'fork' | 'legacy'
 }
 
 // `floating` — rendered as the sole content of a pop-out BrowserWindow (see
@@ -289,6 +291,11 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
   const [tokenCopied, setTokenCopied] = useState(false)
   const [openAbout, setOpenAbout] = useState<string | null>(null)
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null)
+  // Re-opening while already docked (sandbox notch collapsed) wouldn't
+  // otherwise re-expand it — see the matching comment on setShowSettings.
+  const openLegal = (doc: LegalDoc): void => { useSandboxStore.getState().expand(); setLegalDoc(doc) }
+  const sandboxEnabled = useSandboxStore((s) => s.sandboxEnabled)
+  const setSandboxEnabled = useSandboxStore((s) => s.setSandboxEnabled)
   const {
     setShowSettings, setActiveView,
     account,
@@ -332,7 +339,8 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
     surfaceGradientsEnabled, setSurfaceGradientsEnabled,
     wrldThemeBackground, setWrldThemeBackground,
     refreshPlaylists,
-  } = useStorePick('setShowSettings', 'setActiveView', 'account', 'theme', 'setTheme', 'customSkins', 'saveCustomSkin', 'deleteCustomSkin', 'accentColor', 'setAccentColor', 'settingsTab', 'setSettingsTab', 'sidebarPosition', 'setSidebarPosition', 'appMenuPosition', 'setAppMenuPosition', 'navOrder', 'setNavOrder', 'navVisibility', 'setNavItemVisible', 'navControlOrder', 'setNavControlOrder', 'navControlVisibility', 'setNavControlVisible', 'audioOutput', 'setAudioOutput', 'crossfadeEnabled', 'crossfadeDuration', 'setCrossfade', 'pauseFadeEnabled', 'setPauseFade', 'preferOgVersion', 'setPreferOgVersion', 'rotateSuggestedCovers', 'setRotateSuggestedCovers', 'mediaOverlayEnabled', 'setMediaOverlayEnabled', 'popoutWindows', 'setPopoutWindow', 'lyricsOffset', 'setLyricsOffset', 'sleepTimerEnd', 'setSleepTimer', 'hotkeyBindings', 'setHotkeyBinding', 'resetHotkeyBindings', 'resetGlobalHotkeyBindings', 'hotkeySeekSeconds', 'setHotkeySeekSeconds', 'globalHotkeysEnabled', 'setGlobalHotkeysEnabled', 'globalHotkeyBindings', 'setGlobalHotkeyBinding', 'updateStatus', 'libraryFolders', 'addLibraryFolder', 'removeLibraryFolder', 'scanLibrary', 'libraryScanning', 'libraryTracks', 'libraryLastScanned', 'libraryAutoRefresh', 'setLibraryAutoRefresh', 'developerMode', 'setDeveloperMode', 'lastfmUser', 'setLastfmUser', 'lastfmEnabled', 'setLastfmEnabled', 'appTextScale', 'setAppTextScale', 'lyricsScale', 'setLyricsScale', 'lyricsAlign', 'setLyricsAlign', 'lyricsBlur', 'setLyricsBlur', 'lyricsBlurAmount', 'setLyricsBlurAmount', 'lyricsColorActive', 'setLyricsColorActive', 'lyricsColorInactive', 'setLyricsColorInactive', 'appFont', 'setAppFont', 'lyricsFont', 'setLyricsFont', 'gradientsEnabled', 'setGradientsEnabled', 'surfaceGradientsEnabled', 'setSurfaceGradientsEnabled', 'wrldThemeBackground', 'setWrldThemeBackground', 'refreshPlaylists')
+    fullEraNames, setFullEraNames,
+  } = useStorePick('setShowSettings', 'setActiveView', 'account', 'theme', 'setTheme', 'customSkins', 'saveCustomSkin', 'deleteCustomSkin', 'accentColor', 'setAccentColor', 'settingsTab', 'setSettingsTab', 'sidebarPosition', 'setSidebarPosition', 'appMenuPosition', 'setAppMenuPosition', 'navOrder', 'setNavOrder', 'navVisibility', 'setNavItemVisible', 'navControlOrder', 'setNavControlOrder', 'navControlVisibility', 'setNavControlVisible', 'audioOutput', 'setAudioOutput', 'crossfadeEnabled', 'crossfadeDuration', 'setCrossfade', 'pauseFadeEnabled', 'setPauseFade', 'preferOgVersion', 'setPreferOgVersion', 'rotateSuggestedCovers', 'setRotateSuggestedCovers', 'mediaOverlayEnabled', 'setMediaOverlayEnabled', 'popoutWindows', 'setPopoutWindow', 'lyricsOffset', 'setLyricsOffset', 'sleepTimerEnd', 'setSleepTimer', 'hotkeyBindings', 'setHotkeyBinding', 'resetHotkeyBindings', 'resetGlobalHotkeyBindings', 'hotkeySeekSeconds', 'setHotkeySeekSeconds', 'globalHotkeysEnabled', 'setGlobalHotkeysEnabled', 'globalHotkeyBindings', 'setGlobalHotkeyBinding', 'updateStatus', 'libraryFolders', 'addLibraryFolder', 'removeLibraryFolder', 'scanLibrary', 'libraryScanning', 'libraryTracks', 'libraryLastScanned', 'libraryAutoRefresh', 'setLibraryAutoRefresh', 'developerMode', 'setDeveloperMode', 'lastfmUser', 'setLastfmUser', 'lastfmEnabled', 'setLastfmEnabled', 'appTextScale', 'setAppTextScale', 'lyricsScale', 'setLyricsScale', 'lyricsAlign', 'setLyricsAlign', 'lyricsBlur', 'setLyricsBlur', 'lyricsBlurAmount', 'setLyricsBlurAmount', 'lyricsColorActive', 'setLyricsColorActive', 'lyricsColorInactive', 'setLyricsColorInactive', 'appFont', 'setAppFont', 'lyricsFont', 'setLyricsFont', 'gradientsEnabled', 'setGradientsEnabled', 'surfaceGradientsEnabled', 'setSurfaceGradientsEnabled', 'wrldThemeBackground', 'setWrldThemeBackground', 'refreshPlaylists', 'fullEraNames', 'setFullEraNames')
 
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const [customAccent, setCustomAccent] = useState(accentColor)
@@ -353,7 +361,6 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
   // so someone whose updater is wedged keeps a visible way out.
   const [updateFailed, setUpdateFailed] = useState(false)
   const accentDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const overlayRef = useRef<HTMLDivElement>(null)
   // Custom skins — which one the editor modal is open on (null = closed), the
   // hidden file input for Import, and a transient "that file wasn't a skin"
   // message shown under the section.
@@ -464,12 +471,12 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
     minimizeTo: 'taskbar',
     startupView: 'api-tracker',
     discordRpcEnabled: true,
+    discordRpcLabel: 'artist',
     offlineLibraryPath: '',
     miniPlayerHidesWindows: false,
     confirmCloseWhilePlaying: true,
     windowTitleNowPlaying: true,
     rememberWindowSizes: true,
-    updateSource: 'fork',
   })
   const [movingOfflinePath, setMovingOfflinePath] = useState(false)
   const [offlinePathError, setOfflinePathError] = useState<string | null>(null)
@@ -719,11 +726,15 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
     : 'Check for updates'
 
   return (
-    <div
-      ref={overlayRef}
-      className={`fixed inset-0 z-50 flex items-center justify-center ${floating ? '' : 'bg-black/60 backdrop-blur-sm'}`}
-      onClick={(e) => { if (e.target === overlayRef.current) closeSettings() }}
+    <ModalOverlay
+      onClose={closeSettings}
+      floating={floating}
+      zIndexClassName="z-50"
+      panelClassName="bg-surface border border-[var(--border)] rounded-3xl shadow-2xl w-full max-w-[760px] h-[600px] max-h-[85vh]"
+      minWidth={520} minHeight={420}
     >
+      {({ onHandleMouseDown, locked, toggleLock }) => (
+      <>
       {/* Custom-skin editor (portals to <body>, so placement here is fine) */}
       {editingSkinId && (
         <SkinEditorModal
@@ -732,14 +743,13 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
           onEditSkin={setEditingSkinId}
         />
       )}
-      <div className={`bg-surface flex flex-col overflow-hidden ${floating
-        ? 'w-full h-full'
-        : 'border border-[var(--border)] rounded-3xl shadow-2xl w-full max-w-[760px] mx-3 h-[600px] max-h-[85vh]'}`}
-      >
-        {/* Header — in a pop-out it doubles as the frameless window's drag strip */}
+      <div className="bg-surface w-full h-full flex flex-col overflow-hidden">
+        {/* Header — in a pop-out it doubles as the frameless window's drag strip;
+            in-app it's the JS drag handle instead (see ModalOverlay). */}
         <div
-          className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] shrink-0 select-none"
+          className={`flex items-center justify-between px-6 py-4 border-b border-[var(--border)] shrink-0 select-none ${floating ? '' : 'cursor-grab active:cursor-grabbing'}`}
           style={floating ? ({ WebkitAppRegion: 'drag' } as CSSProperties) : undefined}
+          onMouseDown={onHandleMouseDown}
         >
           <div className="flex items-center gap-2" style={noDrag}>
             <h2 className="text-text-primary font-black text-xl tracking-tight">Settings</h2>
@@ -815,6 +825,7 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
                 <Minimize2 size={18} />
               </button>
             )}
+            {!floating && <LockToggle locked={locked} onClick={toggleLock} />}
             <button onClick={closeSettings} className="text-text-muted hover:text-text-primary transition-colors">
               <X size={20} />
             </button>
@@ -1266,6 +1277,13 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
                     </div>
                   )}
                 </Row>
+                <Row
+                  icon={BookOpen}
+                  iconColor="#0891b2"
+                  label="Full era names"
+                  sub='Show eras spelled out ("WRLD On Drugs") instead of abbreviated ("WOD")'
+                  labelExtra={<div className="ml-2 translate-y-[3px]"><Toggle on={fullEraNames} onClick={() => setFullEraNames(!fullEraNames)} /></div>}
+                />
                 <div className="py-3 border-b border-[var(--border)] last:border-b-0">
                   <div className="flex items-center gap-2.5 mb-2.5">
                     <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: '#9333ea' }}>
@@ -2022,6 +2040,14 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
                   <Toggle on={appSettings.rememberWindowSizes} onClick={() => setSetting('rememberWindowSizes', !appSettings.rememberWindowSizes)} />
                 </Row>
                 <Row
+                  icon={FlaskConical}
+                  iconColor="#f59e0b"
+                  label="Sandbox"
+                  sub="Dock modals into a collapsible pill at the top of the window instead of a centered popup. Off restores the plain popup for every modal."
+                >
+                  <Toggle on={sandboxEnabled} onClick={() => setSandboxEnabled(!sandboxEnabled)} />
+                </Row>
+                <Row
                   icon={Minus}
                   iconColor="#6b7280"
                   label="Confirm before quitting while playing"
@@ -2064,15 +2090,18 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
                     </div>
                   )}
                   {/* Equalizer is the inverse of the group above — normally an
-                      in-app popover, so this opts INTO a pop-out. Shown
-                      independently of the master toggle for that reason. */}
-                  <div className="pl-[34px] mt-2.5 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-text-secondary text-sm truncate">Equalizer as pop-out</p>
-                      <p className="text-text-muted text-[11px] truncate">Open the equalizer in its own window instead of an in-app panel</p>
+                      in-app popover, so this opts INTO a pop-out. Still gated
+                      on the master toggle: with pop-outs off there's no
+                      pop-out window for it to open into. */}
+                  {anyPopout && (
+                    <div className="pl-[34px] mt-2.5 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-text-secondary text-sm truncate">Equalizer as pop-out</p>
+                        <p className="text-text-muted text-[11px] truncate">Open the equalizer in its own window instead of an in-app panel</p>
+                      </div>
+                      <Toggle on={popoutWindows.equalizer} onClick={() => setPopoutWindow('equalizer', !popoutWindows.equalizer)} />
                     </div>
-                    <Toggle on={popoutWindows.equalizer} onClick={() => setPopoutWindow('equalizer', !popoutWindows.equalizer)} />
-                  </div>
+                  )}
                 </div>
                 {popoutWindows.miniPlayer && (
                   <Row
@@ -2087,6 +2116,30 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
                 <Row icon={MessageCircle} iconColor="#5865f2" label="Show Discord Status">
                   <Toggle on={appSettings.discordRpcEnabled} onClick={() => setSetting('discordRpcEnabled', !appSettings.discordRpcEnabled)} />
                 </Row>
+                {appSettings.discordRpcEnabled && (
+                  <Row
+                    icon={MessageCircle}
+                    iconColor="#5865f2"
+                    label="Status header"
+                    sub={
+                      appSettings.discordRpcLabel === 'song'
+                        ? 'Shows "Listening to <song name>"'
+                        : appSettings.discordRpcLabel === 'app'
+                          ? 'Shows "Listening to Unreleased"'
+                          : 'Shows "Listening to Juice WRLD"'
+                    }
+                  >
+                    <select
+                      value={appSettings.discordRpcLabel}
+                      onChange={(e) => setSetting('discordRpcLabel', e.target.value)}
+                      className="bg-[var(--surface-overlay)] text-text-primary text-xs rounded-lg px-2 py-1.5 border border-[var(--border)]"
+                    >
+                      <option value="artist">Artist</option>
+                      <option value="song">Song name</option>
+                      <option value="app">Unreleased</option>
+                    </select>
+                  </Row>
+                )}
                 <Row icon={Wrench} iconColor="#6b7280" label="Developer options" sub="Shows a Developer tab with cache & diagnostics tools">
                   <Toggle on={developerMode} onClick={() => setDeveloperMode(!developerMode)} />
                 </Row>
@@ -2124,23 +2177,6 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
                     <Trash2 size={13} />
                     {cacheCleared !== null ? `Cleared ${cacheCleared}` : 'Clear cache'}
                   </button>
-                </Row>
-                <Row
-                  icon={Github}
-                  iconColor="#6b7280"
-                  label="Update source"
-                  sub={appSettings.updateSource === 'legacy'
-                    ? 'Checking leanwrldd/unreleased for updates'
-                    : 'Checking Juice-WRLD-API/Unreleased for updates'}
-                >
-                  <select
-                    value={appSettings.updateSource}
-                    onChange={(e) => setSetting('updateSource', e.target.value)}
-                    className="bg-[var(--surface-overlay)] text-text-primary text-xs rounded-lg px-2 py-1.5 border border-[var(--border)]"
-                  >
-                    <option value="fork">Juice-WRLD-API/Unreleased</option>
-                    <option value="legacy">leanwrldd/unreleased</option>
-                  </select>
                 </Row>
                 <Row icon={DownloadCloud} iconColor="#0ea5e9" label="Online installer" sub="Ships with the app — repairs or reinstalls even if the app won't launch">
                   <button
@@ -2270,14 +2306,14 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
 
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <button
-                    onClick={() => setLegalDoc('terms')}
+                    onClick={() => openLegal('terms')}
                     className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] border border-[var(--border)] text-text-secondary text-sm font-medium transition-colors"
                   >
                     <ScrollText size={15} />
                     Terms of Service
                   </button>
                   <button
-                    onClick={() => setLegalDoc('privacy')}
+                    onClick={() => openLegal('privacy')}
                     className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[var(--surface-raised)] hover:bg-[var(--surface-overlay)] border border-[var(--border)] text-text-secondary text-sm font-medium transition-colors"
                   >
                     <ShieldCheck size={15} />
@@ -2335,6 +2371,8 @@ export default function Settings({ floating = false }: { floating?: boolean }): 
       </div>
 
       {legalDoc && <LegalModal initialDoc={legalDoc} onClose={() => setLegalDoc(null)} />}
-    </div>
+      </>
+      )}
+    </ModalOverlay>
   )
 }

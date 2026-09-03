@@ -3,20 +3,19 @@ import { useResizablePanel } from '../hooks/useResizablePanel'
 import { X, Music, ChevronUp, ChevronDown, Pencil, Info } from 'lucide-react'
 import { useStore, useStorePick } from '../store/useStore'
 import LyricsDisplay from './LyricsDisplay'
-import SongInfoModal from './SongInfoModal'
-import { apiFetch, smallCoverUrl, JWApiSong } from '../lib/juicewrldApi'
+import { smallCoverUrl } from '../lib/juicewrldApi'
 import { ProgressiveCover } from './ProgressiveCover'
 import { useCanEdit } from '../hooks/useChannelRoles'
+import { useLyricsVisible } from '../lib/lyrics'
 
 export default function NowPlaying(): JSX.Element {
   const {
     currentTrack,
     currentTrackFull,
     setShowNowPlaying,
-    setPendingEditorSongId,
-    setActiveView,
     showQueue,
-  } = useStorePick('currentTrack', 'currentTrackFull', 'setShowNowPlaying', 'setPendingEditorSongId', 'setActiveView', 'showQueue')
+    lyricsOverride,
+  } = useStorePick('currentTrack', 'currentTrackFull', 'setShowNowPlaying', 'showQueue', 'lyricsOverride')
 
   const [artCollapsed, setArtCollapsed] = useState(false)
   const [panelWidth, dragHandle] = useResizablePanel(360, 280, 520)
@@ -26,8 +25,6 @@ export default function NowPlaying(): JSX.Element {
   // is the one that needs to clear the custom window controls (see its own
   // header) — this panel only needs the clearance when it's the rightmost.
   const needsWindowControlClearance = isElectron && !isMobile && !showQueue
-  const [infoSong, setInfoSong] = useState<JWApiSong | null>(null)
-  const [loadingInfo, setLoadingInfo] = useState(false)
 
   useEffect(() => {
     const check = (): void => setIsMobile(window.innerWidth < 768)
@@ -35,21 +32,20 @@ export default function NowPlaying(): JSX.Element {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  useEffect(() => { setInfoSong(null) }, [currentTrack?.id])
-
-  const handleInfo = async (): Promise<void> => {
+  // Global infoSongId (not local state) so the info panel survives switching
+  // to another tab (this component itself unmounts when the Wrld tab is
+  // active — see App.tsx). The id is already right there in currentTrack.id
+  // (format 'jw-<id>'), so no fetch is needed just to open it.
+  const handleInfo = (): void => {
     const jwMatch = currentTrack?.id.match(/^jw-(\d+)$/)
     if (!jwMatch) return
-    setLoadingInfo(true)
-    try {
-      const song = await apiFetch<JWApiSong>(`/songs/${jwMatch[1]}/`)
-      setInfoSong(song)
-    } catch { /* silently fail */ }
-    finally { setLoadingInfo(false) }
+    useStore.getState().setInfoSongId(Number(jwMatch[1]))
   }
 
   const jwMatch = currentTrack?.id.match(/^jw-(\d+)$/)
   const canEdit = useCanEdit()
+  const hasLyricsNatural = !!(currentTrackFull?.lyrics || currentTrackFull?.syncedLyrics)
+  const hasLyrics = useLyricsVisible(hasLyricsNatural, lyricsOverride)
 
   return (
     <div
@@ -84,8 +80,7 @@ export default function NowPlaying(): JSX.Element {
             {jwMatch && (
               <button
                 onClick={handleInfo}
-                disabled={loadingInfo}
-                className="text-text-muted hover:text-text-primary transition-colors disabled:opacity-40"
+                className="text-text-muted hover:text-text-primary transition-colors"
                 title="Song info"
               >
                 <Info size={16} />
@@ -117,7 +112,7 @@ export default function NowPlaying(): JSX.Element {
             <p className="text-text-muted text-sm text-center">Play a track to see it here</p>
           </div>
         ) : (
-          <>
+          <div className={hasLyrics ? 'contents' : 'flex-1 min-h-0 flex flex-col justify-center'}>
             {(() => {
               const artSrc = currentTrackFull?.albumArt ?? currentTrack.imageUrl
               return !artCollapsed && (
@@ -157,24 +152,14 @@ export default function NowPlaying(): JSX.Element {
                 </div>
               )
             })()}
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <LyricsDisplay />
-            </div>
-          </>
+            {hasLyrics && (
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <LyricsDisplay />
+              </div>
+            )}
+          </div>
         )}
       </div>
-
-      {infoSong && (
-        <SongInfoModal
-          song={infoSong}
-          onClose={() => setInfoSong(null)}
-          onEdit={canEdit ? (songId) => {
-            setInfoSong(null)
-            setPendingEditorSongId(songId)
-            setActiveView('editor')
-          } : undefined}
-        />
-      )}
     </div>
   )
 }

@@ -349,6 +349,7 @@ function StatsPanel({ onClose }: { onClose: () => void }): JSX.Element {
 
 export default function WordleView(): JSX.Element {
   const { setActiveView, playTrack } = useStorePick('setActiveView', 'playTrack')
+  const isElectron = navigator.userAgent.includes('Electron')
 
   const [mode, setMode] = useState<WordleMode>(() => loadMode())
   const [settings, setSettings] = useState<WordleSettings>(() => loadSettings())
@@ -634,7 +635,8 @@ export default function WordleView(): JSX.Element {
     if (!answer) return
     try {
       const song = await apiFetch<JWApiSong>(`/songs/${answer.song.id}/`)
-      playTrack(songToTrack(song))
+      const track = songToTrack(song)
+      playTrack(track, [track])
     } catch {
       setPlayError(true)
     }
@@ -680,9 +682,17 @@ export default function WordleView(): JSX.Element {
           <ChevronLeft size={22} />
         </button>
       </div>
+      {/* isElectron, not a width breakpoint — the offset clears the frameless
+          window's min/max/close buttons (132px, fixed top-right regardless of
+          window size — see App.tsx's WindowControls), which only exist in the
+          desktop build. Sizing this off viewport width would misalign it the
+          moment the Electron window was resized narrow. */}
       <div
-        className="absolute top-4 right-4 z-20 flex items-center gap-1.5"
-        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        className="absolute top-4 z-20 flex items-center gap-1.5"
+        style={{
+          right: isElectron ? 'calc(1rem + 132px)' : '1rem',
+          WebkitAppRegion: 'no-drag',
+        } as React.CSSProperties}
       >
         <button
           onClick={() => setShowSettings(true)}

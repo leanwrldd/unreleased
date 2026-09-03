@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useMemo, useState, memo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, ChevronDown, ChevronLeft, Play, Pause, SkipBack, SkipForward as SkipFwd, Shuffle, Repeat, Repeat1, Volume2, VolumeX, MoreHorizontal, Info, Heart, Maximize2, Minimize2, PictureInPicture2, ListMusic, GripVertical, Trash2, Check, Download, History, SlidersHorizontal } from 'lucide-react'
+import { Music, Radio, Search, SkipForward, ThumbsUp, ThumbsDown, X, ChevronDown, ChevronLeft, Play, Pause, SkipBack, SkipForward as SkipFwd, Shuffle, Repeat, Repeat1, Volume2, VolumeX, MoreHorizontal, Info, Heart, Maximize2, Minimize2, PictureInPicture2, ListMusic, GripVertical, Trash2, Check, Download, History, SlidersHorizontal, RefreshCw } from 'lucide-react'
 import { useStore, useStorePick } from '../store/useStore'
 import { useShallow } from 'zustand/react/shallow'
-import { parseLrc, getCurrentLineIndex, isLrcFormat, downloadSyncedLyrics, splitAdLibs, ADLIB_OPACITY } from '../lib/lyrics'
+import { parseLrc, getCurrentLineIndex, isLrcFormat, downloadSyncedLyrics, splitAdLibs, ADLIB_OPACITY, useLyricsVisible } from '../lib/lyrics'
 import { formatDuration } from '../lib/format'
 import { seekAudio, getAudioDuration, getAudioCurrentTime } from './Player'
+import { runPlayerCommand } from '../lib/windowSync'
 import { buildImageUrl, apiFetch, songToTrack, JWAPI_BASE, playlistCoverUrl, smallCoverUrl } from '../lib/juicewrldApi'
 import { getActiveRadioClient } from '../lib/radioSocketService'
 import { searchRadioLibrary } from '../lib/radioLibrary'
@@ -15,7 +16,6 @@ import { getVersionGroup } from '../lib/versionsApi'
 import type { JWApiSong } from '../lib/juicewrldApi'
 import * as userApi from '../lib/userApi'
 import { useCanEdit } from '../hooks/useChannelRoles'
-import SongInfoModal from './SongInfoModal'
 import { AlbumArtThumbnail } from './AlbumArtThumbnail'
 import { ProgressiveCover } from './ProgressiveCover'
 import SongContextMenu from './SongContextMenu'
@@ -38,12 +38,12 @@ export default function WrldView(): JSX.Element {
     playTrack,
     isPlaying, setIsPlaying, volume, setVolume,
     shuffle, repeat, toggleShuffle, toggleRepeat,
-    nextTrack, prevTrack,
     showQueue, setShowQueue,
     audioOutput, setAudioOutput,
     wrldThemeBackground,
     gradientsEnabled,
     toggleEqPanel, eqFxActive,
+    lyricsOverride,
   } = useStore(useShallow(s => ({
     currentTrack: s.currentTrack,
     currentTrackFull: s.currentTrackFull,
@@ -69,8 +69,6 @@ export default function WrldView(): JSX.Element {
     repeat: s.repeat,
     toggleShuffle: s.toggleShuffle,
     toggleRepeat: s.toggleRepeat,
-    nextTrack: s.nextTrack,
-    prevTrack: s.prevTrack,
     showQueue: s.showQueue,
     setShowQueue: s.setShowQueue,
     audioOutput: s.audioOutput,
@@ -80,6 +78,7 @@ export default function WrldView(): JSX.Element {
     toggleEqPanel: s.toggleEqPanel,
     // Same "anything non-neutral" indicator as the player bar's EQ button.
     eqFxActive: s.eqEnabled || s.playbackSpeed !== 1 || s.eqBalance !== 0 || s.eqMono || s.eqBoost !== 1 || s.skipSilence || s.reverbEnabled,
+    lyricsOverride: s.lyricsOverride,
   })))
 
   // Skins beyond the classic pair mean `theme === 'dark'` no longer covers
@@ -233,7 +232,8 @@ export default function WrldView(): JSX.Element {
       const res = await fetch(`${JWAPI_BASE}/songs/${songId}/`)
       if (res.ok) {
         const song: JWApiSong = await res.json()
-        playTrack(songToTrack(song))
+        const track = songToTrack(song)
+        playTrack(track, [track])
       }
     } catch {}
     setPlayingAlbumSongId(null)
@@ -347,7 +347,8 @@ export default function WrldView(): JSX.Element {
   const handlePlayVersion = async (songId: number): Promise<void> => {
     try {
       const song = await apiFetch<JWApiSong>(`/songs/${songId}/`)
-      playTrack(songToTrack(song))
+      const track = songToTrack(song)
+      playTrack(track, [track])
     } catch {}
   }
 
@@ -386,6 +387,11 @@ export default function WrldView(): JSX.Element {
     : (currentTrackFull?.syncedLyrics || currentTrackFull?.lyrics || null)
   const isSynced  = rawLyrics ? isLrcFormat(rawLyrics) : false
   const isEditor  = account?.is_editor || account?.is_administrator
+  // FM's Radio/Lyrics tabs stand on their own regardless of lyrics
+  // availability, so the manual override only applies to normal playback —
+  // same scope as the auto-collapse behavior it's overriding.
+  const lyricsVisible = useLyricsVisible(!!rawLyrics, lyricsOverride)
+  const showLyricsColumn = radioFmActive || showQueue || lyricsVisible
 
   // On the theme background these come from the skin's own text vars, so the
   // tab matches the rest of the app (and follows a skin change live) instead
@@ -920,31 +926,33 @@ export default function WrldView(): JSX.Element {
           {/* Mobile layout */}
           <div className="md:hidden relative z-10 flex flex-col h-full min-h-0">
 
-            {/* Header: art + title */}
-            <div className="flex items-center gap-3 px-4 pt-12 pb-3 shrink-0">
-              {ArtBox({ mobile: true })}
-              <div className="flex-1 min-w-0">
-                {displayTitle  && <p className="font-bold text-sm leading-tight truncate" style={{ color: txtPri }} title={displayTitle}>{displayTitle}</p>}
-                {displayArtist && <p className="text-xs mt-0.5 truncate" style={{ color: txtSec }}>{displayArtist}</p>}
-                {displayAlbum  && <p className="text-xs mt-0.5 truncate" style={{ color: txtTer }}>{displayAlbum}</p>}
-                {radioFmActive && !radioFmNowPlaying && <p className="text-xs mt-0.5" style={{ color: txtTer }}>Tuning in…</p>}
+            <div className={showLyricsColumn ? 'contents' : 'flex-1 flex flex-col justify-center'}>
+              {/* Header: art + title */}
+              <div className="flex items-center gap-3 px-4 pt-12 pb-3 shrink-0">
+                {ArtBox({ mobile: true })}
+                <div className="flex-1 min-w-0">
+                  {displayTitle  && <p className="font-bold text-sm leading-tight truncate" style={{ color: txtPri }} title={displayTitle}>{displayTitle}</p>}
+                  {displayArtist && <p className="text-xs mt-0.5 truncate" style={{ color: txtSec }}>{displayArtist}</p>}
+                  {displayAlbum  && <p className="text-xs mt-0.5 truncate" style={{ color: txtTer }}>{displayAlbum}</p>}
+                  {radioFmActive && !radioFmNowPlaying && <p className="text-xs mt-0.5" style={{ color: txtTer }}>Tuning in…</p>}
+                </div>
+                {!radioFmActive && (
+                  <button
+                    onClick={() => setShowQueue(!showQueue)}
+                    title="Playing Next"
+                    className="p-1.5 rounded-full transition-colors hover:bg-white/10"
+                    style={{ color: showQueue ? 'var(--accent)' : (textIsDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.55)') }}
+                  >
+                    <ListMusic size={18} />
+                  </button>
+                )}
+                <FmLikeButton light={textIsDark} />
+                <SongMenu light={textIsDark} />
               </div>
-              {!radioFmActive && (
-                <button
-                  onClick={() => setShowQueue(!showQueue)}
-                  title="Playing Next"
-                  className="p-1.5 rounded-full transition-colors hover:bg-white/10"
-                  style={{ color: showQueue ? 'var(--accent)' : (textIsDark ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.55)') }}
-                >
-                  <ListMusic size={18} />
-                </button>
-              )}
-              <FmLikeButton light={textIsDark} />
-              <SongMenu light={textIsDark} />
             </div>
 
             {/* Tab bar (FM mode) or divider line */}
-            {radioFmActive ? (
+            {showLyricsColumn && (radioFmActive ? (
               <div className="flex items-center gap-1 px-4 pb-2 shrink-0 border-b border-white/5">
                 {(['radio', 'lyrics'] as const).map(tab => (
                   <button key={tab} onClick={() => setFmTab(tab)}
@@ -957,13 +965,13 @@ export default function WrldView(): JSX.Element {
               </div>
             ) : (
               <div className="mx-4 h-px bg-white/10 shrink-0" />
-            )}
+            ))}
 
             {/* Content */}
-            {radioFmActive
+            {showLyricsColumn && (radioFmActive
               ? (fmTab === 'radio' ? FmRadioPanel() : <LyricsPanel rawLyrics={rawLyrics} isSynced={isSynced} syncedLines={syncedLines} radioFmActive={radioFmActive} currentTrack={currentTrack} isEditor={isEditor} txtPri={txtPri} txtSec={txtSec} txtTer={txtTer} txtFaint={txtFaint} />)
               : <LyricsPanel rawLyrics={rawLyrics} isSynced={isSynced} syncedLines={syncedLines} radioFmActive={radioFmActive} currentTrack={currentTrack} isEditor={isEditor} txtPri={txtPri} txtSec={txtSec} txtTer={txtTer} txtFaint={txtFaint} />
-            }
+            )}
 
             {/* Mobile playback bar — the bottom Player bar is hidden on this
                 page, and the mobile layout never had its own controls, so
@@ -985,7 +993,7 @@ export default function WrldView(): JSX.Element {
                       <Shuffle size={16} />
                     </button>
                     <button
-                      onClick={() => prevTrack()}
+                      onClick={() => runPlayerCommand('previous')}
                       disabled={noTrack}
                       className="p-2 rounded-full transition-opacity hover:opacity-70"
                       style={{ color: txtPri }}
@@ -1004,7 +1012,7 @@ export default function WrldView(): JSX.Element {
                         : <Play  size={20} fill="currentColor" className="ml-0.5" />}
                     </button>
                     <button
-                      onClick={() => nextTrack()}
+                      onClick={() => runPlayerCommand('next')}
                       disabled={noTrack}
                       className="p-2 rounded-full transition-opacity hover:opacity-70"
                       style={{ color: txtPri }}
@@ -1099,7 +1107,7 @@ export default function WrldView(): JSX.Element {
                 was making the browser grow a horizontal scrollbar, which
                 shifted the whole column up by its height. */}
             <div className="relative flex flex-col items-center justify-center shrink-0 px-8 xl:px-12 gap-5 overflow-y-auto overflow-x-hidden"
-              style={{ width: '50%', minWidth: 320 }}>
+              style={{ width: showLyricsColumn ? '50%' : '100%', minWidth: 320 }}>
 
               {/* Album art */}
               <div className="relative w-full" style={{ maxWidth: 320 }}>
@@ -1174,7 +1182,7 @@ export default function WrldView(): JSX.Element {
 
                   {/* Prev */}
                   <button
-                    onClick={() => prevTrack()}
+                    onClick={() => runPlayerCommand('previous')}
                     disabled={noTrack}
                     className="p-2 rounded-full transition-opacity hover:opacity-70"
                     style={{ color: txtPri }}
@@ -1197,7 +1205,7 @@ export default function WrldView(): JSX.Element {
 
                   {/* Next */}
                   <button
-                    onClick={() => nextTrack()}
+                    onClick={() => runPlayerCommand('next')}
                     disabled={noTrack}
                     className="p-2 rounded-full transition-opacity hover:opacity-70"
                     style={{ color: txtPri }}
@@ -1359,6 +1367,7 @@ export default function WrldView(): JSX.Element {
                 lyrics entirely, rather than floating a queue popup over the
                 left column) so it gets the full column's height instead of
                 a cramped 300px-capped overlay. */}
+          {showLyricsColumn && (
             <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
               {showQueue && !radioFmActive ? (
                 <div className="h-full flex items-stretch justify-center px-6 xl:px-10 py-7">
@@ -1384,7 +1393,8 @@ export default function WrldView(): JSX.Element {
                 <LyricsPanel padded rawLyrics={rawLyrics} isSynced={isSynced} syncedLines={syncedLines} radioFmActive={radioFmActive} currentTrack={currentTrack} isEditor={isEditor} txtPri={txtPri} txtSec={txtSec} txtTer={txtTer} txtFaint={txtFaint} />
               )}
             </div>
-          </div>
+          )}
+            </div>
 
       </>
 
@@ -1553,21 +1563,17 @@ const FmLikeButton = memo(function FmLikeButton({ light }: { light: boolean }): 
 // (like LyricsPanel/FmProgressBar) so it reads the store directly instead of
 // drilling props from WrldView.
 const SongMenu = memo(function SongMenu({ light }: { light: boolean }): JSX.Element {
-  const { currentTrack, radioFmActive, radioFmNowPlaying, radioFmMatchedSong, likedTrackIds, toggleLike, setActiveView, setPendingEditorSongId } = useStore(useShallow(s => ({
+  const { currentTrack, radioFmActive, radioFmNowPlaying, radioFmMatchedSong, likedTrackIds, toggleLike } = useStore(useShallow(s => ({
     currentTrack: s.currentTrack,
     radioFmActive: s.radioFmActive,
     radioFmNowPlaying: s.radioFmNowPlaying,
     radioFmMatchedSong: s.radioFmMatchedSong,
     likedTrackIds: s.likedTrackIds,
     toggleLike: s.toggleLike,
-    setActiveView: s.setActiveView,
-    setPendingEditorSongId: s.setPendingEditorSongId,
   })))
   const canEdit = useCanEdit()
 
   const [open, setOpen] = useState(false)
-  const [showSongInfo, setShowSongInfo] = useState(false)
-  const [songInfoData, setSongInfoData] = useState<JWApiSong | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
 
   const currentSongId = !radioFmActive && currentTrack ? userApi.trackIdToSongId(currentTrack.id) : null
@@ -1576,13 +1582,11 @@ const SongMenu = memo(function SongMenu({ light }: { light: boolean }): JSX.Elem
   const fmSongId = radioFmActive ? (radioFmNowPlaying?.song_id ?? radioFmMatchedSong?.songId ?? null) : null
   const hasTarget = radioFmActive ? fmSongId != null : !!currentTrack
 
+  // Global infoSongId (not local state) so the info panel survives switching
+  // to another tab, which unmounts this view.
   const openInfo = (songId: number): void => {
     setOpen(false)
-    setSongInfoData(null)
-    setShowSongInfo(true)
-    apiFetch<JWApiSong>(`/songs/${songId}/`)
-      .then(song => setSongInfoData(song))
-      .catch(() => setShowSongInfo(false))
+    useStore.getState().setInfoSongId(songId)
   }
 
   if (!hasTarget) return <></>
@@ -1656,18 +1660,6 @@ const SongMenu = memo(function SongMenu({ light }: { light: boolean }): JSX.Elem
         document.body
       )}
 
-      {showSongInfo && createPortal(
-        <SongInfoModal
-          song={songInfoData}
-          onClose={() => { setShowSongInfo(false); setSongInfoData(null) }}
-          onEdit={canEdit ? (songId) => {
-            setShowSongInfo(false); setSongInfoData(null)
-            setPendingEditorSongId(songId)
-            setActiveView('editor')
-          } : undefined}
-        />,
-        document.body
-      )}
     </div>
   )
 })
@@ -1685,18 +1677,17 @@ const WrldQueuePanel = memo(function WrldQueuePanel({ onClose, variant }: {
   // 'panel' fills the desktop right column in place of the lyrics view.
   variant: 'inline' | 'sheet' | 'panel'
 }): JSX.Element {
-  const { queue, queueIndex, currentTrack, isPlaying, shuffle, radioMode, playTrack, jumpToTrack, removeFromQueue, clearQueue, reorderQueue, onLightBackdrop } = useStore(useShallow(s => ({
+  const { queue, queueIndex, currentTrack, isPlaying, shuffle, jumpToTrack, removeFromQueue, clearQueue, reorderQueue, reshuffleQueue, onLightBackdrop } = useStore(useShallow(s => ({
     queue: s.queue,
     queueIndex: s.queueIndex,
     currentTrack: s.currentTrack,
     isPlaying: s.isPlaying,
     shuffle: s.shuffle,
-    radioMode: s.radioMode,
-    playTrack: s.playTrack,
     jumpToTrack: s.jumpToTrack,
     removeFromQueue: s.removeFromQueue,
     clearQueue: s.clearQueue,
     reorderQueue: s.reorderQueue,
+    reshuffleQueue: s.reshuffleQueue,
     // Every label in here is hardcoded white, which only works over something
     // dark. The art background always is (it's dimmed to 0.22/0.45 brightness),
     // but the theme background is whatever the skin's surface is — so on a
@@ -1825,7 +1816,7 @@ const WrldQueuePanel = memo(function WrldQueuePanel({ onClose, variant }: {
                       track={track}
                       isActive={false}
                       isPlaying={false}
-                      onPlay={() => radioMode ? jumpToTrack(track) : playTrack(track)}
+                      onPlay={() => jumpToTrack(track, history.length - 1 - i)}
                     />
                   ))}
                   {!query && filtered.length > WRLD_MAX_HISTORY_SHOWN && (
@@ -1860,8 +1851,17 @@ const WrldQueuePanel = memo(function WrldQueuePanel({ onClose, variant }: {
 
         {filteredUpcoming.length > 0 ? (
           <div className="px-3 pt-3 pb-6">
-            <p className="text-white/50 text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold">
-              {query ? 'Results' : shuffle ? 'Shuffle' : 'Up Next'} · {filteredUpcoming.length}
+            <p className="text-white/50 text-[10px] uppercase tracking-widest px-1 mb-2 font-semibold flex items-center gap-1.5">
+              <span>{query ? 'Results' : shuffle ? 'Shuffle' : 'Up Next'} · {filteredUpcoming.length}</span>
+              {!query && shuffle && (
+                <button
+                  onClick={reshuffleQueue}
+                  title="Reshuffle"
+                  className="ml-auto p-1 -m-1 rounded text-white/50 hover:text-white/90 transition-colors"
+                >
+                  <RefreshCw size={11} />
+                </button>
+              )}
             </p>
             {filteredUpcoming.map(({ track, i }) => (
               <div
@@ -1878,7 +1878,7 @@ const WrldQueuePanel = memo(function WrldQueuePanel({ onClose, variant }: {
                   isActive={false}
                   isPlaying={false}
                   showDrag={!query}
-                  onPlay={() => playTrack(track, queue.slice(queueIndex + 1 + i))}
+                  onPlay={() => jumpToTrack(track, queueIndex + 1 + i)}
                   onRemove={() => removeFromQueue(queueIndex + 1 + i)}
                 />
               </div>

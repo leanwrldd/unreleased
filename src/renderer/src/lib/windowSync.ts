@@ -16,7 +16,7 @@ const SYNC_KEYS = [
   'theme', 'customSkins', 'accentColor', 'sidebarPosition', 'navOrder', 'navVisibility', 'appMenuPosition',
   'navControlOrder', 'navControlVisibility', 'settingsTab',
   'appTextScale', 'lyricsScale', 'lyricsAlign', 'lyricsBlur', 'appFont', 'lyricsFont', 'gradientsEnabled', 'surfaceGradientsEnabled',
-  'lyricsColorActive', 'lyricsColorInactive', 'lyricsBlurAmount',
+  'lyricsColorActive', 'lyricsColorInactive', 'lyricsBlurAmount', 'lyricsOverride', 'fullEraNames',
   'crossfadeEnabled', 'crossfadeDuration', 'pauseFadeEnabled', 'preferOgVersion',
   // Last.fm connect/disconnect can happen in the pop-out Settings window; the
   // session itself is in shared localStorage, but the scrobbler (main window
@@ -110,6 +110,14 @@ let playerCommandHandler: ((cmd: string, arg?: unknown) => void) | null = null
 export function registerPlayerCommandHandler(handler: (cmd: string, arg?: unknown) => void): () => void {
   playerCommandHandler = handler
   return () => { if (playerCommandHandler === handler) playerCommandHandler = null }
+}
+
+// Run a playback command inside the main renderer. Views such as WRLD render
+// their own transport controls, but the Player owns the real audio elements,
+// crossfade state, and restart semantics. Routing through this bridge keeps
+// those controls on the same path as the tray, hotkeys, and mini-player.
+export function runPlayerCommand(cmd: string, arg?: unknown): void {
+  playerCommandHandler?.(cmd, arg)
 }
 
 // Ask the main window to perform a playback action (play-pause, next, seek…).

@@ -5,7 +5,7 @@ import {
   Download, ArrowUpDown, ArrowUp, ArrowDown, Link, Check, Info, ListPlus, Heart,
   X, Pencil, PackageOpen, CheckSquare2, Square, MonitorSmartphone, Globe, Search,
   Filter, MoreHorizontal, Clipboard, Plus, ListMusic, Replace, Trash2,
-  FolderPlus, FilePlus, ExternalLink, FileText, RefreshCw,
+  FolderPlus, FilePlus, ExternalLink, FileText, RefreshCw, Upload,
 } from 'lucide-react'
 import { useStore, useStorePick } from '../store/useStore'
 import * as userApi from '../lib/userApi'
@@ -27,10 +27,11 @@ import {
   JWAPI_BASE,
 } from '../lib/juicewrldApi'
 import { getFileExt, getMediaType, toFileUrl } from '../lib/fileTypes'
+import { useMultiSelect } from '../hooks/useMultiSelect'
+import { ClampedMenu } from './ClampedMenu'
 import { Track } from '../types'
 import { ProgressiveCover } from './ProgressiveCover'
 import MediaLightbox, { LightboxItem } from './MediaLightbox'
-import SongInfoModal from './SongInfoModal'
 import TextFileViewer, { TextFileSource } from './TextFileViewer'
 
 type ViewMode = 'list' | 'grid'
@@ -202,7 +203,6 @@ export default function ApiFilesView(): JSX.Element {
   const playlistItemRef = useRef<HTMLButtonElement>(null)
   const playlistFlyoutRef = useRef<HTMLDivElement>(null)
   const [playlistFlyoutPos, setPlaylistFlyoutPos] = useState({ top: 0, left: 0 })
-  const [infoSong, setInfoSong] = useState<JWApiSong | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ entry: JWApiFileEntry; x: number; y: number } | null>(null)
   // Whether a right-clicked audio file actually has a matching song in the
   // Tracker — resolved lazily per path on menu-open (not for every row up
@@ -210,20 +210,10 @@ export default function ApiFilesView(): JSX.Element {
   // of opening the info modal on nothing. undefined = not looked up yet,
   // null = looked up, no match.
   const [trackerMatches, setTrackerMatches] = useState<Map<string, number | null>>(new Map())
-  // Clamped against the actual rendered size (not a static guess) — the
-  // menu's height varies with the entry type and canEdit, so a fixed guess
-  // undershoots near the screen edges and spills the menu off-screen.
-  // useLayoutEffect runs before paint, so there's no visible flash at (0,0).
+  // Position clamping is handled by the shared <ClampedMenu> at render time —
+  // this ref is kept only so the playlist flyout below can measure it.
   const ctxMenuRef = useRef<HTMLDivElement>(null)
   const [ctxMenuPos, setCtxMenuPos] = useState({ left: 0, top: 0 })
-  useLayoutEffect(() => {
-    const el = ctxMenuRef.current
-    if (!el || !ctxMenu) return
-    const rect = el.getBoundingClientRect()
-    const top = Math.max(8, Math.min(ctxMenu.y, window.innerHeight - rect.height - 8))
-    const left = Math.max(8, Math.min(ctxMenu.x, window.innerWidth - rect.width - 8))
-    setCtxMenuPos({ top, left })
-  }, [ctxMenu])
 
   // Closing/reopening the menu resets the playlist flyout so it never
   // re-opens against a different entry than the one it was populated for.
@@ -253,9 +243,9 @@ export default function ApiFilesView(): JSX.Element {
   const [searchLoading, setSearchLoading] = useState(false)
   const isSearching = debouncedSearch.trim().length > 0
 
-  // Multi-select state
-  const [selectMode, setSelectMode] = useState(false)
-  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set())
+  // Multi-select state — see the useMultiSelect() call further down (needs
+  // filteredEntries, which isn't defined yet here) for
+  // selectMode/selectedPaths/enterSelectMode/toggleSelect/exitSelectMode.
   const [zipStatus, setZipStatus] = useState<ZipStatus>('idle')
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -269,12 +259,14 @@ export default function ApiFilesView(): JSX.Element {
   // Local file management: right-click menu, plus the inline name editor that
   // doubles as "rename this entry" and "create a new file/folder here".
   const [localCtxMenu, setLocalCtxMenu] = useState<{ entry: LocalEntry; x: number; y: number } | null>(null)
-  const localCtxMenuRef = useRef<HTMLDivElement>(null)
-  const [localCtxMenuPos, setLocalCtxMenuPos] = useState({ left: 0, top: 0 })
   // Right-clicking the empty space around the entries — the folder's own menu
   // (new / view / sort / refresh), the way Explorer and Finder behave.
   const [bgCtxMenu, setBgCtxMenu] = useState<{ x: number; y: number } | null>(null)
   const [bgSubmenu, setBgSubmenu] = useState<'view' | 'sort' | null>(null)
+  // Position clamping for both menus is handled by the shared <ClampedMenu>
+  // at render time. bgCtxMenuRef/bgCtxMenuPos are kept only because the
+  // submenu below needs to measure the outer menu's *settled* clamped box —
+  // see ClampedMenu's onPositioned doc comment.
   const bgCtxMenuRef = useRef<HTMLDivElement>(null)
   const [bgCtxMenuPos, setBgCtxMenuPos] = useState({ left: 0, top: 0 })
   const bgViewItemRef = useRef<HTMLButtonElement>(null)
@@ -285,26 +277,6 @@ export default function ApiFilesView(): JSX.Element {
   const [nameDraft, setNameDraft] = useState('')
   const [nameError, setNameError] = useState<string | null>(null)
   const [nameBusy, setNameBusy] = useState(false)
-
-  useLayoutEffect(() => {
-    const el = localCtxMenuRef.current
-    if (!el || !localCtxMenu) return
-    const rect = el.getBoundingClientRect()
-    setLocalCtxMenuPos({
-      top: Math.max(8, Math.min(localCtxMenu.y, window.innerHeight - rect.height - 8)),
-      left: Math.max(8, Math.min(localCtxMenu.x, window.innerWidth - rect.width - 8)),
-    })
-  }, [localCtxMenu])
-
-  useLayoutEffect(() => {
-    const el = bgCtxMenuRef.current
-    if (!el || !bgCtxMenu) return
-    const rect = el.getBoundingClientRect()
-    setBgCtxMenuPos({
-      top: Math.max(8, Math.min(bgCtxMenu.y, window.innerHeight - rect.height - 8)),
-      left: Math.max(8, Math.min(bgCtxMenu.x, window.innerWidth - rect.width - 8)),
-    })
-  }, [bgCtxMenu])
 
   // Reopening the menu elsewhere must not carry a stale submenu with it.
   useEffect(() => { setBgSubmenu(null) }, [bgCtxMenu])
@@ -339,6 +311,13 @@ export default function ApiFilesView(): JSX.Element {
     const el = (window as any).electron
     if (!el) return
     await el.openPath(filePath)
+  }
+
+  const uploadLocalFiles = async (): Promise<void> => {
+    const el = (window as any).electron
+    if (!el || !localPath) return
+    const result = await el.localUpload(localPath)
+    if (result?.ok) await browseLocal(localPath)
   }
 
   // ── Local file management ──────────────────────────────────────────────────
@@ -581,14 +560,6 @@ export default function ApiFilesView(): JSX.Element {
     navigateRef.current('', false)
   }, [activeChannel]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ESC exits select mode
-  useEffect(() => {
-    if (!selectMode) return
-    const handleKeyDown = (e: KeyboardEvent): void => { if (e.key === 'Escape') exitSelectMode() }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectMode]) // eslint-disable-line react-hooks/exhaustive-deps
-
   // ESC closes an open context menu, like a native one. Registered separately
   // from the select-mode handler so it works whether or not that's active.
   useEffect(() => {
@@ -620,10 +591,10 @@ export default function ApiFilesView(): JSX.Element {
     try {
       const data = await apiFetch<JWApiPaginatedResponse>('/songs/', { search: title, page_size: 5 })
       const match = data.results[0] ?? null
-      setInfoSong(match)
-    } catch {
-      setInfoSong(null)
-    }
+      // Global infoSongId (not local state) so the info panel survives
+      // switching to another tab, which unmounts this view.
+      if (match) useStore.getState().setInfoSongId(match.id)
+    } catch { /* no match — leave whatever's already open (if anything) alone */ }
   }
 
   // Resolves (and caches) whether an audio file has a matching Tracker entry,
@@ -646,11 +617,21 @@ export default function ApiFilesView(): JSX.Element {
 
   // `marker` only drives the confirmation toast — any non-empty string will do.
   const copyTextToClipboard = (text: string, what: 'link' | 'path', marker = text): void => {
-    navigator.clipboard.writeText(text).then(() => {
+    const showConfirmed = (): void => {
       setCopiedPath(marker)
       setCopiedKind(what)
       setTimeout(() => setCopiedPath(null), 1800)
-    })
+    }
+    // Electron: use the native clipboard bridge (main.js's 'copy-text-to-clipboard'
+    // handler) instead of navigator.clipboard — the app's permission handler
+    // denies every web permission request by default, clipboard-write included,
+    // so navigator.clipboard.writeText silently fails here (same pattern
+    // SongContextMenu's "Copy path" already uses correctly).
+    const el = (window as any).electron
+    const write = el?.copyTextToClipboard
+      ? el.copyTextToClipboard(text)
+      : navigator.clipboard.writeText(text)
+    write.then(showConfirmed).catch((e: unknown) => console.error('[copy] failed:', e))
   }
 
   const copyToClipboard = (entry: JWApiFileEntry, text: string, what: 'link' | 'path'): void =>
@@ -707,7 +688,11 @@ export default function ApiFilesView(): JSX.Element {
   }
 
   const openLightbox = (entry: JWApiFileEntry): void => {
-    const mediaEntries = entries.filter((e) => {
+    // While searching, the clicked entry can live in a folder other than the
+    // one currently browsed — `entries` (the current folder's listing) won't
+    // contain it, so the gallery has to be built from the search results
+    // themselves instead.
+    const mediaEntries = (isSearching ? searchResults : entries).filter((e) => {
       const mt = getMediaType(e.name)
       return e.type === 'file' && (mt === 'image' || mt === 'video')
     })
@@ -753,27 +738,10 @@ export default function ApiFilesView(): JSX.Element {
   }
 
   // ── Selection helpers ──────────────────────────────────────────────────────
-
-  const enterSelectMode = (entry: JWApiFileEntry): void => {
-    setSelectMode(true)
-    setSelectedPaths(new Set([entry.path]))
-    setCtxMenu(null)
-  }
-
-  const toggleSelect = (path: string): void => {
-    setSelectedPaths(prev => {
-      const next = new Set(prev)
-      if (next.has(path)) next.delete(path)
-      else next.add(path)
-      return next
-    })
-  }
-
-  const exitSelectMode = (): void => {
-    setSelectMode(false)
-    setSelectedPaths(new Set())
-    setZipStatus('idle')
-  }
+  // enterSelectMode/toggleSelect/exitSelectMode are defined further down,
+  // right after the useMultiSelect() call (needs filteredEntries) — this
+  // closure only runs later, on an actual long-press, so referencing them
+  // here before that point is fine.
 
   const handleLongPressStart = (entry: JWApiFileEntry): void => {
     longPressTimer.current = setTimeout(() => enterSelectMode(entry), 500)
@@ -824,7 +792,7 @@ export default function ApiFilesView(): JSX.Element {
     }
   }
 
-  const downloadZip = (): Promise<void> => startZip([...selectedPaths], 'selection.zip')
+  const downloadZip = (): Promise<void> => startZip([...selectedPaths.keys()], 'selection.zip')
 
   const downloadFolder = (entry: JWApiFileEntry): Promise<void> => startZip([entry.path], `${entry.name}.zip`)
 
@@ -843,6 +811,26 @@ export default function ApiFilesView(): JSX.Element {
       : sortedEntries.filter((e) => e.type === 'directory' || getMediaType(e.name) === typeFilter),
     [sortedEntries, typeFilter]
   )
+
+  // Multi-select — select mode, the selected-paths Map, Escape-to-exit, and
+  // Ctrl/Cmd+A "select all" are handled by the shared hook. Value === key
+  // (path) here since there's nothing extra to carry per entry — `.has()`/
+  // `.size` behave the same as the old Set<string>; only spreads need
+  // `.keys()` now instead of spreading the Map itself.
+  const {
+    selectMode, selected: selectedPaths, selectMany: selectManyPaths, toggle,
+    exitSelectMode, selectAll: selectAllEntries, clear: clearSelection,
+  } = useMultiSelect<string>({
+    onExit: () => setZipStatus('idle'),
+    ctrlA: {
+      getAll: () => new Map(filteredEntries.map(e => [e.path, e.path])),
+    },
+  })
+  const enterSelectMode = (entry: JWApiFileEntry): void => {
+    selectManyPaths(new Map([[entry.path, entry.path]]))
+    setCtxMenu(null)
+  }
+  const toggleSelect = (path: string): void => toggle(path, path)
 
   const filteredLocalEntries = useMemo(
     () => typeFilter === 'all'
@@ -1233,7 +1221,12 @@ export default function ApiFilesView(): JSX.Element {
           </div>
         )}
         {/* Content */}
-        {!localMode && <div className="flex-1 overflow-y-auto px-5 pb-4">
+        {!localMode && <div
+          className="flex-1 overflow-y-auto px-5 pb-4"
+          // Entry rows stop propagation and open their own menu, so anything
+          // reaching here is genuinely the background.
+          onContextMenu={(e) => { e.preventDefault(); setBgCtxMenu({ x: e.clientX, y: e.clientY }) }}
+        >
           {(isSearching ? searchLoading : loading) ? (
             <div className="flex items-center justify-center h-40 gap-2 text-text-muted">
               <Loader2 size={18} className="animate-spin" /><span className="text-sm">{isSearching ? 'Searching…' : 'Loading…'}</span>
@@ -1276,7 +1269,6 @@ export default function ApiFilesView(): JSX.Element {
                     }`}
                     onClick={(e) => {
                       if (e.ctrlKey || e.metaKey) {
-                        if (!selectMode) setSelectMode(true)
                         toggleSelect(entry.path)
                         return
                       }
@@ -1286,7 +1278,7 @@ export default function ApiFilesView(): JSX.Element {
                       else if (mt === 'text') openApiText(entry)
                     }}
                     onDoubleClick={() => { if (!selectMode && mt === 'audio') handlePlay(entry) }}
-                    onContextMenu={e => { e.preventDefault(); openContextMenu(entry, e.clientX, e.clientY) }}
+                    onContextMenu={e => { e.preventDefault(); e.stopPropagation(); openContextMenu(entry, e.clientX, e.clientY) }}
                     onTouchStart={() => handleLongPressStart(entry)}
                     onTouchEnd={handleLongPressEnd}
                   >
@@ -1386,7 +1378,6 @@ export default function ApiFilesView(): JSX.Element {
                     }`}
                     onClick={(e) => {
                       if (e.ctrlKey || e.metaKey) {
-                        if (!selectMode) setSelectMode(true)
                         toggleSelect(entry.path)
                         return
                       }
@@ -1396,7 +1387,7 @@ export default function ApiFilesView(): JSX.Element {
                       else if (mt === 'audio') handlePlay(entry)
                       else if (mt === 'text') openApiText(entry)
                     }}
-                    onContextMenu={e => { e.preventDefault(); openContextMenu(entry, e.clientX, e.clientY) }}
+                    onContextMenu={e => { e.preventDefault(); e.stopPropagation(); openContextMenu(entry, e.clientX, e.clientY) }}
                     onTouchStart={() => handleLongPressStart(entry)}
                     onTouchEnd={handleLongPressEnd}
                   >
@@ -1504,13 +1495,13 @@ export default function ApiFilesView(): JSX.Element {
               {selectedPaths.size} {selectedPaths.size === 1 ? 'item' : 'items'} selected
             </span>
             <button
-              onClick={() => setSelectedPaths(new Set(filteredEntries.map(e => e.path)))}
+              onClick={selectAllEntries}
               className="text-xs text-text-muted hover:text-text-primary px-2 py-1 rounded transition-colors"
             >
               Select all
             </button>
             <button
-              onClick={() => setSelectedPaths(new Set())}
+              onClick={clearSelection}
               className="text-xs text-text-muted hover:text-text-primary px-2 py-1 rounded transition-colors"
             >
               Clear
@@ -1596,11 +1587,12 @@ export default function ApiFilesView(): JSX.Element {
       {!localMode && ctxMenu && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setCtxMenu(null)} />
-          <div
+          <ClampedMenu
             ref={ctxMenuRef}
-            className="fixed z-50 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[180px]"
-            style={{ left: ctxMenuPos.left, top: ctxMenuPos.top }}
-            onClick={e => e.stopPropagation()}
+            x={ctxMenu.x}
+            y={ctxMenu.y}
+            className="min-w-[180px]"
+            onPositioned={setCtxMenuPos}
           >
             {/* Playlist flyout — a child of the menu so the click-away overlay
                 still counts clicks in it as "inside", but positioned beside it. */}
@@ -1745,7 +1737,7 @@ export default function ApiFilesView(): JSX.Element {
                 <Download size={14} className="text-text-muted" /> Download
               </button>
             )}
-          </div>
+          </ClampedMenu>
         </>
       )}
 
@@ -1755,12 +1747,7 @@ export default function ApiFilesView(): JSX.Element {
       {localMode && localCtxMenu && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setLocalCtxMenu(null)} />
-          <div
-            ref={localCtxMenuRef}
-            className="fixed z-50 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[190px]"
-            style={{ left: localCtxMenuPos.left, top: localCtxMenuPos.top }}
-            onClick={e => e.stopPropagation()}
-          >
+          <ClampedMenu x={localCtxMenu.x} y={localCtxMenu.y} className="min-w-[190px]">
             {localCtxMenu.entry.type === 'directory' ? (
               <button onClick={() => { browseLocal(localCtxMenu.entry.path); setLocalCtxMenu(null) }}
                 className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors">
@@ -1799,20 +1786,22 @@ export default function ApiFilesView(): JSX.Element {
               className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-red-400 hover:bg-surface-overlay transition-colors">
               <Trash2 size={14} /> Delete
             </button>
-          </div>
+          </ClampedMenu>
         </>
       )}
 
-      {/* Background (empty-space) menu for the local folder — the Explorer /
-          Finder equivalent: View, Sort by, Refresh, New, Open in file manager. */}
-      {localMode && bgCtxMenu && (
+      {/* Background (empty-space) menu for the current folder — the Explorer /
+          Finder equivalent: View, Sort by, Refresh, plus local-only New /
+          Open in file manager, or API-only Copy link. */}
+      {bgCtxMenu && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setBgCtxMenu(null)} onContextMenu={(e) => { e.preventDefault(); setBgCtxMenu(null) }} />
-          <div
+          <ClampedMenu
             ref={bgCtxMenuRef}
-            className="fixed z-50 bg-surface border border-[var(--border)] rounded-xl shadow-2xl py-1 min-w-[190px]"
-            style={{ left: bgCtxMenuPos.left, top: bgCtxMenuPos.top }}
-            onClick={e => e.stopPropagation()}
+            x={bgCtxMenu.x}
+            y={bgCtxMenu.y}
+            className="min-w-[190px]"
+            onPositioned={setBgCtxMenuPos}
             // Hovering a submenu row opens it, hovering anything else closes
             // it — the way a native submenu behaves.
             onMouseOver={(e) => {
@@ -1889,52 +1878,86 @@ export default function ApiFilesView(): JSX.Element {
               <ChevronRight size={13} className="text-text-muted" />
             </button>
             <button
-              onClick={() => { browseLocal(localPath); setBgCtxMenu(null) }}
+              onClick={() => {
+                if (localMode) browseLocal(localPath)
+                else navigate(currentPath, false)
+                setBgCtxMenu(null)
+              }}
               className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
             >
               <RefreshCw size={14} className="text-text-muted" /> Refresh
             </button>
+            {localMode && (
+              <>
+                <div className="border-t border-[var(--border)] my-1" />
+                <button
+                  onClick={() => startCreate('directory')}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
+                >
+                  <FolderPlus size={14} className="text-text-muted" /> New folder
+                </button>
+                <button
+                  onClick={() => startCreate('file')}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
+                >
+                  <FilePlus size={14} className="text-text-muted" /> New file
+                </button>
+                <button
+                  onClick={() => { uploadLocalFiles(); setBgCtxMenu(null) }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
+                >
+                  <Upload size={14} className="text-text-muted" /> Upload file
+                </button>
+              </>
+            )}
+            {!localMode && canPropose && (
+              <>
+                <div className="border-t border-[var(--border)] my-1" />
+                <button
+                  onClick={() => {
+                    setPendingCompProposal({ paths: [currentPath], changeType: 'upload' })
+                    setBgCtxMenu(null)
+                    setActiveView('contributor')
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
+                >
+                  <Upload size={14} className="text-text-muted" /> Upload file
+                </button>
+              </>
+            )}
             <div className="border-t border-[var(--border)] my-1" />
             <button
-              onClick={() => startCreate('directory')}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
-            >
-              <FolderPlus size={14} className="text-text-muted" /> New folder
-            </button>
-            <button
-              onClick={() => startCreate('file')}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
-            >
-              <FilePlus size={14} className="text-text-muted" /> New file
-            </button>
-            <div className="border-t border-[var(--border)] my-1" />
-            <button
-              onClick={() => { copyTextToClipboard(localPath, 'path'); setBgCtxMenu(null) }}
+              onClick={() => {
+                if (localMode) copyTextToClipboard(localPath, 'path')
+                else copyTextToClipboard(currentPath, 'path')
+                setBgCtxMenu(null)
+              }}
               className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
             >
               <Clipboard size={14} className="text-text-muted" /> Copy folder path
             </button>
-            <button
-              onClick={() => { openLocalFile(localPath); setBgCtxMenu(null) }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
-            >
-              <ExternalLink size={14} className="text-text-muted" /> Open in file manager
-            </button>
-          </div>
+            {localMode ? (
+              <button
+                onClick={() => { openLocalFile(localPath); setBgCtxMenu(null) }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
+              >
+                <ExternalLink size={14} className="text-text-muted" /> Open in file manager
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  copyTextToClipboard(window.location.origin + pathToUrl(currentPath), 'link')
+                  setBgCtxMenu(null)
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-sm text-text-primary hover:bg-surface-overlay transition-colors"
+              >
+                <Link size={14} className="text-text-muted" /> Copy folder link
+              </button>
+            )}
+          </ClampedMenu>
         </>
       )}
 
-      {infoSong && (
-        <SongInfoModal
-          song={infoSong}
-          onClose={() => setInfoSong(null)}
-          onEdit={canEdit ? (songId) => {
-            setInfoSong(null)
-            setPendingEditorSongId(songId)
-            setActiveView('editor')
-          } : undefined}
-        />
-      )}
     </>
   )
 }

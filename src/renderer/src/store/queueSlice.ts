@@ -19,6 +19,7 @@ import { getOwnVersionMeta, getVersionGroup } from '../lib/versionsApi'
 import type { SongVersionMeta } from '../lib/versionsApi'
 import { peekSongPref, hasAnyDefaultVersion } from '../lib/songPrefs'
 import { ls } from '../lib/persist'
+import { resolveQueueContext } from './queueContext'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,14 @@ export interface QueueSlice {
   shuffle: boolean
   repeat: 'none' | 'all' | 'one'
 
+  /**
+   * The queue's tracks in their un-shuffled, source order — the reference used
+   * to put the upcoming portion back when shuffle is switched off. Kept as a
+   * separate list rather than derived from `queue`, since `queue` may have been
+   * shuffled any number of times since. Null in radio mode (no real queue).
+   */
+  queueOriginal: Track[] | null
+
   // Lazy loading (non-radio mode)
   queueFilter: QueueFilter | null
   /** True while a background page fetch is in flight. */
@@ -78,6 +87,10 @@ export interface QueueSlice {
    * `filter` enables lazy loading beyond the initial context.
    * Does NOT activate radio mode — use `startRadio` for that.
    */
+  /**
+   * Start playback. Omitting `context` means standalone playback; callers
+   * representing a collection must pass its tracks explicitly.
+   */
   playTrack: (track: Track, context?: Track[], filter?: QueueFilter | null, source?: 'tracker' | 'playlist' | null) => void
 
   /**
@@ -90,15 +103,20 @@ export interface QueueSlice {
   /**
    * Start radio mode. The queue is seeded with `track` only;
    * subsequent songs come from /radio/random/ one at a time.
+   *
+   * `keepPlayState` — when true, leaves isPlaying as it already was instead
+   * of forcing it on. Use this for "activate radio as a side effect of some
+   * other toggle" call sites (turning shuffle on); leave it unset for an
+   * explicit "play this track" action, where forcing playback on is correct.
    */
-  startRadio: (track: Track, filter?: { category: string; era: string; search: string; total: number } | null) => void
+  startRadio: (track: Track, filter?: { category: string; era: string; search: string; total: number } | null, opts?: { keepPlayState?: boolean }) => void
   /** Exit radio mode, keep current track playing. */
   stopRadio: () => void
 
   /** Advance to the next track. Returns the track, or null if playback stops. */
   nextTrack: () => Track | null
 
-  /** Go back one track (or restart if >3 s in). */
+  /** Move one position back in the queue. Restart semantics belong to Player. */
   prevTrack: () => Track | null
 
   /**
@@ -110,6 +128,7 @@ export interface QueueSlice {
   jumpToTrack: (track: Track, absoluteIndex?: number) => void
 
   toggleShuffle: () => void
+  reshuffleQueue: () => void
   toggleRepeat: () => void
 
   setIsPlaying: (playing: boolean) => void
@@ -246,6 +265,7 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
   // restoring it would resume fetching random songs nobody asked for.
   shuffle: ls.get<boolean>('shuffle') ?? false,
   repeat: ls.get<'none' | 'all' | 'one'>('repeat') ?? 'none',
+  queueOriginal: null,
   queueFilter: null,
   queueLoadingMore: false,
   queueSource: null,
@@ -261,9 +281,11 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
 
   // ── playTrack ──────────────────────────────────────────────────────────────
   playTrack: (track, context?, filter = null, source = null) => {
-    const tracks: Track[] = context ?? (get().queue as Track[])
-    let idx = tracks.findIndex((t: Track) => t.id === track.id)
-    if (idx < 0) idx = 0
+    // Without an explicit context this is a standalone play request, not a
+    // request to graft the song onto whatever queue happened to be active.
+    // Always keep currentTrack aligned with queue[queueIndex], including when
+    // a malformed/partial context does not contain the requested track.
+    const { tracks, index: idx } = resolveQueueContext(track, context)
 
     const { shuffle } = get()
     let finalQueue = tracks
@@ -275,6 +297,9 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
 
     set({
       queue: finalQueue,
+      // `tracks` is the context as the view listed it, before the shuffle
+      // above — exactly what turning shuffle back off should restore to.
+      queueOriginal: tracks,
       queueIndex: idx,
       currentTrack: track,
       currentTrackFull: null,
@@ -298,6 +323,10 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
     if (get().shuffle && source !== 'tracker') {
       const shuffled = fisherYates(tracks)
       get().playTrack(shuffled[0], shuffled, filter, source)
+      // playTrack only ever sees the pre-shuffled list, so hand it the real
+      // source order — otherwise switching shuffle off would "restore" to this
+      // shuffle.
+      set({ queueOriginal: tracks })
     } else {
       get().playTrack(tracks[0], tracks, filter, source)
     }
@@ -309,14 +338,15 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
   },
 
   // ── startRadio ─────────────────────────────────────────────────────────────
-  startRadio: (track, filter = null) => {
+  startRadio: (track, filter = null, opts) => {
     _radioSession++
     set({
       queue: [track],
+      queueOriginal: null,
       queueIndex: 0,
       currentTrack: track,
       currentTrackFull: null,
-      isPlaying: true,
+      isPlaying: opts?.keepPlayState ? get().isPlaying : true,
       queueFilter: null,
       queueLoadingMore: false,
       radioMode: true,
@@ -324,8 +354,15 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       radioNext: null,
       _radioWaiting: false,
       radioFmActive: false,
-      progress: 0,
-      currentTime: 0,
+      // Same reasoning as isPlaying above: when reusing the already-current
+      // track (keepPlayState), the real <audio> element's position was never
+      // actually touched (nothing here changes currentTrack.id, so the
+      // load/seek effect never re-fires) — resetting these to 0 would just
+      // make the displayed time lie about where playback really is, most
+      // visibly while paused (no 'timeupdate' event ever arrives to correct
+      // it back).
+      progress: opts?.keepPlayState ? get().progress : 0,
+      currentTime: opts?.keepPlayState ? get().currentTime : 0,
     })
     get()._prefetchRadioTrack()
     get()._maybeSwapToPreferredVersion(track)
@@ -399,19 +436,8 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
 
   // ── prevTrack ──────────────────────────────────────────────────────────────
   prevTrack: () => {
-    const { queue, queueIndex, currentTime, radioMode } = get()
+    const { queue, queueIndex } = get()
     if (queue.length === 0) return null
-
-    // In radio mode, only allow restarting the current track
-    if (radioMode) {
-      set({ currentTime: 0, progress: 0 })
-      return get().currentTrack
-    }
-
-    if (currentTime > 3) {
-      set({ currentTime: 0, progress: 0 })
-      return get().currentTrack
-    }
 
     const prevIdx = Math.max(0, queueIndex - 1)
     const track = queue[prevIdx]
@@ -428,20 +454,35 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       : queue.findIndex((t: Track) => t.id === track.id)
     if (idx < 0) return
     set({ queueIndex: idx, currentTrack: track, currentTrackFull: null, isPlaying: true, progress: 0, currentTime: 0 })
+    get()._loadMore()
     get()._maybeSwapToPreferredVersion(track)
   },
 
   // ── toggleShuffle ──────────────────────────────────────────────────────────
   toggleShuffle: () => {
-    const { shuffle, queue, queueIndex, queueFilter, radioMode, currentTrack, queueSource } = get()
+    const { shuffle, queue, queueIndex, queueFilter, radioMode, currentTrack, queueSource, queueOriginal } = get()
     const newShuffle = !shuffle
     // Written once up front so every branch below (including the radio-mode
     // early return) leaves storage agreeing with the resulting state.
     ls.set('shuffle', newShuffle)
 
     if (!newShuffle) {
-      // Turning OFF: exit radio mode if active, resume linear playback
-      set({ shuffle: false, radioMode: false, radioNext: null, _radioWaiting: false })
+      // Turning OFF: exit radio mode if active, resume linear playback.
+      //
+      // The queue goes back to being the source list itself, with the playing
+      // track located in it — so what's up next is whatever follows it in the
+      // playlist, and Previous plays what precedes it there. The shuffled
+      // play history is deliberately dropped: once shuffle is off, "the song
+      // before this one" means the playlist's, not the random one that
+      // happened to play. Radio has no source list to go back to (its queue is
+      // only history), so it just stops.
+      const idx = queueOriginal && currentTrack
+        ? queueOriginal.findIndex((t: Track) => t.id === currentTrack.id)
+        : -1
+      const restored = (!radioMode && queueOriginal && idx >= 0)
+        ? { queue: [...queueOriginal], queueIndex: idx }
+        : {}
+      set({ shuffle: false, radioMode: false, radioNext: null, _radioWaiting: false, ...restored })
       return
     }
 
@@ -456,11 +497,49 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       const rf = queueFilter
         ? { category: queueFilter.category, era: queueFilter.era, search: queueFilter.search, total: queueFilter.total }
         : null
-      get().startRadio(currentTrack, rf)
+      get().startRadio(currentTrack, rf, { keepPlayState: true })
       return
     }
 
     // Turning ON (playlist/files/non-tracker): shuffle the upcoming portion
+    const played = queue.slice(0, queueIndex + 1)
+    const upcoming = fisherYates(queue.slice(queueIndex + 1))
+    set({ shuffle: true, queue: [...played, ...upcoming] })
+  },
+
+  // ── reshuffleQueue ─────────────────────────────────────────────────────────
+  // Re-rolls a fresh random order for what's still upcoming, regardless of
+  // whether shuffle was already on — unlike toggleShuffle, which only
+  // randomizes on the OFF→ON transition and otherwise just flips shuffle off.
+  reshuffleQueue: () => {
+    const { currentTrack, queue, queueIndex, queueFilter, radioMode, queueSource } = get()
+    if (!currentTrack) return
+    ls.set('shuffle', true)
+
+    if (radioMode) {
+      // Already mid radio session — only re-roll the next-up prediction.
+      // Reusing startRadio here (like the branch below does) would restart
+      // the currently playing track from 0, force-resume it if paused, and
+      // wipe this session's history — none of that belongs to "give me a
+      // different next song." Bumping _radioSession invalidates any prefetch
+      // already in flight so a stale response can't clobber this one.
+      set({ shuffle: true, radioNext: null })
+      _radioSession++
+      get()._prefetchRadioTrack()
+      return
+    }
+
+    if (queueSource === 'tracker' && currentTrack) {
+      // Not in radio mode yet — same as toggleShuffle's tracker branch,
+      // starting a fresh radio session from the current track.
+      set({ shuffle: true })
+      const rf = queueFilter
+        ? { category: queueFilter.category, era: queueFilter.era, search: queueFilter.search, total: queueFilter.total }
+        : null
+      get().startRadio(currentTrack, rf, { keepPlayState: true })
+      return
+    }
+
     const played = queue.slice(0, queueIndex + 1)
     const upcoming = fisherYates(queue.slice(queueIndex + 1))
     set({ shuffle: true, queue: [...played, ...upcoming] })
@@ -475,24 +554,59 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
   },
 
   // ── Queue editing ──────────────────────────────────────────────────────────
-  addToQueue: (track) => set((s: QueueSlice) => ({ queue: [...s.queue, track] })),
+  // Each of these mirrors its edit into queueOriginal, so that switching
+  // shuffle off later restores a list the user still recognises — with their
+  // hand-queued tracks in it and their removals honoured — instead of the
+  // pristine playlist the session happened to start from.
+  addToQueue: (track) =>
+    set((s: QueueSlice) => ({
+      queue: [...s.queue, track],
+      queueOriginal: s.queueOriginal ? [...s.queueOriginal, track] : null,
+    })),
 
   playNext: (track) =>
     set((s: QueueSlice) => {
       const after = s.queueIndex + 1
-      return { queue: [...s.queue.slice(0, after), track, ...s.queue.slice(after)] }
+      // Positioned relative to the current track in *each* list: the shuffled
+      // queue and the source order disagree about where that track sits.
+      const cur = s.queue[s.queueIndex]
+      const oAfter = s.queueOriginal && cur
+        ? s.queueOriginal.findIndex((t) => t.id === cur.id) + 1
+        : 0
+      return {
+        queue: [...s.queue.slice(0, after), track, ...s.queue.slice(after)],
+        queueOriginal: s.queueOriginal && oAfter > 0
+          ? [...s.queueOriginal.slice(0, oAfter), track, ...s.queueOriginal.slice(oAfter)]
+          : s.queueOriginal,
+      }
     }),
 
   removeFromQueue: (index) =>
     set((s: QueueSlice) => {
       const next = s.queue.filter((_, i) => i !== index)
       const newIndex = index <= s.queueIndex ? Math.max(0, s.queueIndex - 1) : s.queueIndex
-      return { queue: next, queueIndex: newIndex }
+      // Matched by id — the two lists are ordered differently, so the index
+      // doesn't carry across. A duplicated track loses its first copy, which
+      // is indistinguishable from the removed one anyway.
+      const removed = s.queue[index]
+      let dropped = false
+      return {
+        queue: next,
+        queueIndex: newIndex,
+        queueOriginal: s.queueOriginal && removed
+          ? s.queueOriginal.filter((t) => {
+              if (dropped || t.id !== removed.id) return true
+              dropped = true
+              return false
+            })
+          : s.queueOriginal,
+      }
     }),
 
   clearQueue: () =>
     set((s: QueueSlice) => ({
       queue: s.currentTrack ? [s.currentTrack] : [],
+      queueOriginal: s.currentTrack ? [s.currentTrack] : null,
       queueIndex: 0,
       radioMode: false,
       radioNext: null,
@@ -505,7 +619,12 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
       const upcoming = [...s.queue.slice(base)]
       const [moved] = upcoming.splice(fromIdx, 1)
       upcoming.splice(toIdx, 0, moved)
-      return { queue: [...s.queue.slice(0, base), ...upcoming] }
+      const next = [...s.queue.slice(0, base), ...upcoming]
+      // With shuffle off the two lists are the same order, so a drag is really
+      // an edit to the source order and has to stick. While shuffled they've
+      // diverged and these indices mean nothing in the source list — the drag
+      // is just a tweak to this shuffle, discarded when it ends.
+      return { queue: next, queueOriginal: s.shuffle ? s.queueOriginal : next }
     }),
 
   // ── Lazy loading (non-radio) ───────────────────────────────────────────────
@@ -527,7 +646,7 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
     })
       .then((data) => {
         const newTracks = data.results.filter((s) => !!s.path).map(songToTrack)
-        const { queue: q, queueIndex: qi, shuffle: isShuffle, queueFilter: qf } = get()
+        const { queue: q, queueIndex: qi, shuffle: isShuffle, queueFilter: qf, queueOriginal: qo } = get()
         if (!qf) return
 
         let nextQueue: Track[]
@@ -541,6 +660,10 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
 
         set({
           queue: nextQueue,
+          // A page arrives in source order, so it extends the reference order
+          // as-is even when the copies going into `queue` were scattered
+          // randomly through the upcoming tracks above.
+          queueOriginal: qo ? [...qo, ...newTracks] : null,
           queueLoadingMore: false,
           queueFilter: { ...qf, page: qf.page + 1, hasMore: data.next !== null },
         })
@@ -613,6 +736,10 @@ export const createQueueSlice: StateCreator<any, [], [], QueueSlice> = (set, get
           currentTrack: swapped,
           currentTrackFull: null,
           queue: state.queue.map((t: Track) => (t.id === track.id ? swapped : t)),
+          // Same substitution in the source order, or turning shuffle off
+          // couldn't find the now-playing track there and would leave the
+          // queue shuffled.
+          queueOriginal: state.queueOriginal?.map((t: Track) => (t.id === track.id ? swapped : t)) ?? null,
         })
       })
       .catch(() => {})
